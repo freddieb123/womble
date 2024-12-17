@@ -17,6 +17,7 @@ export default function ChatInterface({ config }: Props) {
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [voiceOnlyMode, setVoiceOnlyMode] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const speechQueue = useRef<string[]>([]);
@@ -71,7 +72,13 @@ export default function ChatInterface({ config }: Props) {
         const transcript = Array.from(event.results)
           .map(result => result[0].transcript)
           .join('');
-        setInput(transcript);
+        
+        // In voice-only mode, send message immediately when we detect the end of speech
+        if (voiceOnlyMode && event.results[event.results.length - 1].isFinal) {
+          sendMessage.mutate(transcript);
+        } else {
+          setInput(transcript);
+        }
       };
 
       recognitionRef.current.onerror = (event) => {
@@ -224,37 +231,48 @@ export default function ChatInterface({ config }: Props) {
         </div>
       </ScrollArea>
 
-      <form onSubmit={handleSubmit} className="p-4 border-t flex gap-2">
+      <div className="p-4 border-t flex gap-2">
+        {!voiceOnlyMode && (
+          <form onSubmit={handleSubmit} className="flex gap-2 flex-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setVoiceEnabled(!voiceEnabled);
+                if (voiceEnabled) {
+                  window.speechSynthesis.cancel();
+                  setIsSpeaking(false);
+                  speechQueue.current = [];
+                }
+              }}
+              className={voiceEnabled ? "bg-blue-50" : ""}
+            >
+              {voiceEnabled ? (
+                <Volume2 className="h-4 w-4 text-blue-500" />
+              ) : (
+                <VolumeX className="h-4 w-4" />
+              )}
+            </Button>
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Type your message..."
+              className="flex-1"
+              disabled={sendMessage.isPending}
+            />
+            <Button 
+              type="submit" 
+              disabled={sendMessage.isPending || !input.trim()}
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </form>
+        )}
+        
         <Button
           type="button"
-          variant="outline"
-          onClick={() => {
-            setVoiceEnabled(!voiceEnabled);
-            if (voiceEnabled) {
-              window.speechSynthesis.cancel();
-              setIsSpeaking(false);
-              speechQueue.current = [];
-            }
-          }}
-          className={voiceEnabled ? "bg-blue-50" : ""}
-        >
-          {voiceEnabled ? (
-            <Volume2 className="h-4 w-4 text-blue-500" />
-          ) : (
-            <VolumeX className="h-4 w-4" />
-          )}
-        </Button>
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={isRecording ? "Listening..." : "Type your message..."}
-          className="flex-1"
-          disabled={sendMessage.isPending}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          className={isRecording ? "bg-red-50" : ""}
+          variant={voiceOnlyMode ? "default" : "outline"}
+          className={`${isRecording ? "bg-red-50" : ""} ${voiceOnlyMode ? "bg-blue-500 hover:bg-blue-600" : ""}`}
           onClick={() => {
             if (!recognitionRef.current) {
               toast({
@@ -273,21 +291,36 @@ export default function ChatInterface({ config }: Props) {
               setIsRecording(true);
               setInput("");
             }
+            
+            if (!voiceOnlyMode) {
+              setVoiceOnlyMode(true);
+              setVoiceEnabled(true);
+            }
           }}
         >
           {isRecording ? (
             <MicOff className="h-4 w-4 text-red-500" />
           ) : (
-            <Mic className="h-4 w-4" />
+            <Mic className={`h-4 w-4 ${voiceOnlyMode ? "text-white" : ""}`} />
           )}
         </Button>
-        <Button 
-          type="submit" 
-          disabled={sendMessage.isPending || !input.trim()}
-        >
-          <Send className="h-4 w-4" />
-        </Button>
-      </form>
+        
+        {voiceOnlyMode && !isRecording && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setVoiceOnlyMode(false);
+              setIsRecording(false);
+              if (recognitionRef.current) {
+                recognitionRef.current.stop();
+              }
+            }}
+          >
+            Exit Voice Mode
+          </Button>
+        )}
+      </div>
       <div className="px-4 pb-4">
         <Button
           onClick={async () => {
