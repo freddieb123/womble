@@ -51,35 +51,40 @@ export default function Home() {
   const handleCopyLink = async () => {
     try {
       const savedConfig = await saveConfig.mutateAsync();
-      if (!savedConfig) {
+      if (!savedConfig || !savedConfig.id) {
         throw new Error("Failed to save configuration");
       }
-      const params = new URLSearchParams();
-      params.set('configId', savedConfig.id.toString());
-      const url = `${window.location.origin}/chat?${params.toString()}`;
-      
+      console.log("Creating link for config:", savedConfig);
+      const url = `${window.location.origin}/chat?configId=${savedConfig.id}`;
       await navigator.clipboard.writeText(url);
       toast({
         description: "Link copied to clipboard!",
       });
     } catch (error) {
       console.error("Error copying link:", error);
-      // Error already handled by mutation
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to create shareable link",
+      });
     }
   };
 
   const handleOpenChat = async () => {
     try {
       const savedConfig = await saveConfig.mutateAsync();
-      if (!savedConfig) {
+      if (!savedConfig || !savedConfig.id) {
         throw new Error("Failed to save configuration");
       }
-      const params = new URLSearchParams();
-      params.set('configId', savedConfig.id.toString());
-      window.open(`/chat?${params.toString()}`, '_blank');
+      console.log("Opening chat for config:", savedConfig);
+      window.open(`${window.location.origin}/chat?configId=${savedConfig.id}`, '_blank');
     } catch (error) {
       console.error("Error opening chat:", error);
-      // Error already handled by mutation
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to open chat window",
+      });
     }
   };
 

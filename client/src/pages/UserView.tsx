@@ -8,10 +8,12 @@ import { SelectChatConfig } from "@db/schema";
 
 export default function UserView() {
   const [location] = useLocation();
-  const queryString = location.split('/chat')[1] || '';
-  const params = new URLSearchParams(queryString.startsWith('?') ? queryString.slice(1) : queryString);
-  const configId = params.get('configId');
+  // Parse the query string directly
+  const searchParams = new URLSearchParams(window.location.search);
+  const configId = searchParams.get('configId');
   
+  console.log("Current location:", location);
+  console.log("Search params:", window.location.search);
   console.log("Loading config with ID:", configId);
 
   const { data: savedConfig, isLoading, error } = useQuery<SelectChatConfig>({
