@@ -225,7 +225,10 @@ export default function Home() {
                   <div className="space-y-4">
                     <div>
                       <h3 className="font-semibold mb-1">System Prompt</h3>
-                      <p className="text-sm text-gray-600">{config.systemPrompt}</p>
+                      <p className="text-sm text-gray-600">
+                        {config.systemPrompt.split(' ').slice(0, 30).join(' ')}
+                        {config.systemPrompt.split(' ').length > 30 ? '...' : ''}
+                      </p>
                     </div>
                     {config.userInstructions && (
                       <div>
