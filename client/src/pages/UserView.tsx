@@ -74,7 +74,7 @@ export default function UserView() {
     systemPrompt: savedConfig.systemPrompt,
     temperature: 0.7,
     maxTokens: 1000,
-    userInstructions: savedConfig.userInstructions // Added userInstructions
+    userInstructions: savedConfig.userInstructions || ""
   };
 
   return (
