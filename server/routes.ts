@@ -185,14 +185,16 @@ export function registerRoutes(app: Express): Server {
       });
 
       // Get OpenAI streaming response with optimized settings
+      const isVoiceMode = req.query.mode === 'voice';
       const stream = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: isVoiceMode ? "gpt-4-turbo-preview" : "gpt-3.5-turbo",
         messages: apiMessages,
-        temperature: parsedConfig.temperature,
-        max_tokens: parsedConfig.maxTokens,
+        temperature: isVoiceMode ? 0.7 : parsedConfig.temperature,
+        max_tokens: isVoiceMode ? 150 : parsedConfig.maxTokens, // Shorter responses for voice
         stream: true,
-        presence_penalty: 0.6, // Encourage more concise responses
-        frequency_penalty: 0.5, // Reduce repetition
+        presence_penalty: isVoiceMode ? 0.3 : 0.6, // Less penalty for voice to be more conversational
+        frequency_penalty: isVoiceMode ? 0.3 : 0.5, // Less penalty for voice to sound more natural
+        response_format: { type: "text" }
       });
 
       // Handle the stream with immediate sending

@@ -105,7 +105,8 @@ export default function ChatInterface({ config }: Props) {
 
   const sendMessage = useMutation({
     mutationFn: async (content: string) => {
-      const response = await fetch("/api/messages", {
+      const queryParams = voiceOnlyMode ? '?mode=voice' : '';
+      const response = await fetch(`/api/messages${queryParams}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, config }),
