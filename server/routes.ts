@@ -6,12 +6,19 @@ import { z } from "zod";
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const messages: {
+// Store messages per session
+const sessions: Record<string, {
   id: string;
   content: string;
   role: 'user' | 'assistant';
   timestamp: number;
-}[] = [];
+}[]> = {};
+
+function getSessionId(req: Express.Request): string {
+  // Use query parameters as session identifier
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  return url.searchParams.toString() || 'default';
+}
 
 const configSchema = z.object({
   systemPrompt: z.string(),
@@ -20,9 +27,11 @@ const configSchema = z.object({
 });
 
 export function registerRoutes(app: Express): Server {
-  app.get("/api/messages", (_req, res) => {
+  app.get("/api/messages", (req, res) => {
+    const sessionId = getSessionId(req);
+    const sessionMessages = sessions[sessionId] || [];
     res.json({
-      messages,
+      messages: sessionMessages,
       isLoading: false,
       error: null
     });
@@ -31,12 +40,18 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/messages", async (req, res) => {
     try {
       const { content, config } = req.body;
+      const sessionId = getSessionId(req);
       
       if (!content || typeof content !== "string") {
         return res.status(400).send("Message content is required");
       }
 
       const parsedConfig = configSchema.parse(config);
+
+      // Initialize session if it doesn't exist
+      if (!sessions[sessionId]) {
+        sessions[sessionId] = [];
+      }
 
       // Add user message
       const userMessage = {
@@ -45,18 +60,21 @@ export function registerRoutes(app: Express): Server {
         role: 'user' as const,
         timestamp: Date.now()
       };
-      messages.push(userMessage);
+      sessions[sessionId].push(userMessage);
+
+      // Prepare messages for OpenAI API
+      const apiMessages = [
+        { role: "system", content: parsedConfig.systemPrompt },
+        ...sessions[sessionId].map(m => ({
+          role: m.role,
+          content: m.content
+        }))
+      ];
 
       // Get OpenAI response
       const completion = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
-        messages: [
-          { role: "system", content: parsedConfig.systemPrompt },
-          ...messages.map(m => ({
-            role: m.role,
-            content: m.content
-          }))
-        ],
+        messages: apiMessages,
         temperature: parsedConfig.temperature,
         max_tokens: parsedConfig.maxTokens,
       });
@@ -68,7 +86,7 @@ export function registerRoutes(app: Express): Server {
         role: 'assistant' as const,
         timestamp: Date.now()
       };
-      messages.push(assistantMessage);
+      sessions[sessionId].push(assistantMessage);
 
       res.json({ success: true });
     } catch (error) {
