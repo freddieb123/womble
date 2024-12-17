@@ -21,40 +21,17 @@ export default function AdminPanel({ config, onConfigChange }: Props) {
             value={config.systemPrompt}
             onChange={(e) => onConfigChange({
               ...config,
-              systemPrompt: e.target.value
+              systemPrompt: e.target.value,
+              temperature: 0.7,
+              maxTokens: 1000
             })}
             placeholder="Enter system prompt..."
             className="resize-none"
-            rows={4}
+            rows={6}
           />
-        </div>
-
-        <div className="space-y-2">
-          <Label>Temperature: {config.temperature}</Label>
-          <Slider
-            value={[config.temperature]}
-            onValueChange={(value) => onConfigChange({
-              ...config,
-              temperature: value[0]
-            })}
-            min={0}
-            max={2}
-            step={0.1}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label>Max Tokens: {config.maxTokens}</Label>
-          <Slider
-            value={[config.maxTokens]}
-            onValueChange={(value) => onConfigChange({
-              ...config,
-              maxTokens: value[0]
-            })}
-            min={100}
-            max={4000}
-            step={100}
-          />
+          <p className="text-sm text-muted-foreground">
+            Customize how the AI assistant behaves by providing specific instructions.
+          </p>
         </div>
       </div>
     </div>

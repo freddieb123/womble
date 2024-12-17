@@ -29,13 +29,13 @@ export default function Home() {
           </Button>
         </div>
 
-        <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
-          <Card className={`p-6 ${showAdmin ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-5">
+          <Card className={`p-6 ${showAdmin ? 'lg:col-span-3' : 'lg:col-span-5'}`}>
             <ChatInterface config={config} />
           </Card>
 
           {showAdmin && (
-            <Card className="p-6">
+            <Card className="p-6 lg:col-span-2">
               <AdminPanel config={config} onConfigChange={setConfig} />
             </Card>
           )}
