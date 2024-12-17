@@ -14,7 +14,14 @@ const chatConfigSchema = z.object({
   feedbackCriteria: z.string().nullable(),
 });
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+if (!process.env.OPENAI_API_KEY) {
+  throw new Error("OPENAI_API_KEY is required");
+}
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  dangerouslyAllowBrowser: false
+});
 
 // Store messages per session
 const sessions: Record<string, {
@@ -170,23 +177,39 @@ export function registerRoutes(app: Express): Server {
       let accumulatedMessage = '';
       const messageId = crypto.randomUUID();
 
-      // Get OpenAI streaming response
+      // Set up SSE
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      });
+
+      // Get OpenAI streaming response with optimized settings
       const stream = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: apiMessages,
         temperature: parsedConfig.temperature,
         max_tokens: parsedConfig.maxTokens,
         stream: true,
+        presence_penalty: 0.6, // Encourage more concise responses
+        frequency_penalty: 0.5, // Reduce repetition
       });
 
-      // Handle the stream
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content || '';
-        if (content) {
-          accumulatedMessage += content;
-          // Send the chunk to the client
-          res.write(`data: ${JSON.stringify({ content, messageId })}\n\n`);
+      // Handle the stream with immediate sending
+      try {
+        for await (const chunk of stream) {
+          const content = chunk.choices[0]?.delta?.content || '';
+          if (content) {
+            accumulatedMessage += content;
+            // Send the chunk immediately
+            res.write(`data: ${JSON.stringify({ content, messageId })}\n\n`);
+          }
         }
+      } catch (streamError) {
+        console.error("Stream error:", streamError);
+        res.write(`data: ${JSON.stringify({ error: "Stream interrupted" })}\n\n`);
+        res.end();
+        return;
       }
 
       // Add the complete AI response to the session

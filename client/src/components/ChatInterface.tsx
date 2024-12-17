@@ -30,13 +30,23 @@ export default function ChatInterface({ config }: Props) {
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => {
       setIsSpeaking(false);
-      // Check if there are more items in the queue
+      // Process next item in queue if any
       const nextText = speechQueue.current.shift();
       if (nextText) speak(nextText);
     };
     
+    // Optimize speech settings for faster response
+    utterance.rate = 1.1; // Slightly faster than normal
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    
+    // If currently speaking, queue the text
+    // Otherwise speak immediately
     if (window.speechSynthesis.speaking) {
-      speechQueue.current.push(text);
+      // Only queue if it's a substantial piece of text
+      if (text.length > 3) {
+        speechQueue.current.push(text);
+      }
     } else {
       window.speechSynthesis.speak(utterance);
     }
@@ -148,10 +158,13 @@ export default function ChatInterface({ config }: Props) {
 
               assistantMessage.content += parsed.content;
               
-              // Speak the new content in real-time
-              speak(parsed.content);
+              // Optimize speech chunking for more natural flow
+              // Only speak when we have a complete phrase or punctuation
+              if (parsed.content.match(/[.!?,;]\s*$/) || parsed.content.length > 10) {
+                speak(parsed.content);
+              }
               
-              // Update the messages in real-time
+              // Update UI immediately without waiting for speech
               queryClient.setQueryData<ChatState>(["/api/messages"], (old) => ({
                 messages: [
                   ...(old?.messages || []).filter(m => m.id !== assistantMessage.id),
