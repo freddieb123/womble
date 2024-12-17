@@ -53,6 +53,7 @@ export function registerRoutes(app: Express): Server {
         systemPrompt: parsedConfig.systemPrompt,
       }).returning();
 
+      console.log("Saved chat config:", result[0]);
       res.json(result[0]);
     } catch (error: any) {
       console.error("Error saving chat config:", error);

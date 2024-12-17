@@ -35,7 +35,8 @@ export default function Home() {
       return response.json();
     },
     onSuccess: (savedConfig) => {
-      return savedConfig.id;
+      console.log("Successfully saved config:", savedConfig);
+      return savedConfig;
     },
     onError: (error: Error) => {
       toast({
