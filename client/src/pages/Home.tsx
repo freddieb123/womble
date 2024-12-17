@@ -25,6 +25,7 @@ export default function Home() {
         body: JSON.stringify({
           title: config.title,
           systemPrompt: config.systemPrompt,
+          userInstructions: config.userInstructions,
         }),
       });
       
