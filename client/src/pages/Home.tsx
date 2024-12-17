@@ -156,16 +156,16 @@ export default function Home() {
                 New Configuration
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+            <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
               <DialogHeader>
                 <DialogTitle>Create New Configuration</DialogTitle>
               </DialogHeader>
-              <ScrollArea className="flex-1 pr-4">
-                <div className="mt-4">
+              <ScrollArea className="flex-1 -mx-6 px-6">
+                <div className="py-4">
                   <AdminPanel config={config} onConfigChange={setConfig} />
                 </div>
               </ScrollArea>
-              <div className="mt-4 pt-4 border-t flex justify-end">
+              <div className="pt-4 border-t flex justify-end">
                 <Button onClick={() => saveConfig.mutate()} disabled={saveConfig.isPending}>
                   Save Configuration
                 </Button>
@@ -190,14 +190,14 @@ export default function Home() {
                           <Pencil className="h-4 w-4" />
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+                      <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
                         <DialogHeader>
                           <DialogTitle>Edit Configuration</DialogTitle>
                         </DialogHeader>
                         {editingConfig && (
                           <>
-                            <ScrollArea className="flex-1 pr-4">
-                              <div className="mt-4">
+                            <ScrollArea className="flex-1 -mx-6 px-6">
+                              <div className="py-4">
                                 <AdminPanel
                                   config={{
                                     ...editingConfig,
