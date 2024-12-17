@@ -27,7 +27,15 @@ export default function ChatInterface({ config }: Props) {
   const speak = (text: string) => {
     if (!voiceEnabled) return;
     
-    const utterance = new SpeechSynthesisUtterance(text);
+    // Clean up text: replace punctuation with pauses and remove explicit punctuation words
+    const cleanText = text
+      .replace(/([.!?])\s+/g, '$1\n') // Add pauses after punctuation
+      .replace(/\sexclamation mark\s/gi, '!') // Replace spoken punctuation with symbols
+      .replace(/\speriod\s/gi, '.') 
+      .replace(/\squestion mark\s/gi, '?')
+      .replace(/\scomma\s/gi, ',');
+    
+    const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => {
       setIsSpeaking(false);
@@ -38,11 +46,11 @@ export default function ChatInterface({ config }: Props) {
     
     // Optimize speech settings based on mode
     if (voiceOnlyMode) {
-      utterance.rate = 1.2; // Faster for voice conversations
+      utterance.rate = 1.1; // Slightly faster for natural conversation
       utterance.pitch = 1.0;
       utterance.volume = 1.0;
     } else {
-      utterance.rate = 1.1; // Slightly faster for text mode
+      utterance.rate = 1.0; // Normal rate for text mode
       utterance.pitch = 1.0;
       utterance.volume = 1.0;
     }
@@ -50,9 +58,9 @@ export default function ChatInterface({ config }: Props) {
     // If currently speaking, queue the text
     // Otherwise speak immediately
     if (window.speechSynthesis.speaking) {
-      // Only queue if it's a substantial piece of text
-      if (text.length > 3) {
-        speechQueue.current.push(text);
+      // Queue longer phrases, ignore very short responses
+      if (cleanText.length > 2) {
+        speechQueue.current.push(cleanText);
       }
     } else {
       window.speechSynthesis.speak(utterance);
@@ -250,7 +258,7 @@ export default function ChatInterface({ config }: Props) {
       </ScrollArea>
 
       <div className="p-4 border-t flex gap-2">
-        {!voiceOnlyMode && (
+        {!voiceOnlyMode ? (
           <form onSubmit={handleSubmit} className="flex gap-2 flex-1">
             <Button
               type="button"
@@ -285,6 +293,12 @@ export default function ChatInterface({ config }: Props) {
               <Send className="h-4 w-4" />
             </Button>
           </form>
+        ) : (
+          <div className="flex-1 flex justify-center items-center">
+            <p className="text-sm text-muted-foreground">
+              {isRecording ? "Listening..." : "Click microphone to start speaking"}
+            </p>
+          </div>
         )}
         
         <Button
