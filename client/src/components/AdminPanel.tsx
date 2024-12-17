@@ -15,15 +15,31 @@ export default function AdminPanel({ config, onConfigChange }: Props) {
       
       <div className="space-y-4">
         <div className="space-y-2">
+          <Label htmlFor="title">Title</Label>
+          <input
+            id="title"
+            type="text"
+            value={config.title}
+            onChange={(e) => onConfigChange({
+              ...config,
+              title: e.target.value
+            })}
+            placeholder="Enter a title for this chat configuration..."
+            className="w-full px-3 py-2 border rounded-md"
+          />
+          <p className="text-sm text-muted-foreground">
+            Give your chat configuration a memorable title.
+          </p>
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="system-prompt">System Prompt</Label>
           <Textarea
             id="system-prompt"
             value={config.systemPrompt}
             onChange={(e) => onConfigChange({
               ...config,
-              systemPrompt: e.target.value,
-              temperature: 0.7,
-              maxTokens: 1000
+              systemPrompt: e.target.value
             })}
             placeholder="Enter system prompt..."
             className="resize-none"

@@ -2,29 +2,76 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Copy, ExternalLink } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useMutation } from "@tanstack/react-query";
+import AdminPanel from "@/components/AdminPanel";
+import type { AdminConfig } from "@/lib/types";
 
 export default function Home() {
-  const [instructions, setInstructions] = useState("You are a helpful AI assistant.");
+  const [config, setConfig] = useState<AdminConfig>({
+    title: "",
+    systemPrompt: "You are a helpful AI assistant.",
+    temperature: 0.7,
+    maxTokens: 1000
+  });
   const { toast } = useToast();
 
-  const handleCopyLink = () => {
-    const params = new URLSearchParams();
-    params.set('instructions', encodeURIComponent(instructions));
-    const url = `${window.location.origin}/chat?${params.toString()}`;
-    
-    navigator.clipboard.writeText(url).then(() => {
+  const saveConfig = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/chat-configs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: config.title,
+          systemPrompt: config.systemPrompt,
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to save configuration");
+      }
+      
+      return response.json();
+    },
+    onSuccess: (savedConfig) => {
+      return savedConfig.id;
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+      throw error;
+    },
+  });
+
+  const handleCopyLink = async () => {
+    try {
+      const savedConfig = await saveConfig.mutateAsync();
+      const params = new URLSearchParams();
+      params.set('configId', savedConfig.id.toString());
+      const url = `${window.location.origin}/chat?${params.toString()}`;
+      
+      await navigator.clipboard.writeText(url);
       toast({
         description: "Link copied to clipboard!",
       });
-    });
+    } catch (error) {
+      // Error already handled by mutation
+    }
   };
 
-  const handleOpenChat = () => {
-    const params = new URLSearchParams();
-    params.set('instructions', encodeURIComponent(instructions));
-    window.open(`/chat?${params.toString()}`, '_blank');
+  const handleOpenChat = async () => {
+    try {
+      const savedConfig = await saveConfig.mutateAsync();
+      const params = new URLSearchParams();
+      params.set('configId', savedConfig.id.toString());
+      window.open(`/chat?${params.toString()}`, '_blank');
+    } catch (error) {
+      // Error already handled by mutation
+    }
   };
 
   return (
@@ -35,26 +82,19 @@ export default function Home() {
         </div>
 
         <Card className="p-6">
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold mb-2">Chat Instructions</h2>
-              <p className="text-sm text-muted-foreground mb-4">
-                Enter the instructions for the AI assistant. These will be used as the system prompt.
-              </p>
-              <Textarea
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
-                placeholder="Enter instructions for the AI assistant..."
-                className="min-h-[200px]"
-              />
-            </div>
+          <div className="space-y-6">
+            <AdminPanel config={config} onConfigChange={setConfig} />
 
             <div className="flex gap-2">
-              <Button onClick={handleCopyLink}>
+              <Button onClick={handleCopyLink} disabled={saveConfig.isPending}>
                 <Copy className="h-4 w-4 mr-2" />
                 Copy Link
               </Button>
-              <Button variant="outline" onClick={handleOpenChat}>
+              <Button 
+                variant="outline" 
+                onClick={handleOpenChat}
+                disabled={saveConfig.isPending}
+              >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Open Chat
               </Button>

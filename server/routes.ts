@@ -1,7 +1,10 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import OpenAI from "openai";
 import { z } from "zod";
+import { db } from "@db";
+import { chatConfigs } from "@db/schema";
+import { eq } from "drizzle-orm";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -14,7 +17,7 @@ const sessions: Record<string, {
   timestamp: number;
 }[]> = {};
 
-function getSessionId(req: Express.Request): string {
+function getSessionId(req: Request): string {
   // Use query parameters as session identifier
   const url = new URL(req.url, `http://${req.headers.host}`);
   return url.searchParams.toString() || 'default';
@@ -26,8 +29,13 @@ const configSchema = z.object({
   maxTokens: z.number().min(100).max(4000)
 });
 
+const chatConfigSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  systemPrompt: z.string().min(1, "System prompt is required"),
+});
+
 export function registerRoutes(app: Express): Server {
-  app.get("/api/messages", (req, res) => {
+  app.get("/api/messages", (req: Request, res) => {
     const sessionId = getSessionId(req);
     const sessionMessages = sessions[sessionId] || [];
     res.json({
@@ -35,6 +43,43 @@ export function registerRoutes(app: Express): Server {
       isLoading: false,
       error: null
     });
+  });
+
+  app.post("/api/chat-configs", async (req, res) => {
+    try {
+      const parsedConfig = chatConfigSchema.parse(req.body);
+      const result = await db.insert(chatConfigs).values({
+        title: parsedConfig.title,
+        systemPrompt: parsedConfig.systemPrompt,
+      }).returning();
+
+      res.json(result[0]);
+    } catch (error: any) {
+      console.error("Error saving chat config:", error);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/chat-configs/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid ID" });
+      }
+
+      const config = await db.query.chatConfigs.findFirst({
+        where: eq(chatConfigs.id, id),
+      });
+
+      if (!config) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+
+      res.json(config);
+    } catch (error: any) {
+      console.error("Error fetching chat config:", error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   app.post("/api/messages", async (req, res) => {
@@ -69,7 +114,7 @@ export function registerRoutes(app: Express): Server {
           role: m.role,
           content: m.content
         }))
-      ];
+      ] as const;
 
       // Get OpenAI response
       const completion = await openai.chat.completions.create({
@@ -89,7 +134,7 @@ export function registerRoutes(app: Express): Server {
       sessions[sessionId].push(assistantMessage);
 
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error processing message:", error);
       res.status(500).send(error.message);
     }

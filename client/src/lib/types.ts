@@ -12,6 +12,7 @@ export interface ChatState {
 }
 
 export interface AdminConfig {
+  title: string;
   systemPrompt: string;
   temperature: number;
   maxTokens: number;
