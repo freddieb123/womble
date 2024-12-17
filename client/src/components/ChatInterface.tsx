@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Mic, MicOff } from "lucide-react";
+import { Send, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import MessageBubble from "./MessageBubble";
@@ -15,10 +15,39 @@ interface Props {
 export default function ChatInterface({ config }: Props) {
   const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const speechQueue = useRef<string[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const speak = (text: string) => {
+    if (!voiceEnabled) return;
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      // Check if there are more items in the queue
+      const nextText = speechQueue.current.shift();
+      if (nextText) speak(nextText);
+    };
+    
+    if (window.speechSynthesis.speaking) {
+      speechQueue.current.push(text);
+    } else {
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  // Stop speaking when component unmounts
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, []);
 
   useEffect(() => {
     // Initialize speech recognition
@@ -119,6 +148,9 @@ export default function ChatInterface({ config }: Props) {
 
               assistantMessage.content += parsed.content;
               
+              // Speak the new content in real-time
+              speak(parsed.content);
+              
               // Update the messages in real-time
               queryClient.setQueryData<ChatState>(["/api/messages"], (old) => ({
                 messages: [
@@ -180,6 +212,25 @@ export default function ChatInterface({ config }: Props) {
       </ScrollArea>
 
       <form onSubmit={handleSubmit} className="p-4 border-t flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            setVoiceEnabled(!voiceEnabled);
+            if (voiceEnabled) {
+              window.speechSynthesis.cancel();
+              setIsSpeaking(false);
+              speechQueue.current = [];
+            }
+          }}
+          className={voiceEnabled ? "bg-blue-50" : ""}
+        >
+          {voiceEnabled ? (
+            <Volume2 className="h-4 w-4 text-blue-500" />
+          ) : (
+            <VolumeX className="h-4 w-4" />
+          )}
+        </Button>
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
