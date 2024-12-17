@@ -4,13 +4,14 @@ import ChatInterface from "@/components/ChatInterface";
 import { AdminConfig } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle } from "lucide-react";
+import { SelectChatConfig } from "@db/schema";
 
 export default function UserView() {
   const [location] = useLocation();
   const params = new URLSearchParams(location.split('?')[1] || '');
   const configId = params.get('configId');
 
-  const { data: savedConfig, isLoading, error } = useQuery({
+  const { data: savedConfig, isLoading, error } = useQuery<SelectChatConfig>({
     queryKey: [`/api/chat-configs/${configId}`],
     enabled: !!configId,
   });
@@ -63,6 +64,7 @@ export default function UserView() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         <Card className="p-6">
+          <h1 className="text-2xl font-bold text-blue-900 mb-4">{config.title}</h1>
           <ChatInterface config={config} />
         </Card>
       </div>
