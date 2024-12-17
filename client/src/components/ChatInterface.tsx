@@ -16,7 +16,7 @@ export default function ChatInterface({ config }: Props) {
   const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [voiceEnabled] = useState(true); // Always enabled for voice-first interface
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const speechQueue = useRef<string[]>([]);
@@ -72,15 +72,6 @@ export default function ChatInterface({ config }: Props) {
           .map(result => result[0].transcript)
           .join('');
         setInput(transcript);
-        
-        // Auto-send if we detect a complete sentence
-        const lastResult = event.results[event.results.length - 1];
-        if (lastResult.isFinal && transcript.trim()) {
-          if (transcript.match(/[.!?]\s*$/)) {
-            sendMessage.mutate(transcript.trim());
-            setInput("");
-          }
-        }
       };
 
       recognitionRef.current.onerror = (event) => {
@@ -233,11 +224,37 @@ export default function ChatInterface({ config }: Props) {
         </div>
       </ScrollArea>
 
-      <div className="p-4 border-t flex justify-center items-center">
+      <form onSubmit={handleSubmit} className="p-4 border-t flex gap-2">
         <Button
           type="button"
-          size="lg"
-          className={`rounded-full p-8 ${isRecording ? 'bg-red-100 hover:bg-red-200' : 'bg-blue-100 hover:bg-blue-200'}`}
+          variant="outline"
+          onClick={() => {
+            setVoiceEnabled(!voiceEnabled);
+            if (voiceEnabled) {
+              window.speechSynthesis.cancel();
+              setIsSpeaking(false);
+              speechQueue.current = [];
+            }
+          }}
+          className={voiceEnabled ? "bg-blue-50" : ""}
+        >
+          {voiceEnabled ? (
+            <Volume2 className="h-4 w-4 text-blue-500" />
+          ) : (
+            <VolumeX className="h-4 w-4" />
+          )}
+        </Button>
+        <Input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={isRecording ? "Listening..." : "Type your message..."}
+          className="flex-1"
+          disabled={sendMessage.isPending}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          className={isRecording ? "bg-red-50" : ""}
           onClick={() => {
             if (!recognitionRef.current) {
               toast({
@@ -251,10 +268,6 @@ export default function ChatInterface({ config }: Props) {
             if (isRecording) {
               recognitionRef.current.stop();
               setIsRecording(false);
-              if (input.trim()) {
-                sendMessage.mutate(input.trim());
-                setInput("");
-              }
             } else {
               recognitionRef.current.start();
               setIsRecording(true);
@@ -263,12 +276,18 @@ export default function ChatInterface({ config }: Props) {
           }}
         >
           {isRecording ? (
-            <MicOff className="h-8 w-8 text-red-500" />
+            <MicOff className="h-4 w-4 text-red-500" />
           ) : (
-            <Mic className="h-8 w-8 text-blue-500" />
+            <Mic className="h-4 w-4" />
           )}
         </Button>
-      </div>
+        <Button 
+          type="submit" 
+          disabled={sendMessage.isPending || !input.trim()}
+        >
+          <Send className="h-4 w-4" />
+        </Button>
+      </form>
       <div className="px-4 pb-4">
         <Button
           onClick={async () => {
