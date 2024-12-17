@@ -49,7 +49,7 @@ export function registerRoutes(app: Express): Server {
 
       // Get OpenAI response
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-3.5-turbo",
         messages: [
           { role: "system", content: parsedConfig.systemPrompt },
           ...messages.map(m => ({
@@ -58,7 +58,7 @@ export function registerRoutes(app: Express): Server {
           }))
         ],
         temperature: parsedConfig.temperature,
-        max_tokens: parsedConfig.maxTokens
+        max_tokens: parsedConfig.maxTokens,
       });
 
       // Add AI response
