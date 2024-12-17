@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send } from "lucide-react";
+import { Send, Mic, MicOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import MessageBubble from "./MessageBubble";
@@ -14,9 +14,44 @@ interface Props {
 
 export default function ChatInterface({ config }: Props) {
   const [input, setInput] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    // Initialize speech recognition
+    if (window.SpeechRecognition || window.webkitSpeechRecognition) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+
+      recognitionRef.current.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0].transcript)
+          .join('');
+        setInput(transcript);
+      };
+
+      recognitionRef.current.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsRecording(false);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to record audio. Please check your microphone permissions.",
+        });
+      };
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [toast]);
 
   const { data: chatState = { messages: [], isLoading: false, error: null } } = useQuery<ChatState>({
     queryKey: ["/api/messages"],
@@ -83,10 +118,40 @@ export default function ChatInterface({ config }: Props) {
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Type your message..."
+          placeholder={isRecording ? "Listening..." : "Type your message..."}
           className="flex-1"
           disabled={sendMessage.isPending}
         />
+        <Button
+          type="button"
+          variant="outline"
+          className={isRecording ? "bg-red-50" : ""}
+          onClick={() => {
+            if (!recognitionRef.current) {
+              toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Speech recognition is not supported in your browser.",
+              });
+              return;
+            }
+
+            if (isRecording) {
+              recognitionRef.current.stop();
+              setIsRecording(false);
+            } else {
+              recognitionRef.current.start();
+              setIsRecording(true);
+              setInput("");
+            }
+          }}
+        >
+          {isRecording ? (
+            <MicOff className="h-4 w-4 text-red-500" />
+          ) : (
+            <Mic className="h-4 w-4" />
+          )}
+        </Button>
         <Button 
           type="submit" 
           disabled={sendMessage.isPending || !input.trim()}
