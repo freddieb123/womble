@@ -73,7 +73,8 @@ export default function UserView() {
     title: savedConfig.title,
     systemPrompt: savedConfig.systemPrompt,
     temperature: 0.7,
-    maxTokens: 1000
+    maxTokens: 1000,
+    userInstructions: savedConfig.userInstructions // Added userInstructions
   };
 
   return (
@@ -81,6 +82,12 @@ export default function UserView() {
       <div className="max-w-4xl mx-auto">
         <Card className="p-6">
           <h1 className="text-2xl font-bold text-blue-900 mb-4">{config.title}</h1>
+          {config.userInstructions && (
+            <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+              <h2 className="text-sm font-semibold text-blue-900 mb-2">Instructions</h2>
+              <p className="text-sm text-blue-800">{config.userInstructions}</p>
+            </div>
+          )}
           <ChatInterface config={config} />
         </Card>
       </div>

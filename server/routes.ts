@@ -32,6 +32,7 @@ const configSchema = z.object({
 const chatConfigSchema = z.object({
   title: z.string().min(1, "Title is required"),
   systemPrompt: z.string().min(1, "System prompt is required"),
+  userInstructions: z.string().optional(),
 });
 
 export function registerRoutes(app: Express): Server {

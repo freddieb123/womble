@@ -11,6 +11,7 @@ export default function Home() {
   const [config, setConfig] = useState<AdminConfig>({
     title: "",
     systemPrompt: "You are a helpful AI assistant.",
+    userInstructions: "",
     temperature: 0.7,
     maxTokens: 1000
   });

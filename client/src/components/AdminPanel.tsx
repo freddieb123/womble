@@ -49,6 +49,24 @@ export default function AdminPanel({ config, onConfigChange }: Props) {
             Customize how the AI assistant behaves by providing specific instructions.
           </p>
         </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="user-instructions">User Instructions</Label>
+          <Textarea
+            id="user-instructions"
+            value={config.userInstructions}
+            onChange={(e) => onConfigChange({
+              ...config,
+              userInstructions: e.target.value
+            })}
+            placeholder="Enter instructions for users..."
+            className="resize-none"
+            rows={4}
+          />
+          <p className="text-sm text-muted-foreground">
+            Add helpful instructions or context that will be shown to users of this chat.
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ export const chatConfigs = pgTable("chat_configs", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   systemPrompt: text("system_prompt").notNull(),
+  userInstructions: text("user_instructions"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
