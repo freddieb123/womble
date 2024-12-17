@@ -114,7 +114,7 @@ export function registerRoutes(app: Express): Server {
           role: m.role,
           content: m.content
         }))
-      ] as const;
+      ];
 
       // Get OpenAI response
       const completion = await openai.chat.completions.create({

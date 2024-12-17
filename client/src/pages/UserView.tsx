@@ -14,7 +14,24 @@ export default function UserView() {
   const { data: savedConfig, isLoading, error } = useQuery<SelectChatConfig>({
     queryKey: [`/api/chat-configs/${configId}`],
     enabled: !!configId,
+    retry: 1,
+    staleTime: Infinity,
   });
+
+  if (!configId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
+        <div className="max-w-4xl mx-auto">
+          <Card className="p-6">
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              <p className="text-sm text-red-700">No configuration ID provided</p>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -31,22 +48,16 @@ export default function UserView() {
   }
 
   if (error || !savedConfig) {
-    const config: AdminConfig = {
-      title: "Default Configuration",
-      systemPrompt: "You are a helpful AI assistant.",
-      temperature: 0.7,
-      maxTokens: 1000
-    };
-
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
         <div className="max-w-4xl mx-auto">
           <Card className="p-6">
-            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-yellow-500" />
-              <p className="text-sm text-yellow-700">Using default configuration: {error?.message}</p>
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              <p className="text-sm text-red-700">
+                Failed to load chat configuration: {error instanceof Error ? error.message : 'Unknown error'}
+              </p>
             </div>
-            <ChatInterface config={config} />
           </Card>
         </div>
       </div>
