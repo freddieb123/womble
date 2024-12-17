@@ -156,17 +156,19 @@ export default function Home() {
                 New Configuration
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
               <DialogHeader>
                 <DialogTitle>Create New Configuration</DialogTitle>
               </DialogHeader>
-              <div className="mt-4">
-                <AdminPanel config={config} onConfigChange={setConfig} />
-                <div className="mt-4 flex justify-end">
-                  <Button onClick={() => saveConfig.mutate()} disabled={saveConfig.isPending}>
-                    Save Configuration
-                  </Button>
+              <ScrollArea className="flex-1 pr-4">
+                <div className="mt-4">
+                  <AdminPanel config={config} onConfigChange={setConfig} />
                 </div>
+              </ScrollArea>
+              <div className="mt-4 pt-4 border-t flex justify-end">
+                <Button onClick={() => saveConfig.mutate()} disabled={saveConfig.isPending}>
+                  Save Configuration
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -188,28 +190,34 @@ export default function Home() {
                           <Pencil className="h-4 w-4" />
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
+                      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
                         <DialogHeader>
                           <DialogTitle>Edit Configuration</DialogTitle>
                         </DialogHeader>
                         {editingConfig && (
-                          <div className="mt-4">
-                            <AdminPanel
-                              config={{
-                                ...editingConfig,
-                                temperature: 0.7,
-                                maxTokens: 1000,
-                              }}
-                              onConfigChange={(updatedConfig) => {
-                                setEditingConfig({
-                                  ...editingConfig,
-                                  title: updatedConfig.title,
-                                  systemPrompt: updatedConfig.systemPrompt,
-                                  userInstructions: updatedConfig.userInstructions || null,
-                                });
-                              }}
-                            />
-                            <div className="mt-4 flex justify-end">
+                          <>
+                            <ScrollArea className="flex-1 pr-4">
+                              <div className="mt-4">
+                                <AdminPanel
+                                  config={{
+                                    ...editingConfig,
+                                    temperature: 0.7,
+                                    maxTokens: 1000,
+                                    feedbackCriteria: editingConfig.feedbackCriteria || "",
+                                  }}
+                                  onConfigChange={(updatedConfig) => {
+                                    setEditingConfig({
+                                      ...editingConfig,
+                                      title: updatedConfig.title,
+                                      systemPrompt: updatedConfig.systemPrompt,
+                                      userInstructions: updatedConfig.userInstructions || null,
+                                      feedbackCriteria: updatedConfig.feedbackCriteria || null,
+                                    });
+                                  }}
+                                />
+                              </div>
+                            </ScrollArea>
+                            <div className="mt-4 pt-4 border-t flex justify-end">
                               <Button
                                 onClick={() => editingConfig && updateConfig.mutate(editingConfig)}
                                 disabled={updateConfig.isPending}
@@ -217,7 +225,7 @@ export default function Home() {
                                 Update Configuration
                               </Button>
                             </div>
-                          </div>
+                          </>
                         )}
                       </DialogContent>
                     </Dialog>
