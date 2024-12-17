@@ -68,11 +68,76 @@ export default function ChatInterface({ config }: Props) {
       if (!response.ok) {
         throw new Error(await response.text());
       }
+
+      // Add the user message immediately
+      const userMessage: Message = {
+        id: crypto.randomUUID(),
+        content,
+        role: 'user',
+        timestamp: Date.now()
+      };
       
-      return response.json();
+      queryClient.setQueryData<ChatState>(["/api/messages"], (old) => ({
+        messages: [...(old?.messages || []), userMessage],
+        isLoading: false,
+        error: null
+      }));
+
+      let assistantMessage: Message = {
+        id: '',
+        content: '',
+        role: 'assistant',
+        timestamp: Date.now()
+      };
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error("Failed to read response");
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(5);
+            if (data === '[DONE]') continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.error) throw new Error(parsed.error);
+
+              if (!assistantMessage.id) {
+                assistantMessage.id = parsed.messageId;
+              }
+
+              assistantMessage.content += parsed.content;
+              
+              // Update the messages in real-time
+              queryClient.setQueryData<ChatState>(["/api/messages"], (old) => ({
+                messages: [
+                  ...(old?.messages || []).filter(m => m.id !== assistantMessage.id),
+                  { ...assistantMessage }
+                ],
+                isLoading: false,
+                error: null
+              }));
+            } catch (e) {
+              console.error('Error parsing SSE data:', e);
+            }
+          }
+        }
+      }
+
+      return { success: true };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
       setInput("");
     },
     onError: (error) => {

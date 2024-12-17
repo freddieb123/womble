@@ -153,6 +153,11 @@ export function registerRoutes(app: Express): Server {
       };
       sessions[sessionId].push(userMessage);
 
+      // Set up SSE headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
       // Prepare messages for OpenAI API
       const apiMessages = [
         { role: "system", content: parsedConfig.systemPrompt },
@@ -162,27 +167,44 @@ export function registerRoutes(app: Express): Server {
         }))
       ];
 
-      // Get OpenAI response
-      const completion = await openai.chat.completions.create({
+      let accumulatedMessage = '';
+      const messageId = crypto.randomUUID();
+
+      // Get OpenAI streaming response
+      const stream = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: apiMessages,
         temperature: parsedConfig.temperature,
         max_tokens: parsedConfig.maxTokens,
+        stream: true,
       });
 
-      // Add AI response
+      // Handle the stream
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          accumulatedMessage += content;
+          // Send the chunk to the client
+          res.write(`data: ${JSON.stringify({ content, messageId })}\n\n`);
+        }
+      }
+
+      // Add the complete AI response to the session
       const assistantMessage = {
-        id: crypto.randomUUID(),
-        content: completion.choices[0].message.content || "",
+        id: messageId,
+        content: accumulatedMessage,
         role: 'assistant' as const,
         timestamp: Date.now()
       };
       sessions[sessionId].push(assistantMessage);
 
-      res.json({ success: true });
+      // End the stream
+      res.write('data: [DONE]\n\n');
+      res.end();
     } catch (error: any) {
       console.error("Error processing message:", error);
-      res.status(500).send(error.message);
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      res.end();
     }
   });
 
