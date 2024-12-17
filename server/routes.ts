@@ -1,12 +1,18 @@
-import type { Express, Request } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
-import OpenAI from "openai";
-import { z } from "zod";
 import { db } from "@db";
 import { chatConfigs } from "@db/schema";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
+import crypto from 'crypto';
+import OpenAI from 'openai';
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024
+const chatConfigSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  systemPrompt: z.string().min(1, "System prompt is required"),
+  userInstructions: z.string().nullable(),
+});
+
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Store messages per session
@@ -29,14 +35,9 @@ const configSchema = z.object({
   maxTokens: z.number().min(100).max(4000)
 });
 
-const chatConfigSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  systemPrompt: z.string().min(1, "System prompt is required"),
-  userInstructions: z.string().optional(),
-});
 
 export function registerRoutes(app: Express): Server {
-  app.get("/api/messages", (req: Request, res) => {
+  app.get("/api/messages", (req: Request, res: Response) => {
     const sessionId = getSessionId(req);
     const sessionMessages = sessions[sessionId] || [];
     res.json({
