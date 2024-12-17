@@ -6,11 +6,11 @@ import { AdminConfig } from "@/lib/types";
 export default function UserView() {
   // Get instructions from URL parameters
   const [location] = useLocation();
-  const params = new URLSearchParams(location.split('?')[1]);
-  const instructions = decodeURIComponent(params.get('instructions') || '');
+  const params = new URLSearchParams(location.split('?')[1] || '');
+  const instructions = params.get('instructions');
   
   const config: AdminConfig = {
-    systemPrompt: instructions || "You are a helpful AI assistant.",
+    systemPrompt: instructions ? decodeURIComponent(instructions) : "You are a helpful AI assistant.",
     temperature: 0.7,
     maxTokens: 1000
   };
