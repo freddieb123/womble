@@ -12,6 +12,7 @@ export const chatConfigs = pgTable("chat_configs", {
   title: text("title").notNull(),
   systemPrompt: text("system_prompt").notNull(),
   userInstructions: text("user_instructions"),
+  feedbackCriteria: text("feedback_criteria"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

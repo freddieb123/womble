@@ -24,6 +24,7 @@ export default function Home() {
     title: "",
     systemPrompt: "You are a helpful AI assistant.",
     userInstructions: "",
+    feedbackCriteria: "",
     temperature: 0.7,
     maxTokens: 1000
   });
@@ -45,6 +46,7 @@ export default function Home() {
           title: config.title,
           systemPrompt: config.systemPrompt,
           userInstructions: config.userInstructions,
+          feedbackCriteria: config.feedbackCriteria,
         }),
       });
       

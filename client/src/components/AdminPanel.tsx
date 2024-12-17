@@ -67,6 +67,24 @@ export default function AdminPanel({ config, onConfigChange }: Props) {
             Add helpful instructions or context that will be shown to users of this chat.
           </p>
         </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="feedback-criteria">Feedback Criteria</Label>
+          <Textarea
+            id="feedback-criteria"
+            value={config.feedbackCriteria}
+            onChange={(e) => onConfigChange({
+              ...config,
+              feedbackCriteria: e.target.value
+            })}
+            placeholder="Enter criteria for providing feedback to users..."
+            className="resize-none"
+            rows={4}
+          />
+          <p className="text-sm text-muted-foreground">
+            Specify criteria that will be used to assess and provide feedback on user interactions.
+          </p>
+        </div>
       </div>
     </div>
   );

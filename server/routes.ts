@@ -11,6 +11,7 @@ const chatConfigSchema = z.object({
   title: z.string().min(1, "Title is required"),
   systemPrompt: z.string().min(1, "System prompt is required"),
   userInstructions: z.string().nullable(),
+  feedbackCriteria: z.string().nullable(),
 });
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -181,6 +182,40 @@ export function registerRoutes(app: Express): Server {
     } catch (error: any) {
       console.error("Error processing message:", error);
       res.status(500).send(error.message);
+    }
+  });
+
+  app.post("/api/chat-feedback", async (req: Request, res: Response) => {
+    try {
+      const sessionId = getSessionId(req);
+      const sessionMessages = sessions[sessionId] || [];
+      const { feedbackCriteria } = req.body;
+
+      if (!feedbackCriteria) {
+        return res.status(400).json({ error: "Feedback criteria is required" });
+      }
+
+      if (sessionMessages.length === 0) {
+        return res.status(400).json({ error: "No chat messages to analyze" });
+      }
+
+      const prompt = `Please analyze the following chat conversation and provide feedback based on these criteria: ${feedbackCriteria}\n\nChat transcript:\n${sessionMessages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [
+          { role: "system", content: "You are an expert at providing constructive feedback on conversations." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+      });
+
+      const feedback = completion.choices[0].message.content;
+      res.json({ feedback });
+    } catch (error: any) {
+      console.error("Error getting feedback:", error);
+      res.status(500).json({ error: error.message });
     }
   });
 

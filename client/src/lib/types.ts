@@ -15,6 +15,7 @@ export interface AdminConfig {
   title: string;
   systemPrompt: string;
   userInstructions: string;
+  feedbackCriteria: string;
   temperature: number;
   maxTokens: number;
 }

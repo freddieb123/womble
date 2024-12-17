@@ -94,6 +94,50 @@ export default function ChatInterface({ config }: Props) {
           <Send className="h-4 w-4" />
         </Button>
       </form>
+      <div className="px-4 pb-4">
+        <Button
+          onClick={async () => {
+            if (!config.feedbackCriteria) {
+              toast({
+                variant: "destructive",
+                title: "Error",
+                description: "No feedback criteria specified for this chat configuration.",
+              });
+              return;
+            }
+
+            try {
+              const response = await fetch("/api/chat-feedback", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ feedbackCriteria: config.feedbackCriteria }),
+              });
+
+              if (!response.ok) {
+                throw new Error(await response.text());
+              }
+
+              const { feedback } = await response.json();
+              toast({
+                title: "Chat Feedback",
+                description: feedback,
+                duration: 10000,
+              });
+            } catch (error) {
+              toast({
+                variant: "destructive",
+                title: "Error",
+                description: error instanceof Error ? error.message : "Failed to get feedback",
+              });
+            }
+          }}
+          variant="outline"
+          className="w-full"
+          disabled={chatState.messages.length === 0}
+        >
+          Get Feedback
+        </Button>
+      </div>
     </div>
   );
 }
