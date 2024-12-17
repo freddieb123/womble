@@ -84,6 +84,46 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: error.message });
     }
   });
+  app.get("/api/chat-configs", async (_req, res) => {
+    try {
+      const configs = await db.query.chatConfigs.findMany({
+        orderBy: (chatConfigs, { desc }) => [desc(chatConfigs.createdAt)]
+      });
+      res.json(configs);
+    } catch (error: any) {
+      console.error("Error fetching chat configs:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/chat-configs/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid ID" });
+      }
+
+      const parsedConfig = chatConfigSchema.parse(req.body);
+      const result = await db.update(chatConfigs)
+        .set({
+          title: parsedConfig.title,
+          systemPrompt: parsedConfig.systemPrompt,
+          userInstructions: parsedConfig.userInstructions,
+        })
+        .where(eq(chatConfigs.id, id))
+        .returning();
+
+      if (!result.length) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+
+      res.json(result[0]);
+    } catch (error: any) {
+      console.error("Error updating chat config:", error);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
 
   app.post("/api/messages", async (req, res) => {
     try {
