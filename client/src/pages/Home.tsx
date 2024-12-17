@@ -50,6 +50,9 @@ export default function Home() {
   const handleCopyLink = async () => {
     try {
       const savedConfig = await saveConfig.mutateAsync();
+      if (!savedConfig) {
+        throw new Error("Failed to save configuration");
+      }
       const params = new URLSearchParams();
       params.set('configId', savedConfig.id.toString());
       const url = `${window.location.origin}/chat?${params.toString()}`;
@@ -59,6 +62,7 @@ export default function Home() {
         description: "Link copied to clipboard!",
       });
     } catch (error) {
+      console.error("Error copying link:", error);
       // Error already handled by mutation
     }
   };
@@ -66,10 +70,14 @@ export default function Home() {
   const handleOpenChat = async () => {
     try {
       const savedConfig = await saveConfig.mutateAsync();
+      if (!savedConfig) {
+        throw new Error("Failed to save configuration");
+      }
       const params = new URLSearchParams();
       params.set('configId', savedConfig.id.toString());
       window.open(`/chat?${params.toString()}`, '_blank');
     } catch (error) {
+      console.error("Error opening chat:", error);
       // Error already handled by mutation
     }
   };

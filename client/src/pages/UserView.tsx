@@ -8,7 +8,8 @@ import { SelectChatConfig } from "@db/schema";
 
 export default function UserView() {
   const [location] = useLocation();
-  const params = new URLSearchParams(location.split('?')[1] || '');
+  const searchParams = location.includes('?') ? location.split('?')[1] : '';
+  const params = new URLSearchParams(searchParams);
   const configId = params.get('configId');
 
   const { data: savedConfig, isLoading, error } = useQuery<SelectChatConfig>({
