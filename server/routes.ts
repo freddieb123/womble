@@ -111,6 +111,7 @@ export function registerRoutes(app: Express): Server {
           title: parsedConfig.title,
           systemPrompt: parsedConfig.systemPrompt,
           userInstructions: parsedConfig.userInstructions,
+          feedbackCriteria: parsedConfig.feedbackCriteria,
         })
         .where(eq(chatConfigs.id, id))
         .returning();
