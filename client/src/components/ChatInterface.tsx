@@ -69,14 +69,20 @@ export default function ChatInterface({ config }: Props) {
       recognitionRef.current.interimResults = true;
 
       recognitionRef.current.onresult = (event) => {
-        const transcript = Array.from(event.results)
-          .map(result => result[0].transcript)
-          .join('');
-        
-        // In voice-only mode, send message immediately when we detect the end of speech
-        if (voiceOnlyMode && event.results[event.results.length - 1].isFinal) {
-          sendMessage.mutate(transcript);
+        if (voiceOnlyMode) {
+          const lastResult = event.results[event.results.length - 1];
+          const transcript = lastResult[0].transcript;
+          
+          if (lastResult.isFinal) {
+            // Only send if the transcript is meaningful (not just noise)
+            if (transcript.trim().length > 2) {
+              sendMessage.mutate(transcript.trim());
+            }
+          }
         } else {
+          const transcript = Array.from(event.results)
+            .map(result => result[0].transcript)
+            .join('');
           setInput(transcript);
         }
       };

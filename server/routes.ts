@@ -187,8 +187,11 @@ export function registerRoutes(app: Express): Server {
       // Get OpenAI streaming response with optimized settings
       const isVoiceMode = req.query.mode === 'voice';
       const stream = await openai.chat.completions.create({
-        model: isVoiceMode ? "gpt-4-turbo-preview" : "gpt-3.5-turbo",
-        messages: apiMessages,
+        model: isVoiceMode ? "gpt-4o-realtime-preview-2024-12-17" : "gpt-3.5-turbo",
+        messages: apiMessages.map(msg => ({
+          role: msg.role as 'system' | 'user' | 'assistant',
+          content: msg.content
+        })),
         temperature: isVoiceMode ? 0.7 : parsedConfig.temperature,
         max_tokens: isVoiceMode ? 150 : parsedConfig.maxTokens, // Shorter responses for voice
         stream: true,
