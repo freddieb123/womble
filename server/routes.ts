@@ -52,6 +52,7 @@ export function registerRoutes(app: Express): Server {
       const result = await db.insert(chatConfigs).values({
         title: parsedConfig.title,
         systemPrompt: parsedConfig.systemPrompt,
+        userInstructions: parsedConfig.userInstructions,
       }).returning();
 
       console.log("Saved chat config:", result[0]);
