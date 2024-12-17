@@ -193,10 +193,10 @@ export function registerRoutes(app: Express): Server {
           content: msg.content
         })),
         temperature: isVoiceMode ? 0.7 : parsedConfig.temperature,
-        max_tokens: isVoiceMode ? 150 : parsedConfig.maxTokens, // Shorter responses for voice
+        max_tokens: isVoiceMode ? 50 : parsedConfig.maxTokens, // Even shorter responses for voice to improve latency
         stream: true,
-        presence_penalty: isVoiceMode ? 0.3 : 0.6, // Less penalty for voice to be more conversational
-        frequency_penalty: isVoiceMode ? 0.3 : 0.5, // Less penalty for voice to sound more natural
+        presence_penalty: isVoiceMode ? 0.2 : 0.6, // Minimal penalty for voice to be more responsive
+        frequency_penalty: isVoiceMode ? 0.2 : 0.5, // Minimal penalty for voice to sound more natural
         response_format: { type: "text" }
       });
 

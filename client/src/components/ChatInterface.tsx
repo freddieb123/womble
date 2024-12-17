@@ -36,10 +36,16 @@ export default function ChatInterface({ config }: Props) {
       if (nextText) speak(nextText);
     };
     
-    // Optimize speech settings for faster response
-    utterance.rate = 1.1; // Slightly faster than normal
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
+    // Optimize speech settings based on mode
+    if (voiceOnlyMode) {
+      utterance.rate = 1.2; // Faster for voice conversations
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+    } else {
+      utterance.rate = 1.1; // Slightly faster for text mode
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+    }
     
     // If currently speaking, queue the text
     // Otherwise speak immediately
@@ -172,10 +178,15 @@ export default function ChatInterface({ config }: Props) {
 
               assistantMessage.content += parsed.content;
               
-              // Optimize speech chunking for more natural flow
-              // Only speak when we have a complete phrase or punctuation
-              if (parsed.content.match(/[.!?,;]\s*$/) || parsed.content.length > 10) {
+              // For voice mode, handle speech synthesis differently
+              if (voiceOnlyMode) {
+                // In voice mode, speak each chunk immediately for faster responses
                 speak(parsed.content);
+              } else {
+                // For text mode, wait for complete phrases
+                if (parsed.content.match(/[.!?,;]\s*$/) || parsed.content.length > 10) {
+                  speak(parsed.content);
+                }
               }
               
               // Update UI immediately without waiting for speech
