@@ -36,6 +36,7 @@ export default function ChatInterface({ config }: Props) {
       const searchParams = new URLSearchParams(window.location.search);
       const configId = searchParams.get('configId');
       url.searchParams.set('configId', configId || '');
+      url.searchParams.set('sessionId', sessionId);
       
       const response = await fetch(url.toString(), {
         method: "POST",
@@ -55,7 +56,7 @@ export default function ChatInterface({ config }: Props) {
         timestamp: Date.now()
       };
       
-      queryClient.setQueryData<ChatState>(["/api/messages"], (old) => ({
+      queryClient.setQueryData<ChatState>([`/api/messages?configId=${configId}&sessionId=${sessionId}`], (old) => ({
         messages: [...(old?.messages || []), userMessage],
         isLoading: false,
         error: null
@@ -98,7 +99,7 @@ export default function ChatInterface({ config }: Props) {
               assistantMessage.content += parsed.content;
               
               // Update UI immediately
-              queryClient.setQueryData<ChatState>(["/api/messages"], (old) => ({
+              queryClient.setQueryData<ChatState>([`/api/messages?configId=${configId}&sessionId=${sessionId}`], (old) => ({
                 messages: [
                   ...(old?.messages || []).filter(m => m.id !== assistantMessage.id),
                   { ...assistantMessage }
