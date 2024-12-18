@@ -16,6 +16,13 @@ export default function ConversationAnalysis() {
   const [chatUrl, setChatUrl] = useState("");
   const [conversations, setConversations] = useState<{ sessionId: string; messages: Message[]; createdAt: string; feedback?: string }[]>([]);
   const [feedbacks, setFeedbacks] = useState<Record<string, ConversationFeedback>>({});
+  const [aggregatedData, setAggregatedData] = useState<{
+    summary?: {
+      totalParticipants: number;
+      completedWithFeedback: number;
+      averageScore: number;
+    };
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -95,49 +102,35 @@ export default function ConversationAnalysis() {
 
       const responseData = await response.json();
       console.log('Fetched data:', responseData);
-      
-      if (!conversationsResponse.ok) {
-        // If conversation is not found for the specific session, show error
-        if (conversationsResponse.status === 404 && sessionId) {
-          throw new Error("No conversation found for this chat link");
-        }
-        console.error('Failed to fetch conversations:', responseText);
-        throw new Error(`Failed to fetch conversations: ${responseText}`);
-      }
-      
-      let conversationsData;
-      try {
-        conversationsData = JSON.parse(responseText);
-        console.log('Parsed conversations data:', conversationsData);
-      } catch (error) {
-        console.error('Error parsing conversations data:', error);
-        throw new Error('Invalid response format from server');
-      }
-      
-      if (!Array.isArray(conversationsData)) {
-        throw new Error("Invalid response format: expected an array of conversations");
-      }
-      
-      if (sessionId && conversationsData.length === 0) {
-        throw new Error("No conversation found for this chat link");
-      }
 
       if (linkId) {
         // Handle aggregated feedback data
         const { feedbackItems, summary } = responseData;
         
         // Process each feedback item
-        const processedItems = feedbackItems.map(item => ({
+        const processedItems = feedbackItems.map((item: { 
+          sessionId: string; 
+          createdAt: string; 
+          feedback: any; 
+        }) => ({
           sessionId: item.sessionId,
           createdAt: item.createdAt,
           feedback: item.feedback
         }));
 
         setConversations(processedItems);
+        setAggregatedData(responseData);
         
         // Store feedback data
         const feedbackMap: Record<string, ConversationFeedback> = {};
-        feedbackItems.forEach(item => {
+        feedbackItems.forEach((item: {
+          sessionId: string;
+          feedback?: {
+            bullets: string[];
+            score: number;
+            summary: string;
+          };
+        }) => {
           if (item.feedback) {
             feedbackMap[item.sessionId] = {
               bullets: item.feedback.bullets || [],
@@ -235,7 +228,7 @@ export default function ConversationAnalysis() {
           </Card>
         ) : (
           <ScrollArea className="h-[calc(100vh-16rem)]">
-            {linkId && responseData?.summary && (
+            {aggregatedData?.summary && (
               <Card className="mb-4">
                 <CardHeader>
                   <h2 className="text-lg font-semibold">Aggregated Feedback Statistics</h2>
@@ -245,19 +238,19 @@ export default function ConversationAnalysis() {
                     <div className="bg-blue-50 p-4 rounded-lg text-center">
                       <div className="text-sm text-blue-600">Total Participants</div>
                       <div className="text-2xl font-bold text-blue-900">
-                        {responseData.summary.totalParticipants}
+                        {aggregatedData.summary.totalParticipants}
                       </div>
                     </div>
                     <div className="bg-blue-50 p-4 rounded-lg text-center">
                       <div className="text-sm text-blue-600">Completed with Feedback</div>
                       <div className="text-2xl font-bold text-blue-900">
-                        {responseData.summary.completedWithFeedback}
+                        {aggregatedData.summary.completedWithFeedback}
                       </div>
                     </div>
                     <div className="bg-blue-50 p-4 rounded-lg text-center">
                       <div className="text-sm text-blue-600">Average Score</div>
                       <div className="text-2xl font-bold text-blue-900">
-                        {responseData.summary.averageScore.toFixed(1)}/10
+                        {aggregatedData.summary.averageScore?.toFixed(1) || "N/A"}/10
                       </div>
                     </div>
                   </div>
