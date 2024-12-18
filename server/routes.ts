@@ -112,30 +112,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/chat-links", async (req: Request, res: Response) => {
-    try {
-      const { configId } = req.body;
-      
-      if (!configId) {
-        return res.status(400).json({ error: "Config ID is required" });
-      }
-
-      // Generate a unique linkId using crypto
-      const linkId = crypto.randomUUID();
-
-      // Return the generated link details
-      res.json({
-        configId,
-        linkId,
-        url: `/chat/${configId}?linkId=${linkId}`
-      });
-      
-    } catch (error: any) {
-      console.error("Error creating chat link:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
   app.post("/api/chat-configs", async (req, res) => {
     try {
       const parsedConfig = chatConfigSchema.parse(req.body);
@@ -221,15 +197,17 @@ export function registerRoutes(app: Express): Server {
       const { content, config } = req.body;
       const url = new URL(req.url, `http://${req.headers.host}`);
       const configId = parseInt(url.searchParams.get("configId") || "");
-      const linkId = url.searchParams.get("linkId");
+      const urlSessionId = url.searchParams.get("sessionId");
       
-      if (!linkId) {
-        console.error('Missing linkId in request parameters');
-        return res.status(400).json({ error: "Link ID is required for chat sessions" });
+      if (!urlSessionId) {
+        console.error('Missing sessionId in request parameters');
+        return res.status(400).json({ error: "Session ID is required for chat sessions" });
       }
       
+      // Use the URL's sessionId as the linkId for grouping related conversations
+      const linkId = urlSessionId;
       // Generate a new unique sessionId for this specific conversation instance
-      const sessionId = crypto.randomUUID();
+      let sessionId = crypto.randomUUID();
       
       console.log('Processing message:', {
         configId,

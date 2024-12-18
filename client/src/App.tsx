@@ -2,7 +2,6 @@ import { Switch, Route } from "wouter";
 import Home from "./pages/Home";
 import UserView from "./pages/UserView";
 import ConversationAnalysis from "./pages/ConversationAnalysis";
-import ChatLinkCreator from "./pages/ChatLinkCreator";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
 
@@ -12,7 +11,6 @@ function App() {
       <Route path="/" component={Home} />
       <Route path="/chat" component={UserView} />
       <Route path="/analysis" component={ConversationAnalysis} />
-      <Route path="/create-link" component={ChatLinkCreator} />
       <Route component={NotFound} />
     </Switch>
   );
