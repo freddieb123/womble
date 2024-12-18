@@ -208,7 +208,7 @@ export default function ChatInterface({ config }: Props) {
       </div>
 
       <Dialog open={feedbackOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" hideClose>
           <DialogHeader>
             <DialogTitle className="flex justify-between items-center">
               <span>Chat Feedback</span>
