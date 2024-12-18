@@ -225,26 +225,32 @@ export function registerRoutes(app: Express): Server {
 
       // Save or update conversation in database
       try {
-        // Always get the sessionId from URL/query params to ensure consistency
-        const currentSessionId = getSessionId(req);
-        console.log('Saving conversation with sessionId:', currentSessionId);
+        // Always get the sessionId from URL params first
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const sessionId = url.searchParams.get("sessionId");
         
-        const messagesJson = JSON.stringify(sessions[currentSessionId]);
+        if (!sessionId) {
+          throw new Error("No session ID provided in URL");
+        }
+        
+        console.log('Saving conversation with sessionId:', sessionId);
+        
+        const messagesJson = JSON.stringify(sessions[sessionId]);
         
         // Check if conversation exists
         const existingConversation = await db.query.conversations.findFirst({
           where: and(
             eq(conversations.configId, configId),
-            eq(conversations.sessionId, currentSessionId)
+            eq(conversations.sessionId, sessionId)
           ),
         });
 
         if (existingConversation) {
           console.log('Updating existing conversation:', {
             configId,
-            sessionId: currentSessionId,
-            messageCount: sessions[currentSessionId].length,
-            messageTypes: sessions[currentSessionId].map(m => m.role).join(', ')
+            sessionId,
+            messageCount: sessions[sessionId].length,
+            messageTypes: sessions[sessionId].map(m => m.role).join(', ')
           });
 
           await db
@@ -255,21 +261,21 @@ export function registerRoutes(app: Express): Server {
             })
             .where(and(
               eq(conversations.configId, configId),
-              eq(conversations.sessionId, currentSessionId)
+              eq(conversations.sessionId, sessionId)
             ));
         } else {
           console.log('Creating new conversation:', {
             configId,
-            sessionId: currentSessionId,
-            messageCount: sessions[currentSessionId].length,
-            messageTypes: sessions[currentSessionId].map(m => m.role).join(', ')
+            sessionId,
+            messageCount: sessions[sessionId].length,
+            messageTypes: sessions[sessionId].map(m => m.role).join(', ')
           });
 
           const result = await db
             .insert(conversations)
             .values({
               configId,
-              sessionId: currentSessionId,
+              sessionId,
               messages: messagesJson,
               createdAt: new Date(),
               updatedAt: new Date()
@@ -284,14 +290,14 @@ export function registerRoutes(app: Express): Server {
         const savedConversation = await db.query.conversations.findFirst({
           where: and(
             eq(conversations.configId, configId),
-            eq(conversations.sessionId, currentSessionId)
+            eq(conversations.sessionId, sessionId)
           ),
         });
 
         if (!savedConversation) {
           console.error('Failed to verify conversation save:', {
             configId,
-            sessionId: currentSessionId,
+            sessionId,
             attempted: true
           });
           throw new Error("Failed to save conversation - verification failed");
@@ -314,8 +320,8 @@ export function registerRoutes(app: Express): Server {
         console.error("Error saving conversation:", {
           error,
           configId,
-          sessionId: currentSessionId,
-          messageCount: sessions[currentSessionId]?.length
+          sessionId,
+          messageCount: sessions[sessionId]?.length
         });
       }
 
