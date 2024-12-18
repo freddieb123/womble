@@ -21,7 +21,7 @@ export const conversations = pgTable("conversations", {
   id: serial("id").primaryKey(),
   configId: integer("config_id").notNull().references(() => chatConfigs.id),
   sessionId: text("session_id").notNull(),
-  linkId: text("link_id").notNull().default('legacy'),
+  linkId: text("link_id").notNull(),
   messages: jsonb("messages").notNull().default('[]'),
   feedback: jsonb("feedback").default('{}'),
   createdAt: timestamp("created_at").defaultNow().notNull(),

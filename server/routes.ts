@@ -56,6 +56,11 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Valid config ID is required" });
       }
 
+      if (!linkId) {
+        console.log("Missing linkId in request parameters");
+        return res.status(400).json({ error: "Link ID is required" });
+      }
+
       console.log('Fetching messages:', { configId, sessionId, linkId });
 
       // Try to get messages from database first
@@ -203,8 +208,15 @@ export function registerRoutes(app: Express): Server {
       const { content, config } = req.body;
       const url = new URL(req.url, `http://${req.headers.host}`);
       const configId = parseInt(url.searchParams.get("configId") || "");
-      const linkId = url.searchParams.get("linkId") || 'legacy';
+      const linkId = url.searchParams.get("linkId");
       let sessionId = url.searchParams.get("sessionId");
+
+      if (!linkId) {
+        console.error('Missing linkId in request parameters');
+        return res.status(400).json({ error: "Link ID is required for chat sessions" });
+      }
+      
+      console.log('Processing message with linkId:', linkId);
       
       // For new conversations, generate a session ID
       if (!sessionId) {
