@@ -112,6 +112,30 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/chat-links", async (req: Request, res: Response) => {
+    try {
+      const { configId } = req.body;
+      
+      if (!configId) {
+        return res.status(400).json({ error: "Config ID is required" });
+      }
+
+      // Generate a unique linkId using crypto
+      const linkId = crypto.randomUUID();
+
+      // Return the generated link details
+      res.json({
+        configId,
+        linkId,
+        url: `/chat/${configId}?linkId=${linkId}`
+      });
+      
+    } catch (error: any) {
+      console.error("Error creating chat link:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/chat-configs", async (req, res) => {
     try {
       const parsedConfig = chatConfigSchema.parse(req.body);
