@@ -565,6 +565,85 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
     }
   });
 
+  // Endpoint to get aggregated feedback for conversations with the same link_id
+  app.get("/api/conversations/:configId/feedback", async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.configId);
+      const linkId = req.query.linkId as string;
+      
+      if (isNaN(configId)) {
+        return res.status(400).json({ error: "Invalid config ID" });
+      }
+      
+      if (!linkId) {
+        return res.status(400).json({ error: "Link ID is required" });
+      }
+
+      console.log('Fetching aggregated feedback for:', { configId, linkId });
+
+      // Get all conversations for this link
+      const linkedConversations = await db.query.conversations.findMany({
+        where: and(
+          eq(conversations.configId, configId),
+          eq(conversations.linkId, linkId)
+        ),
+        orderBy: [desc(conversations.createdAt)]
+      });
+
+      console.log(`Found ${linkedConversations.length} conversations for link:`, linkId);
+
+      // Process feedback data
+      const feedbackStats = {
+        totalConversations: linkedConversations.length,
+        averageScore: 0,
+        feedbackItems: [] as Array<{ feedback: any, sessionId: string, createdAt: Date }>,
+        summary: {
+          totalParticipants: linkedConversations.length,
+          completedWithFeedback: 0,
+          averageScore: 0
+        }
+      };
+
+      let totalScore = 0;
+      let conversationsWithFeedback = 0;
+
+      linkedConversations.forEach(conv => {
+        if (conv.feedback) {
+          let feedbackData;
+          try {
+            feedbackData = typeof conv.feedback === 'string' 
+              ? JSON.parse(conv.feedback)
+              : conv.feedback;
+
+            if (feedbackData.score) {
+              totalScore += feedbackData.score;
+              conversationsWithFeedback++;
+            }
+
+            feedbackStats.feedbackItems.push({
+              feedback: feedbackData,
+              sessionId: conv.sessionId,
+              createdAt: conv.createdAt
+            });
+          } catch (error) {
+            console.error('Error parsing feedback for session:', conv.sessionId, error);
+          }
+        }
+      });
+
+      // Calculate averages
+      if (conversationsWithFeedback > 0) {
+        feedbackStats.summary.averageScore = totalScore / conversationsWithFeedback;
+        feedbackStats.summary.completedWithFeedback = conversationsWithFeedback;
+      }
+
+      res.json(feedbackStats);
+    } catch (error: any) {
+      console.error("Error fetching aggregated feedback:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.configId);
@@ -580,6 +659,7 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
 
       // Build the where clause based on provided parameters
       let whereClause;
+      let orderByClause = [desc(conversations.createdAt)];
       
       if (sessionId) {
         // If sessionId is provided, fetch that specific conversation
@@ -590,6 +670,7 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
         console.log('Fetching specific conversation for sessionId:', sessionId);
       } else if (linkId) {
         // If linkId is provided, fetch all conversations in that group
+        // This allows us to see all conversations from the same shared link
         whereClause = and(
           eq(conversations.configId, configId),
           eq(conversations.linkId, linkId)
