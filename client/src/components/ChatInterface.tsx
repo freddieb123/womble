@@ -2,9 +2,10 @@ import { useState, useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send } from "lucide-react";
+import { Send, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import MessageBubble from "./MessageBubble";
 import type { Message, ChatState, AdminConfig } from "@/lib/types";
 
@@ -14,6 +15,8 @@ interface Props {
 
 export default function ChatInterface({ config }: Props) {
   const [input, setInput] = useState("");
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackData, setFeedbackData] = useState<{ bullets: string[], score: number | null }>({ bullets: [], score: null });
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -186,20 +189,8 @@ export default function ChatInterface({ config }: Props) {
               }
 
               const { bullets, score, rawFeedback } = await response.json();
-              toast({
-                title: `Chat Feedback - Score: ${score}/10`,
-                description: (
-                  <div className="mt-2 space-y-2">
-                    {bullets.map((bullet: string, index: number) => (
-                      <div key={index} className="flex items-start gap-2">
-                        <span>•</span>
-                        <span>{bullet}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) as any,
-                duration: 10000,
-              });
+              setFeedbackData({ bullets, score });
+              setFeedbackOpen(true);
             } catch (error) {
               toast({
                 variant: "destructive",
@@ -215,6 +206,29 @@ export default function ChatInterface({ config }: Props) {
           Get Feedback
         </Button>
       </div>
+
+      <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex justify-between items-center">
+              <span>Your Communication Score: {feedbackData.score}/10</span>
+              <DialogClose asChild>
+                <Button variant="ghost" size="icon">
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogClose>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {feedbackData.bullets.map((bullet, index) => (
+              <div key={index} className="flex items-start gap-2">
+                <span>•</span>
+                <span>{bullet}</span>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -263,7 +263,7 @@ ${sessionMessages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
         messages: [
           { 
             role: "system", 
-            content: "You are an expert at evaluating user communication. Focus solely on the user's messages and interactions, ignoring the AI assistant's responses. Provide concise bullet points about the user's performance, followed by a score out of 10. Keep feedback brief and actionable."
+            content: "You are an expert at evaluating user communication. Focus solely on the user's messages and interactions, ignoring the AI assistant's responses. Address the user directly using 'you' in your feedback. For example: 'You maintained clear communication' instead of 'The user maintained clear communication'. Provide concise bullet points about their performance, followed by a score out of 10. Keep feedback brief and actionable."
           },
           { role: "user", content: prompt }
         ],
