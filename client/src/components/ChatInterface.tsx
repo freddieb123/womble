@@ -185,10 +185,19 @@ export default function ChatInterface({ config }: Props) {
                 throw new Error(await response.text());
               }
 
-              const { feedback } = await response.json();
+              const { bullets, score, rawFeedback } = await response.json();
               toast({
-                title: "Chat Feedback",
-                description: feedback,
+                title: `Chat Feedback - Score: ${score}/10`,
+                description: (
+                  <div className="mt-2 space-y-2">
+                    {bullets.map((bullet: string, index: number) => (
+                      <div key={index} className="flex items-start gap-2">
+                        <span>•</span>
+                        <span>{bullet}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) as any,
                 duration: 10000,
               });
             } catch (error) {

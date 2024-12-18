@@ -249,20 +249,46 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "No chat messages to analyze" });
       }
 
-      const prompt = `Please analyze the following chat conversation and provide feedback based on these criteria: ${feedbackCriteria}\n\nChat transcript:\n${sessionMessages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
+      const prompt = `Analyze this chat conversation based on these criteria: ${feedbackCriteria}
+
+Please provide:
+1. 2-3 bullet points (maximum 4) highlighting key observations
+2. A score from 1-10 (where 10 is perfect) based on how well the conversation met the criteria
+
+Chat transcript:
+${sessionMessages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: [
-          { role: "system", content: "You are an expert at providing constructive feedback on conversations." },
+          { 
+            role: "system", 
+            content: "You are an expert at providing concise feedback. Always respond with bullet points followed by a score out of 10. Keep bullets brief and actionable."
+          },
           { role: "user", content: prompt }
         ],
         temperature: 0.7,
         max_tokens: 1000,
       });
 
-      const feedback = completion.choices[0].message.content;
-      res.json({ feedback });
+      const response = completion.choices[0].message.content;
+      
+      // Extract score from the response (assuming it's at the end after "Score:" or similar)
+      const scoreMatch = response.match(/(\d+)(?:\s*\/\s*10|\s*out of\s*10)/i);
+      const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
+      
+      // Get bullet points (everything before the score)
+      const bullets = response
+        .split(/score:?\s*\d+(?:\s*\/\s*10|\s*out of\s*10)/i)[0]
+        .split(/[•\-\*]\s+/)
+        .filter(bullet => bullet.trim())
+        .map(bullet => bullet.trim());
+
+      res.json({ 
+        bullets,
+        score,
+        rawFeedback: response 
+      });
     } catch (error: any) {
       console.error("Error getting feedback:", error);
       res.status(500).json({ error: error.message });
