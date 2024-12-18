@@ -217,13 +217,6 @@ export function registerRoutes(app: Express): Server {
 
       // Save conversation in database
       try {
-        console.log('Attempting to save conversation:', {
-          configId,
-          sessionId,
-          messageCount: sessions[sessionId].length,
-          sampleMessage: sessions[sessionId][0]
-        });
-
         const existingConversation = await db.query.conversations.findFirst({
           where: and(
             eq(conversations.configId, configId),
@@ -232,56 +225,66 @@ export function registerRoutes(app: Express): Server {
         });
 
         const messagesJson = JSON.stringify(sessions[sessionId]);
-        console.log('Messages to save:', {
+        
+        // Log what we're about to save
+        console.log('Saving conversation:', {
+          configId,
+          sessionId,
           messageCount: sessions[sessionId].length,
-          jsonLength: messagesJson.length,
-          sample: messagesJson.substring(0, 100) + '...'
+          messageTypes: sessions[sessionId].map(m => m.role).join(', '),
+          isUpdate: !!existingConversation
         });
 
         if (existingConversation) {
-          console.log('Updating existing conversation:', existingConversation.id);
           await db
             .update(conversations)
             .set({
-              messages: messagesJson
+              messages: messagesJson,
+              updatedAt: new Date() // Add this if you have an updatedAt column
             })
             .where(and(
               eq(conversations.configId, configId),
               eq(conversations.sessionId, sessionId)
             ));
         } else {
-          console.log('Creating new conversation');
-          const result = await db
+          await db
             .insert(conversations)
             .values({
               configId,
               sessionId,
-              messages: messagesJson
-            })
-            .returning();
-          console.log('Created conversation:', result[0]);
+              messages: messagesJson,
+              createdAt: new Date()
+            });
         }
 
-        // Verify the save by immediately reading back
+        // Verify the save
         const savedConversation = await db.query.conversations.findFirst({
           where: and(
             eq(conversations.configId, configId),
             eq(conversations.sessionId, sessionId)
           ),
         });
-        
+
+        if (!savedConversation) {
+          throw new Error("Failed to save conversation - verification failed");
+        }
+
+        const savedMessages = typeof savedConversation.messages === 'string' 
+          ? JSON.parse(savedConversation.messages) 
+          : savedConversation.messages;
+
         console.log('Verified saved conversation:', {
-          id: savedConversation?.id,
-          sessionId: savedConversation?.sessionId,
-          messagesCount: savedConversation ? 
-            (typeof savedConversation.messages === 'string' ? 
-              JSON.parse(savedConversation.messages).length : 
-              savedConversation.messages.length) : 
-            0
+          id: savedConversation.id,
+          sessionId: savedConversation.sessionId,
+          messageCount: Array.isArray(savedMessages) ? savedMessages.length : 0,
+          lastMessage: Array.isArray(savedMessages) && savedMessages.length > 0 
+            ? { role: savedMessages[savedMessages.length - 1].role } 
+            : null
         });
       } catch (error) {
         console.error("Error saving conversation:", error);
-        // Continue with the chat even if saving fails
+        // Log the error but continue with the chat
+        // This ensures the user experience isn't interrupted even if saving fails
       }
 
       // Set up SSE headers
@@ -348,6 +351,29 @@ export function registerRoutes(app: Express): Server {
         timestamp: Date.now()
       };
       sessions[sessionId].push(assistantMessage);
+
+      // Save the complete conversation with the assistant's response
+      try {
+        const messagesJson = JSON.stringify(sessions[sessionId]);
+        await db
+          .update(conversations)
+          .set({
+            messages: messagesJson,
+            updatedAt: new Date() // Add this if you have an updatedAt column
+          })
+          .where(and(
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId)
+          ));
+        
+        console.log('Saved completed conversation:', {
+          sessionId,
+          messageCount: sessions[sessionId].length,
+          lastMessage: { role: 'assistant' }
+        });
+      } catch (error) {
+        console.error("Error saving completed conversation:", error);
+      }
 
       // End the stream
       res.write('data: [DONE]\n\n');
