@@ -510,21 +510,51 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
       console.log('Query parameters:', {
         configId,
         sessionId,
-        hasSessionFilter: !!sessionId
+        hasSessionFilter: !!sessionId,
+        whereClause
       });
 
+      // First try to find the exact conversation if sessionId is provided
+      if (sessionId) {
+        const conversation = await db.query.conversations.findFirst({
+          where: and(
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId)
+          ),
+        });
+
+        if (!conversation) {
+          console.log('No conversation found for session:', sessionId);
+          return res.status(404).json({ error: "Conversation not found" });
+        }
+
+        // Parse messages and return single conversation
+        try {
+          const messages = typeof conversation.messages === 'string' 
+            ? JSON.parse(conversation.messages) 
+            : conversation.messages;
+
+          return res.json([{
+            sessionId: conversation.sessionId,
+            messages,
+            createdAt: conversation.createdAt,
+            feedback: conversation.feedback
+          }]);
+        } catch (error) {
+          console.error('Error parsing conversation messages:', error);
+          return res.status(500).json({ error: "Failed to parse conversation data" });
+        }
+      }
+
+      // If no sessionId, get all conversations for the config
       const savedConversations = await db.query.conversations.findMany({
-        where: whereClause,
+        where: eq(conversations.configId, configId),
         orderBy: [desc(conversations.createdAt)]
       });
 
       console.log('Found conversations:', savedConversations.length);
 
       if (savedConversations.length === 0) {
-        if (sessionId) {
-          console.log('No conversation found for session:', sessionId);
-          return res.status(404).json({ error: "Conversation not found" });
-        }
         console.log('No conversations found for config:', configId);
         return res.json([]);
       }

@@ -24,6 +24,7 @@ export const conversations = pgTable("conversations", {
   messages: jsonb("messages").notNull().default('[]'),
   feedback: jsonb("feedback").default('{}'),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => {
   return {
     configSessionIdx: unique("config_session_idx").on(table.configId, table.sessionId),
