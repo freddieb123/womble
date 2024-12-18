@@ -6,6 +6,8 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
+import { type Request as ReqType, type Response as ResType } from "express";
+
 
 const chatConfigSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -23,13 +25,8 @@ const openai = new OpenAI({
   dangerouslyAllowBrowser: false
 });
 
-// Store messages per session
-const sessions: Record<string, {
-  id: string;
-  content: string;
-  role: 'user' | 'assistant';
-  timestamp: number;
-}[]> = {};
+// Store conversations by session ID
+const sessions: Record<string, any[]> = {};
 
 function getSessionId(req: Request): string {
   // Use query parameters as session identifier
@@ -299,6 +296,22 @@ ${sessionMessages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
       });
     } catch (error: any) {
       console.error("Error getting feedback:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
+    try {
+      const configId = req.params.configId;
+      // Get all conversations for this config by checking session IDs
+      const relevantSessions = Object.entries(sessions)
+        .filter(([sessionId]) => sessionId.includes(`configId=${configId}`))
+        .map(([_, messages]) => messages)
+        .filter(messages => messages.length > 0);
+
+      res.json(relevantSessions);
+    } catch (error: any) {
+      console.error("Error fetching conversations:", error);
       res.status(500).json({ error: error.message });
     }
   });
