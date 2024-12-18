@@ -27,25 +27,13 @@ const openai = new OpenAI({
 // Store conversations by session ID
 const sessions: Record<string, any[]> = {};
 
-function getSessionId(req: Request): string {
-  // Try to get sessionId from URL search params first
+function getSessionIdFromUrl(req: Request): string {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  const urlSessionId = url.searchParams.get("sessionId");
-  if (urlSessionId) {
-    console.log('Found sessionId in URL search params:', urlSessionId);
-    return urlSessionId;
+  const sessionId = url.searchParams.get("sessionId");
+  if (!sessionId) {
+    throw new Error("No session ID provided in URL");
   }
-  
-  // Then try query parameters
-  if (req.query.sessionId) {
-    console.log('Found sessionId in query params:', req.query.sessionId);
-    return req.query.sessionId as string;
-  }
-  
-  // Only generate a new one if no existing sessionId found
-  const newSessionId = crypto.randomUUID();
-  console.log('No existing sessionId found, generated new one:', newSessionId);
-  return newSessionId;
+  return sessionId;
 }
 
 const configSchema = z.object({
@@ -63,8 +51,10 @@ export function registerRoutes(app: Express): Server {
       const sessionId = url.searchParams.get("sessionId");
 
       if (!sessionId) {
-        return res.status(400).json({ error: "Session ID is required" });
+        return res.status(400).json({ error: "Session ID is required in URL" });
       }
+
+      console.log('Fetching messages with URL sessionId:', sessionId);
 
       console.log("Fetching messages for:", { configId, sessionId });
 
@@ -213,8 +203,11 @@ export function registerRoutes(app: Express): Server {
 
       const parsedConfig = configSchema.parse(config);
 
-      // Initialize session array if it doesn't exist
+      console.log('Processing message with sessionId:', sessionId);
+      
+      // Initialize or get session array
       if (!sessions[sessionId]) {
+        console.log('Initializing new session:', sessionId);
         sessions[sessionId] = [];
       }
 
@@ -226,6 +219,11 @@ export function registerRoutes(app: Express): Server {
         timestamp: Date.now()
       };
       sessions[sessionId].push(userMessage);
+      console.log('Added user message to session:', {
+        sessionId,
+        messageId: userMessage.id,
+        messagesCount: sessions[sessionId].length
+      });
 
       // Save or update conversation in database
       try {
@@ -430,8 +428,13 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/chat-feedback", async (req: Request, res: Response) => {
     try {
       const { feedbackCriteria } = req.body;
-      const sessionId = getSessionId(req);
-      const configId = parseInt(new URL(req.url, `http://${req.headers.host}`).searchParams.get("configId") || "0");
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const sessionId = url.searchParams.get("sessionId");
+      const configId = parseInt(url.searchParams.get("configId") || "0");
+
+      if (!sessionId) {
+        return res.status(400).json({ error: "Session ID is required in URL" });
+      }
 
       console.log('Received feedback request:', { feedbackCriteria, configId, sessionId });
 
