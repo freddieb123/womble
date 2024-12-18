@@ -14,8 +14,8 @@ interface ConversationFeedback {
 
 export default function ConversationAnalysis() {
   const [chatUrl, setChatUrl] = useState("");
-  const [conversations, setConversations] = useState<{ sessionId: string; messages: Message[]; createdAt: string }[]>([]);
-  const [feedbacks, setFeedbacks] = useState<ConversationFeedback[]>([]);
+  const [conversations, setConversations] = useState<{ sessionId: string; messages: Message[]; createdAt: string; feedback?: string }[]>([]);
+  const [feedbacks, setFeedbacks] = useState<Record<string, ConversationFeedback>>({});
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -94,36 +94,41 @@ export default function ConversationAnalysis() {
         throw new Error("Invalid response format for conversations");
       }
 
-      setConversations(conversationsData);
-      console.log('Set conversations state with:', conversationsData.length, 'conversations');
-
-      // Get feedback for each conversation
-      const feedbackPromises = conversationsData.map(async (conversation) => {
-        console.log('Processing conversation:', conversation);
+      // Process conversations and their feedback
+      const processedConversations = conversationsData.map(conversation => {
+        let parsedFeedback: ConversationFeedback | undefined;
         
-        const feedbackResponse = await fetch("/api/chat-feedback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            feedbackCriteria: config.feedbackCriteria,
-            messages: conversation.messages
-          }),
-        });
-
-        if (!feedbackResponse.ok) {
-          const errorText = await feedbackResponse.text();
-          console.error('Feedback error:', errorText);
-          throw new Error(`Failed to get feedback: ${errorText}`);
+        if (conversation.feedback) {
+          try {
+            const feedbackData = JSON.parse(conversation.feedback);
+            if (feedbackData.bullets && feedbackData.score !== undefined) {
+              parsedFeedback = {
+                bullets: feedbackData.bullets,
+                score: feedbackData.score,
+                summary: feedbackData.summary
+              };
+            }
+          } catch (error) {
+            console.error('Error parsing feedback:', error);
+          }
         }
 
-        const feedback = await feedbackResponse.json();
-        console.log('Received feedback:', feedback);
-        return feedback;
+        // If we have parsed feedback, store it in the feedbacks state
+        if (parsedFeedback) {
+          setFeedbacks(prev => ({
+            ...prev,
+            [conversation.sessionId]: parsedFeedback
+          }));
+        }
+
+        return {
+          ...conversation,
+          feedback: conversation.feedback
+        };
       });
 
-      const allFeedback = await Promise.all(feedbackPromises);
-      console.log('All feedback:', allFeedback);
-      setFeedbacks(allFeedback);
+      setConversations(processedConversations);
+      console.log('Set conversations state with:', processedConversations.length, 'conversations');
     } catch (error) {
       toast({
         variant: "destructive",
@@ -176,10 +181,10 @@ export default function ConversationAnalysis() {
                     </p>
                   </CardHeader>
                   <CardContent>
-                    {feedbacks[index] && (
+                    {feedbacks[conversation.sessionId] ? (
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          {feedbacks[index].bullets.map((bullet, bulletIndex) => (
+                          {feedbacks[conversation.sessionId].bullets.map((bullet, bulletIndex) => (
                             <div key={bulletIndex} className="flex items-start gap-2 text-sm">
                               <span>•</span>
                               <span>{bullet}</span>
@@ -189,15 +194,19 @@ export default function ConversationAnalysis() {
                         <div className="border-t pt-4">
                           <div className="flex flex-col gap-2 bg-blue-50 p-4 rounded-lg">
                             <span className="text-2xl font-bold text-blue-900">
-                              {feedbacks[index].score}/10
+                              {feedbacks[conversation.sessionId].score}/10
                             </span>
-                            {feedbacks[index].summary && (
+                            {feedbacks[conversation.sessionId].summary && (
                               <p className="text-sm text-blue-700">
-                                {feedbacks[index].summary}
+                                {feedbacks[conversation.sessionId].summary}
                               </p>
                             )}
                           </div>
                         </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        No feedback available for this conversation
                       </div>
                     )}
                   </CardContent>
