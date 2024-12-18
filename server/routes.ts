@@ -28,12 +28,24 @@ const openai = new OpenAI({
 const sessions: Record<string, any[]> = {};
 
 function getSessionId(req: Request): string {
+  // First try to get sessionId from query parameters
   if (req.query.sessionId) {
+    console.log('Found sessionId in query params:', req.query.sessionId);
     return req.query.sessionId as string;
   }
+  
+  // Then try to get it from URL search params
   const url = new URL(req.url, `http://${req.headers.host}`);
   const sessionId = url.searchParams.get("sessionId");
-  return sessionId || crypto.randomUUID();
+  if (sessionId) {
+    console.log('Found sessionId in URL search params:', sessionId);
+    return sessionId;
+  }
+  
+  // If no sessionId found, generate a new one
+  const newSessionId = crypto.randomUUID();
+  console.log('Generated new sessionId:', newSessionId);
+  return newSessionId;
 }
 
 const configSchema = z.object({
@@ -180,7 +192,7 @@ export function registerRoutes(app: Express): Server {
       const { content, config } = req.body;
       const url = new URL(req.url, `http://${req.headers.host}`);
       const configId = parseInt(url.searchParams.get("configId") || "");
-      const sessionId = url.searchParams.get("sessionId") || crypto.randomUUID();
+      const sessionId = getSessionId(req);
       
       if (!content || typeof content !== "string") {
         return res.status(400).send("Message content is required");
@@ -192,8 +204,10 @@ export function registerRoutes(app: Express): Server {
 
       const parsedConfig = configSchema.parse(config);
 
-      // Create a new conversation for each chat session
-      sessions[sessionId] = [];
+      // Initialize session array if it doesn't exist
+      if (!sessions[sessionId]) {
+        sessions[sessionId] = [];
+      }
 
       // Add user message
       const userMessage = {
