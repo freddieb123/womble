@@ -193,7 +193,6 @@ export default function ChatInterface({ config }: Props) {
               const searchParams = new URLSearchParams(window.location.search);
               const configId = searchParams.get('configId');
               url.searchParams.set('configId', configId || '');
-              url.searchParams.set('sessionId', sessionId);
 
               const response = await fetch(url.toString(), {
                 method: "POST",

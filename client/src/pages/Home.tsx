@@ -114,11 +114,10 @@ export default function Home() {
 
   const handleCopyLink = async (configId: number) => {
     try {
-      const sessionId = crypto.randomUUID();
-      const url = `${window.location.origin}/chat?configId=${configId}&sessionId=${sessionId}`;
+      const url = `${window.location.origin}/chat?configId=${configId}`;
       await navigator.clipboard.writeText(url);
       toast({
-        description: "New chat link copied to clipboard!",
+        description: "Link copied to clipboard!",
       });
     } catch (error) {
       toast({
@@ -127,6 +126,10 @@ export default function Home() {
         description: "Failed to copy link",
       });
     }
+  };
+
+  const handleOpenChat = (configId: number) => {
+    window.open(`${window.location.origin}/chat?configId=${configId}`, '_blank');
   };
 
   if (isLoading) {
@@ -253,7 +256,11 @@ export default function Home() {
                     <div className="flex gap-2">
                       <Button size="sm" onClick={() => handleCopyLink(config.id)}>
                         <Copy className="h-4 w-4 mr-2" />
-                        Create New Chat Link
+                        Copy Link
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handleOpenChat(config.id)}>
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Open Chat
                       </Button>
                     </div>
                   </div>

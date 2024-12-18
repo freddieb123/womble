@@ -27,13 +27,10 @@ const openai = new OpenAI({
 // Store conversations by session ID
 const sessions: Record<string, any[]> = {};
 
-function getSessionIdFromUrl(req: Request): string {
+function getSessionId(req: Request): string {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const sessionId = url.searchParams.get("sessionId");
-  if (!sessionId) {
-    throw new Error("No session ID provided in URL");
-  }
-  return sessionId;
+  return sessionId || crypto.randomUUID();
 }
 
 const configSchema = z.object({
@@ -48,50 +45,33 @@ export function registerRoutes(app: Express): Server {
     try {
       const url = new URL(req.url, `http://${req.headers.host}`);
       const configId = parseInt(url.searchParams.get("configId") || "");
-      const linkId = url.searchParams.get("linkId");
+      const sessionId = url.searchParams.get("sessionId") || crypto.randomUUID();
+
+      console.log("Fetching messages for:", { configId, sessionId });
 
       if (isNaN(configId) || configId <= 0) {
         console.log("Invalid configId:", configId);
         return res.status(400).json({ error: "Valid config ID is required" });
       }
 
-      if (!linkId) {
-        console.log("Missing linkId in request parameters");
-        return res.status(400).json({ error: "Link ID is required" });
-      }
-
-      console.log('Fetching messages:', { configId, linkId });
-
       // Try to get messages from database first
-      let whereClause;
-      
-      whereClause = and(
-        eq(conversations.configId, configId),
-        eq(conversations.linkId, linkId)
-      );
-      
-
       const conversation = await db.query.conversations.findFirst({
-        where: whereClause,
-        orderBy: [desc(conversations.createdAt)]
+        where: and(
+          eq(conversations.configId, configId),
+          eq(conversations.sessionId, sessionId)
+        ),
       });
 
-      console.log("Found conversation:", conversation ? "yes" : "no", {
-        configId,
-        linkId,
-        hasMessages: conversation?.messages ? true : false
-      });
+      console.log("Found conversation:", conversation ? "yes" : "no");
 
-      // Initialize or update session with messages from the database
-      const sessionId = crypto.randomUUID(); // Generate a new session ID here
-      if (conversation) {
-        sessions[sessionId] = typeof conversation.messages === 'string' 
-          ? JSON.parse(conversation.messages) 
-          : conversation.messages;
-        console.log("Loaded existing conversation from database, messages count:", sessions[sessionId].length);
-      } else {
-        sessions[sessionId] = [];
-        console.log("No existing conversation found, initializing empty session:", sessionId);
+      // Initialize session if it doesn't exist
+      if (!sessions[sessionId]) {
+        sessions[sessionId] = conversation ? 
+          (typeof conversation.messages === 'string' ? 
+            JSON.parse(conversation.messages) : 
+            conversation.messages) : 
+          [];
+        console.log("Initialized session with messages count:", sessions[sessionId].length);
       }
 
       const response = {
@@ -197,36 +177,11 @@ export function registerRoutes(app: Express): Server {
       const { content, config } = req.body;
       const url = new URL(req.url, `http://${req.headers.host}`);
       const configId = parseInt(url.searchParams.get("configId") || "");
-      const urlSessionId = url.searchParams.get("sessionId");
-      
-      if (!urlSessionId) {
-        console.error('Missing sessionId in request parameters');
-        return res.status(400).json({ error: "Session ID is required for chat sessions" });
-      }
-      
-      // Use the URL's sessionId as the linkId for grouping related conversations
-      const linkId = urlSessionId;
-      // Generate a new unique sessionId for this specific conversation instance
-      let sessionId = crypto.randomUUID();
-      
-      console.log('Processing message:', {
-        configId,
-        urlSessionId,
-        linkId: urlSessionId,
-        newSessionId: sessionId
-      });
-      
-      // For new conversations, generate a session ID
-      if (!sessionId) {
-        sessionId = crypto.randomUUID();
-        console.log('Generated new sessionId:', sessionId);
-      }
+      const sessionId = url.searchParams.get("sessionId") || crypto.randomUUID();
       
       if (!content || typeof content !== "string") {
         return res.status(400).send("Message content is required");
       }
-
-      console.log('Processing message:', { configId, sessionId, linkId });
 
       if (isNaN(configId) || configId <= 0) {
         return res.status(400).json({ error: "Valid config ID is required" });
@@ -234,138 +189,68 @@ export function registerRoutes(app: Express): Server {
 
       const parsedConfig = configSchema.parse(config);
 
-      console.log('Processing message with sessionId:', sessionId);
-      
-      // Ensure the sessions object exists and initialize if needed
+      // Initialize session if it doesn't exist
       if (!sessions[sessionId]) {
-        console.log('Initializing new session:', sessionId);
-        sessions[sessionId] = [];
+        // Try to get existing conversation from database
+        const existingConversation = await db.query.conversations.findFirst({
+          where: and(
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId)
+          ),
+        });
+
+        sessions[sessionId] = existingConversation ? 
+          JSON.parse(existingConversation.messages as string) : [];
       }
 
-      // Create and add user message
+      // Add user message
       const userMessage = {
         id: crypto.randomUUID(),
         content,
         role: 'user' as const,
         timestamp: Date.now()
       };
-
-      // Add message to session storage
       sessions[sessionId].push(userMessage);
-      
-      console.log('Added message to session:', {
-        sessionId,
-        linkId,
-        messageId: userMessage.id,
-        messageCount: sessions[sessionId].length
-      });
 
-      // Save or update conversation in database
-        try {
-          if (!sessionId) {
-            throw new Error("Session ID is required at this point");
-          }
+      // Save conversation in database
+      try {
+        const existingConversation = await db.query.conversations.findFirst({
+          where: and(
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId)
+          ),
+        });
 
-          console.log('Saving conversation:', {
-            configId,
-            sessionId,
-            linkId,
-            messageCount: sessions[sessionId].length
-          });
-
-          // Use the session ID for this chat
-          const messagesJson = JSON.stringify(sessions[sessionId]);
-          
-          // Check if conversation exists
-          const existingConversation = await db.query.conversations.findFirst({
-            where: and(
+        if (existingConversation) {
+          await db
+            .update(conversations)
+            .set({
+              messages: JSON.stringify(sessions[sessionId])
+            })
+            .where(and(
               eq(conversations.configId, configId),
               eq(conversations.sessionId, sessionId)
-            ),
-          });
-
-          if (existingConversation) {
-            console.log('Updating existing conversation:', {
-              configId,
-              sessionId: sessionId,
-              linkId,
-              messageCount: sessions[sessionId].length,
-              messageTypes: sessions[sessionId].map(m => m.role).join(', ')
-            });
-
-            await db
-              .update(conversations)
-              .set({
-                messages: messagesJson,
-                updatedAt: new Date()
-              })
-              .where(and(
-                eq(conversations.configId, configId),
-                eq(conversations.sessionId, sessionId)
-              ));
-          } else {
-            console.log('Creating new conversation:', {
-              configId,
-              sessionId: sessionId,
-              linkId,
-              messageCount: sessions[sessionId].length,
-              messageTypes: sessions[sessionId].map(m => m.role).join(', ')
-            });
-
-            const result = await db
-              .insert(conversations)
-              .values({
-                configId,
-                sessionId: sessionId,
-                linkId,
-                messages: messagesJson,
-                createdAt: new Date(),
-                updatedAt: new Date()
-              })
-              .returning();
-              
-            console.log('Created new conversation with ID:', result[0].id);
-
-          }
-
-          // Verify the save
-          const savedConversation = await db.query.conversations.findFirst({
-            where: and(
-              eq(conversations.configId, configId),
-              eq(conversations.sessionId, sessionId)
-            ),
-          });
-
-          if (!savedConversation) {
-            console.error('Failed to verify conversation save:', {
+            ));
+        } else {
+          await db
+            .insert(conversations)
+            .values({
               configId,
               sessionId,
-              attempted: true
+              messages: JSON.stringify(sessions[sessionId])
             });
-            throw new Error("Failed to save conversation - verification failed");
-          }
-
-          const savedMessages = typeof savedConversation.messages === 'string' 
-            ? JSON.parse(savedConversation.messages) 
-            : savedConversation.messages;
-
-          console.log('Successfully verified saved conversation:', {
-            id: savedConversation.id,
-            sessionId: savedConversation.sessionId,
-            configId: savedConversation.configId,
-            messageCount: Array.isArray(savedMessages) ? savedMessages.length : 0,
-            lastMessage: Array.isArray(savedMessages) && savedMessages.length > 0 
-              ? { role: savedMessages[savedMessages.length - 1].role } 
-              : null
-          });
-        } catch (error) {
-          console.error("Error saving conversation:", {
-            error,
-            configId,
-            sessionId,
-            messageCount: sessions[sessionId]?.length
-          });
         }
+
+        // Log success for debugging
+        console.log("Successfully saved conversation:", {
+          configId,
+          sessionId,
+          messageCount: sessions[sessionId].length
+        });
+      } catch (error) {
+        console.error("Error saving conversation:", error);
+        // Continue with the chat even if saving fails
+      }
 
       // Set up SSE headers
       res.setHeader('Content-Type', 'text/event-stream');
@@ -432,29 +317,6 @@ export function registerRoutes(app: Express): Server {
       };
       sessions[sessionId].push(assistantMessage);
 
-      // Save the complete conversation with the assistant's response
-      try {
-        const messagesJson = JSON.stringify(sessions[sessionId]);
-        await db
-          .update(conversations)
-          .set({
-            messages: messagesJson,
-            updatedAt: new Date() // Add this if you have an updatedAt column
-          })
-          .where(and(
-            eq(conversations.configId, configId),
-            eq(conversations.sessionId, sessionId)
-          ));
-        
-        console.log('Saved completed conversation:', {
-          sessionId,
-          messageCount: sessions[sessionId].length,
-          lastMessage: { role: 'assistant' }
-        });
-      } catch (error) {
-        console.error("Error saving completed conversation:", error);
-      }
-
       // End the stream
       res.write('data: [DONE]\n\n');
       res.end();
@@ -467,42 +329,32 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/chat-feedback", async (req: Request, res: Response) => {
     try {
-      const { feedbackCriteria } = req.body;
-      const url = new URL(req.url, `http://${req.headers.host}`);
-      const sessionId = url.searchParams.get("sessionId");
-      const configId = parseInt(url.searchParams.get("configId") || "0");
+      const { feedbackCriteria, messages } = req.body;
+      const sessionId = getSessionId(req);
+      const configId = parseInt(new URL(req.url, `http://${req.headers.host}`).searchParams.get("configId") || "0");
 
-      if (!sessionId) {
-        return res.status(400).json({ error: "Session ID is required in URL" });
-      }
-
-      console.log('Received feedback request:', { feedbackCriteria, configId, sessionId });
+      console.log('Received feedback request:', { feedbackCriteria, messageCount: messages?.length, configId, sessionId });
 
       if (!feedbackCriteria) {
         return res.status(400).json({ error: "Feedback criteria is required" });
       }
 
-      // Fetch the conversation from database
-      const conversation = await db.query.conversations.findFirst({
-        where: and(
-          eq(conversations.configId, configId),
-          eq(conversations.sessionId, sessionId)
-        ),
-      });
+      // Use provided messages if available, otherwise fall back to session messages
+      const messagesToAnalyze = messages || (sessions[sessionId] || []);
 
-      if (!conversation) {
-        return res.status(400).json({ error: "Conversation not found" });
-      }
-
-      const messagesToAnalyze = typeof conversation.messages === 'string' 
-        ? JSON.parse(conversation.messages)
-        : conversation.messages;
-
-      if (!Array.isArray(messagesToAnalyze) || messagesToAnalyze.length === 0) {
+      if (messagesToAnalyze.length === 0) {
         return res.status(400).json({ error: "No chat messages to analyze" });
       }
 
-      // Remove duplicate conversation check since we already have it above
+      if (configId) {
+        // Find the conversation in the database
+        const conversation = await db.query.conversations.findFirst({
+          where: and(
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId)
+          )
+        });
+      }
 
       const prompt = `Analyze the user's interactions in this conversation based on these criteria: ${feedbackCriteria}
 
@@ -575,219 +427,21 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
     }
   });
 
-  // Endpoint to get aggregated feedback for conversations with the same link_id
-  app.get("/api/conversations/:configId/feedback", async (req: Request, res: Response) => {
-    try {
-      const configId = parseInt(req.params.configId);
-      const linkId = req.query.linkId as string;
-      
-      if (isNaN(configId)) {
-        return res.status(400).json({ error: "Invalid config ID" });
-      }
-      
-      if (!linkId) {
-        return res.status(400).json({ error: "Link ID is required" });
-      }
-
-      console.log('Fetching aggregated feedback for:', { configId, linkId });
-
-      // Get all conversations for this link
-      const linkedConversations = await db.query.conversations.findMany({
-        where: and(
-          eq(conversations.configId, configId),
-          eq(conversations.linkId, linkId)
-        ),
-        orderBy: [desc(conversations.createdAt)]
-      });
-
-      console.log(`Found ${linkedConversations.length} conversations for link:`, linkId);
-
-      // Process feedback data
-      const feedbackStats = {
-        totalConversations: linkedConversations.length,
-        averageScore: 0,
-        feedbackItems: [] as Array<{ feedback: any, sessionId: string, createdAt: Date }>,
-        summary: {
-          totalParticipants: linkedConversations.length,
-          completedWithFeedback: 0,
-          averageScore: 0
-        }
-      };
-
-      let totalScore = 0;
-      let conversationsWithFeedback = 0;
-
-      linkedConversations.forEach(conv => {
-        if (conv.feedback) {
-          let feedbackData;
-          try {
-            feedbackData = typeof conv.feedback === 'string' 
-              ? JSON.parse(conv.feedback)
-              : conv.feedback;
-
-            if (feedbackData.score) {
-              totalScore += feedbackData.score;
-              conversationsWithFeedback++;
-            }
-
-            feedbackStats.feedbackItems.push({
-              feedback: feedbackData,
-              sessionId: conv.sessionId,
-              createdAt: conv.createdAt
-            });
-          } catch (error) {
-            console.error('Error parsing feedback for session:', conv.sessionId, error);
-          }
-        }
-      });
-
-      // Calculate averages
-      if (conversationsWithFeedback > 0) {
-        feedbackStats.summary.averageScore = totalScore / conversationsWithFeedback;
-        feedbackStats.summary.completedWithFeedback = conversationsWithFeedback;
-      }
-
-      res.json(feedbackStats);
-    } catch (error: any) {
-      console.error("Error fetching aggregated feedback:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
   app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.configId);
-      const sessionId = req.query.sessionId as string;
-      const linkId = req.query.linkId as string;
-      
-      console.log('Fetching conversations for:', { configId, sessionId, linkId });
-      
       if (isNaN(configId)) {
-        console.log('Invalid configId:', configId);
         return res.status(400).json({ error: "Invalid config ID" });
       }
 
-      // Build the where clause based on provided parameters
-      let whereClause;
-      let orderByClause = [desc(conversations.createdAt)];
-      
-      if (sessionId) {
-        // If sessionId is provided, fetch that specific conversation
-        whereClause = and(
-          eq(conversations.configId, configId),
-          eq(conversations.sessionId, sessionId)
-        );
-        console.log('Fetching specific conversation for sessionId:', sessionId);
-      } else if (linkId) {
-        // If linkId is provided, fetch all conversations in that group
-        // This allows us to see all conversations from the same shared link
-        whereClause = and(
-          eq(conversations.configId, configId),
-          eq(conversations.linkId, linkId)
-        );
-        console.log('Fetching all conversations for linkId:', linkId);
-      } else {
-        // Otherwise, fetch all conversations for this config
-        whereClause = eq(conversations.configId, configId);
-        console.log('Fetching all conversations for configId:', configId);
-      }
-
-      console.log('Query parameters:', {
-        configId,
-        sessionId,
-        hasSessionFilter: !!sessionId,
-        whereClause
-      });
-
-      // First try to find the exact conversation if sessionId is provided
-      if (sessionId) {
-        const conversation = await db.query.conversations.findFirst({
-          where: and(
-            eq(conversations.configId, configId),
-            eq(conversations.sessionId, sessionId)
-          ),
-        });
-
-        if (!conversation) {
-          console.log('No conversation found for session:', sessionId);
-          return res.status(404).json({ error: "Conversation not found" });
-        }
-
-        // Parse messages and return single conversation
-        try {
-          const messages = typeof conversation.messages === 'string' 
-            ? JSON.parse(conversation.messages) 
-            : conversation.messages;
-
-          return res.json([{
-            sessionId: conversation.sessionId,
-            messages,
-            createdAt: conversation.createdAt,
-            feedback: conversation.feedback
-          }]);
-        } catch (error) {
-          console.error('Error parsing conversation messages:', error);
-          return res.status(500).json({ error: "Failed to parse conversation data" });
-        }
-      }
-
-      // If no sessionId, get all conversations for the config
       const savedConversations = await db.query.conversations.findMany({
-        where: whereClause, // Use the where clause built earlier
+        where: eq(conversations.configId, configId),
         orderBy: [desc(conversations.createdAt)]
       });
 
-      console.log('Found conversations:', savedConversations.length);
-
-      if (savedConversations.length === 0) {
-        console.log('No conversations found for config:', configId);
-        return res.json([]);
-      }
-
-      const conversationMessages = savedConversations.map(conv => {
-        let messages;
-        try {
-          if (typeof conv.messages === 'string') {
-            // First try parsing as is
-            try {
-              messages = JSON.parse(conv.messages);
-            } catch {
-              // If that fails, try handling double-escaped JSON
-              const unescaped = conv.messages
-                .replace(/^""|""$/g, '') // Remove leading/trailing double quotes
-                .replace(/\\"/g, '"')     // Replace escaped quotes
-                .replace(/\\\\/g, '\\');  // Replace double backslashes
-              messages = JSON.parse(unescaped);
-            }
-          } else {
-            messages = conv.messages;
-          }
-
-          if (!Array.isArray(messages)) {
-            console.error(`Invalid messages format for session ${conv.sessionId}:`, messages);
-            messages = [];
-          }
-
-          console.log(`Successfully processed conversation ${conv.sessionId}:`, { 
-            messageCount: messages.length,
-            sampleMessage: messages.length > 0 ? {
-              id: messages[0].id,
-              role: messages[0].role,
-              contentPreview: messages[0].content.substring(0, 50)
-            } : null
-          });
-        } catch (error) {
-          console.error(`Error processing messages for session ${conv.sessionId}:`, error);
-          messages = [];
-        }
-        return {
-          sessionId: conv.sessionId,
-          messages,
-          createdAt: conv.createdAt
-        };
-      });
-      
-      console.log('Returning processed conversations:', conversationMessages.length);
+      const conversationMessages = savedConversations.map(conv => 
+        typeof conv.messages === 'string' ? JSON.parse(conv.messages) : conv.messages
+      );
       res.json(conversationMessages);
     } catch (error: any) {
       console.error("Error fetching conversations:", error);

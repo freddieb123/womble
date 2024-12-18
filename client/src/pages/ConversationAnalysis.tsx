@@ -14,180 +14,75 @@ interface ConversationFeedback {
 
 export default function ConversationAnalysis() {
   const [chatUrl, setChatUrl] = useState("");
-  const [conversations, setConversations] = useState<{ sessionId: string; messages: Message[]; createdAt: string; feedback?: string }[]>([]);
-  const [feedbacks, setFeedbacks] = useState<Record<string, ConversationFeedback>>({});
-  const [aggregatedData, setAggregatedData] = useState<{
-    summary?: {
-      totalParticipants: number;
-      completedWithFeedback: number;
-      averageScore: number;
-    };
-  } | null>(null);
+  const [conversations, setConversations] = useState<Message[][]>([]);
+  const [feedbacks, setFeedbacks] = useState<ConversationFeedback[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   const handleAnalyze = async () => {
-    setIsLoading(true);
     try {
-      // Validate and extract URL parameters
-      let url;
-      try {
-        url = new URL(chatUrl);
-      } catch (error) {
-        throw new Error("Invalid URL format");
-      }
-
-      // Extract configId and linkId from URL path or search params
-      let configId, linkId;
-      
-      // Try to get configId from path first (e.g., /chat/13?linkId=abc123)
-      const pathMatch = url.pathname.match(/\/chat\/(\d+)/);
-      if (pathMatch) {
-        configId = pathMatch[1];
-      } else {
-        // Fallback to search params
-        configId = url.searchParams.get("configId");
-      }
-      
-      // Look for linkId in search params (support both linkId and legacy sessionId)
-      linkId = url.searchParams.get("linkId") || url.searchParams.get("sessionId");
-      
-      console.log('Extracted URL parameters:', { configId, linkId, pathname: url.pathname, searchParams: Object.fromEntries(url.searchParams) });
+      // Extract configId from URL
+      const url = new URL(chatUrl);
+      const configId = url.searchParams.get("configId");
       
       if (!configId) {
         throw new Error("Invalid chat URL - missing configId");
       }
 
-      if (!linkId) {
-        throw new Error("Invalid chat URL - missing linkId");
-      }
-
-      console.log("Analyzing conversation with:", { configId, linkId, url: chatUrl });
-      console.log('Starting analysis with URL:', chatUrl);
-      console.log('Extracted params:', { configId, linkId });
+      setIsLoading(true);
 
       // Fetch config to get feedback criteria
-      console.log('Fetching chat configuration...');
       const configResponse = await fetch(`/api/chat-configs/${configId}`);
       if (!configResponse.ok) {
-        const errorText = await configResponse.text();
-        console.error('Failed to fetch config:', errorText);
-        throw new Error(`Failed to fetch chat configuration: ${errorText}`);
+        throw new Error(`Failed to fetch chat configuration: ${await configResponse.text()}`);
       }
       const config = await configResponse.json();
-      console.log('Received config:', config);
 
       if (!config.feedbackCriteria) {
-        console.error('No feedback criteria found in config');
         throw new Error("This chat configuration has no feedback criteria set");
       }
 
-      // If we have a linkId, fetch aggregated feedback, otherwise fetch individual conversations
-      const endpoint = linkId 
-        ? `/api/conversations/${configId}/feedback?linkId=${linkId}`
-        : `/api/conversations/${configId}`;
+      // Fetch conversations
+      const conversationsResponse = await fetch(`/api/conversations/${configId}`);
+      if (!conversationsResponse.ok) {
+        throw new Error(`Failed to fetch conversations: ${await conversationsResponse.text()}`);
+      }
+      const conversationsData = await conversationsResponse.json();
       
-      console.log('Fetching from endpoint:', endpoint);
-      
-      const response = await fetch(endpoint);
-      console.log('Response status:', response.status);
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error("No conversations found for this link");
+      if (!Array.isArray(conversationsData) || conversationsData.length === 0) {
+        throw new Error("No conversations found for this chat configuration");
+      }
+
+      setConversations(conversationsData);
+      console.log('Fetched conversations:', conversationsData);
+
+      // Get feedback for each conversation
+      const feedbackPromises = conversationsData.map(async (conversation: Message[]) => {
+        console.log('Processing conversation:', conversation);
+        
+        const feedbackResponse = await fetch("/api/chat-feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            feedbackCriteria: config.feedbackCriteria,
+            messages: conversation
+          }),
+        });
+
+        if (!feedbackResponse.ok) {
+          const errorText = await feedbackResponse.text();
+          console.error('Feedback error:', errorText);
+          throw new Error(`Failed to get feedback: ${errorText}`);
         }
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch data: ${errorText}`);
-      }
 
-      const responseData = await response.json();
-      console.log('Fetched data:', responseData);
+        const feedback = await feedbackResponse.json();
+        console.log('Received feedback:', feedback);
+        return feedback;
+      });
 
-      if (linkId) {
-        // Handle aggregated feedback data
-        const { feedbackItems, summary } = responseData;
-        
-        // Process each feedback item
-        const processedItems = feedbackItems.map((item: { 
-          sessionId: string; 
-          createdAt: string; 
-          feedback: any; 
-        }) => ({
-          sessionId: item.sessionId,
-          createdAt: item.createdAt,
-          feedback: item.feedback
-        }));
-
-        setConversations(processedItems);
-        setAggregatedData(responseData);
-        
-        // Store feedback data
-        const feedbackMap: Record<string, ConversationFeedback> = {};
-        feedbackItems.forEach((item: {
-          sessionId: string;
-          feedback?: {
-            bullets: string[];
-            score: number;
-            summary: string;
-          };
-        }) => {
-          if (item.feedback) {
-            feedbackMap[item.sessionId] = {
-              bullets: item.feedback.bullets || [],
-              score: item.feedback.score || null,
-              summary: item.feedback.summary || null
-            };
-          }
-        });
-        
-        setFeedbacks(feedbackMap);
-        
-        console.log('Processed aggregated feedback:', {
-          items: processedItems.length,
-          averageScore: summary.averageScore,
-          totalParticipants: summary.totalParticipants
-        });
-      } else {
-        // Handle individual conversation data
-        const processedConversations = responseData.map((conversation: any) => {
-          let parsedFeedback: ConversationFeedback | undefined;
-          
-          if (conversation.feedback) {
-            try {
-              const feedbackData = typeof conversation.feedback === 'string' 
-                ? JSON.parse(conversation.feedback)
-                : conversation.feedback;
-                
-              if (feedbackData.bullets || feedbackData.score !== undefined) {
-                parsedFeedback = {
-                  bullets: feedbackData.bullets || [],
-                  score: feedbackData.score || null,
-                  summary: feedbackData.summary || null
-                };
-              }
-            } catch (error) {
-              console.error('Error parsing feedback:', error);
-            }
-          }
-
-          // Store parsed feedback
-          if (parsedFeedback) {
-            setFeedbacks(prev => ({
-              ...prev,
-              [conversation.sessionId]: parsedFeedback
-            }));
-          }
-
-          return {
-            ...conversation,
-            feedback: conversation.feedback
-          };
-        });
-
-        setConversations(processedConversations);
-        console.log('Set conversations state with:', processedConversations.length, 'conversations');
-      }
-
+      const allFeedback = await Promise.all(feedbackPromises);
+      console.log('All feedback:', allFeedback);
+      setFeedbacks(allFeedback);
     } catch (error) {
       toast({
         variant: "destructive",
@@ -228,51 +123,19 @@ export default function ConversationAnalysis() {
           </Card>
         ) : (
           <ScrollArea className="h-[calc(100vh-16rem)]">
-            {aggregatedData?.summary && (
-              <Card className="mb-4">
-                <CardHeader>
-                  <h2 className="text-lg font-semibold">Aggregated Feedback Statistics</h2>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-blue-50 p-4 rounded-lg text-center">
-                      <div className="text-sm text-blue-600">Total Participants</div>
-                      <div className="text-2xl font-bold text-blue-900">
-                        {aggregatedData.summary.totalParticipants}
-                      </div>
-                    </div>
-                    <div className="bg-blue-50 p-4 rounded-lg text-center">
-                      <div className="text-sm text-blue-600">Completed with Feedback</div>
-                      <div className="text-2xl font-bold text-blue-900">
-                        {aggregatedData.summary.completedWithFeedback}
-                      </div>
-                    </div>
-                    <div className="bg-blue-50 p-4 rounded-lg text-center">
-                      <div className="text-sm text-blue-600">Average Score</div>
-                      <div className="text-2xl font-bold text-blue-900">
-                        {aggregatedData.summary.averageScore?.toFixed(1) || "N/A"}/10
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
             <div className="space-y-4">
-              {conversations.map((conversation) => (
-                <Card key={conversation.sessionId}>
+              {conversations.map((conversation, index) => (
+                <Card key={index}>
                   <CardHeader>
                     <h2 className="text-lg font-semibold">
-                      Conversation from {new Date(conversation.createdAt).toLocaleString()}
+                      Conversation {index + 1}
                     </h2>
-                    <p className="text-sm text-muted-foreground">
-                      Session ID: {conversation.sessionId}
-                    </p>
                   </CardHeader>
                   <CardContent>
-                    {feedbacks[conversation.sessionId] ? (
+                    {feedbacks[index] && (
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          {feedbacks[conversation.sessionId].bullets.map((bullet, bulletIndex) => (
+                          {feedbacks[index].bullets.map((bullet, bulletIndex) => (
                             <div key={bulletIndex} className="flex items-start gap-2 text-sm">
                               <span>•</span>
                               <span>{bullet}</span>
@@ -282,19 +145,15 @@ export default function ConversationAnalysis() {
                         <div className="border-t pt-4">
                           <div className="flex flex-col gap-2 bg-blue-50 p-4 rounded-lg">
                             <span className="text-2xl font-bold text-blue-900">
-                              {feedbacks[conversation.sessionId].score}/10
+                              {feedbacks[index].score}/10
                             </span>
-                            {feedbacks[conversation.sessionId].summary && (
+                            {feedbacks[index].summary && (
                               <p className="text-sm text-blue-700">
-                                {feedbacks[conversation.sessionId].summary}
+                                {feedbacks[index].summary}
                               </p>
                             )}
                           </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground">
-                        No feedback available for this conversation
                       </div>
                     )}
                   </CardContent>

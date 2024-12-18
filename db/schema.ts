@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, unique, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 
@@ -21,17 +21,12 @@ export const conversations = pgTable("conversations", {
   id: serial("id").primaryKey(),
   configId: integer("config_id").notNull().references(() => chatConfigs.id),
   sessionId: text("session_id").notNull(),
-  linkId: text("link_id").notNull(),
   messages: jsonb("messages").notNull().default('[]'),
   feedback: jsonb("feedback").default('{}'),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => {
   return {
-    // Index for finding all conversations in a group (same link_id)
-    linkIdConfigIdx: index("link_id_config_idx").on(table.linkId, table.configId),
-    // Index for finding specific conversations
-    configSessionIdx: index("config_session_idx").on(table.configId, table.sessionId),
+    configSessionIdx: unique("config_session_idx").on(table.configId, table.sessionId),
   };
 });
 
