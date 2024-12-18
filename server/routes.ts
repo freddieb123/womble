@@ -342,8 +342,20 @@ export function registerRoutes(app: Express): Server {
       // Use provided messages if available, otherwise fall back to session messages
       const messagesToAnalyze = messages || (sessions[sessionId] || []);
 
-      if (messagesToAnalyze.length === 0) {
-        return res.status(400).json({ error: "No chat messages to analyze" });
+      if (!Array.isArray(messagesToAnalyze) || messagesToAnalyze.length === 0) {
+        return res.status(400).json({ 
+          error: "No chat messages to analyze. Please have a conversation first before requesting feedback." 
+        });
+      }
+
+      // Ensure there are at least two messages (one from user and one from assistant)
+      const hasUserMessage = messagesToAnalyze.some(m => m.role === 'user');
+      const hasAssistantMessage = messagesToAnalyze.some(m => m.role === 'assistant');
+      
+      if (!hasUserMessage || !hasAssistantMessage) {
+        return res.status(400).json({ 
+          error: "Please have at least one complete exchange before requesting feedback." 
+        });
       }
 
       if (configId) {

@@ -197,7 +197,10 @@ export default function ChatInterface({ config }: Props) {
               const response = await fetch(url.toString(), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ feedbackCriteria: config.feedbackCriteria }),
+                body: JSON.stringify({ 
+                  feedbackCriteria: config.feedbackCriteria,
+                  messages: chatState.messages 
+                }),
               });
 
               if (!response.ok) {
