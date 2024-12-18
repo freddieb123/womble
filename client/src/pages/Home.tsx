@@ -14,6 +14,7 @@ type ChatConfig = {
   title: string;
   systemPrompt: string;
   userInstructions: string | null;
+  feedbackCriteria: string | null;
   createdAt: string;
 };
 
@@ -32,7 +33,6 @@ export default function Home() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch all chat configurations
   const { data: configs, isLoading } = useQuery<ChatConfig[]>({
     queryKey: ['/api/chat-configs'],
   });
@@ -57,20 +57,20 @@ export default function Home() {
       
       return response.json();
     },
-    onSuccess: (savedConfig) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
       setIsCreateOpen(false);
       setConfig({
         title: "",
         systemPrompt: "You are a helpful AI assistant.",
         userInstructions: "",
+        feedbackCriteria: "",
         temperature: 0.7,
         maxTokens: 1000
       });
       toast({
         description: "Configuration saved successfully!",
       });
-      return savedConfig;
     },
     onError: (error: Error) => {
       toast({
@@ -149,29 +149,34 @@ export default function Home() {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-blue-900">AI Chat Configurations</h1>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                New Configuration
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
-              <DialogHeader>
-                <DialogTitle>Create New Configuration</DialogTitle>
-              </DialogHeader>
-              <ScrollArea className="flex-1 -mx-6 px-6">
-                <div className="py-4">
-                  <AdminPanel config={config} onConfigChange={setConfig} />
-                </div>
-              </ScrollArea>
-              <div className="pt-4 border-t flex justify-end">
-                <Button onClick={() => saveConfig.mutate()} disabled={saveConfig.isPending}>
-                  Save Configuration
+          <div className="flex gap-4">
+            <Button variant="outline" onClick={() => window.location.href = '/analysis'}>
+              View Conversations
+            </Button>
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Configuration
                 </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
+                <DialogHeader>
+                  <DialogTitle>Create New Configuration</DialogTitle>
+                </DialogHeader>
+                <ScrollArea className="flex-1 -mx-6 px-6">
+                  <div className="py-4">
+                    <AdminPanel config={config} onConfigChange={setConfig} />
+                  </div>
+                </ScrollArea>
+                <div className="pt-4 border-t flex justify-end">
+                  <Button onClick={() => saveConfig.mutate()} disabled={saveConfig.isPending}>
+                    Save Configuration
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         <ScrollArea className="h-[calc(100vh-12rem)]">
@@ -200,10 +205,12 @@ export default function Home() {
                               <div className="py-4">
                                 <AdminPanel
                                   config={{
-                                    ...editingConfig,
+                                    title: editingConfig.title,
+                                    systemPrompt: editingConfig.systemPrompt,
+                                    userInstructions: editingConfig.userInstructions || "",
+                                    feedbackCriteria: editingConfig.feedbackCriteria || "",
                                     temperature: 0.7,
                                     maxTokens: 1000,
-                                    feedbackCriteria: editingConfig.feedbackCriteria || "",
                                   }}
                                   onConfigChange={(updatedConfig) => {
                                     setEditingConfig({
