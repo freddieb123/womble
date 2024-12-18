@@ -1,13 +1,11 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
-import { chatConfigs } from "@db/schema";
+import { chatConfigs, conversations } from "@db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
-import { type Request as ReqType, type Response as ResType } from "express";
-import { conversations } from "@db/schema";
 
 
 const chatConfigSchema = z.object({
@@ -43,14 +41,42 @@ const configSchema = z.object({
 
 
 export function registerRoutes(app: Express): Server {
-  app.get("/api/messages", (req: Request, res: Response) => {
-    const sessionId = getSessionId(req);
-    const sessionMessages = sessions[sessionId] || [];
-    res.json({
-      messages: sessionMessages,
-      isLoading: false,
-      error: null
-    });
+  app.get("/api/messages", async (req: Request, res: Response) => {
+    try {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const configId = parseInt(url.searchParams.get("configId") || "");
+      const sessionId = `configId=${configId}`;
+
+      if (isNaN(configId) || configId <= 0) {
+        return res.status(400).json({ error: "Valid config ID is required" });
+      }
+
+      // Try to get messages from database first
+      const conversation = await db.query.conversations.findFirst({
+        where: and(
+          eq(conversations.configId, configId),
+          eq(conversations.sessionId, sessionId)
+        ),
+      });
+
+      // Initialize session if it doesn't exist
+      if (!sessions[sessionId]) {
+        sessions[sessionId] = conversation ? JSON.parse(conversation.messages as string) : [];
+      }
+
+      res.json({
+        messages: sessions[sessionId],
+        isLoading: false,
+        error: null
+      });
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      res.status(500).json({
+        messages: [],
+        isLoading: false,
+        error: "Failed to fetch messages"
+      });
+    }
   });
 
   app.post("/api/chat-configs", async (req, res) => {
@@ -152,7 +178,16 @@ export function registerRoutes(app: Express): Server {
 
       // Initialize session if it doesn't exist
       if (!sessions[sessionId]) {
-        sessions[sessionId] = [];
+        // Try to get existing conversation from database
+        const existingConversation = await db.query.conversations.findFirst({
+          where: and(
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId)
+          ),
+        });
+
+        sessions[sessionId] = existingConversation ? 
+          JSON.parse(existingConversation.messages as string) : [];
       }
 
       // Add user message
@@ -164,17 +199,23 @@ export function registerRoutes(app: Express): Server {
       };
       sessions[sessionId].push(userMessage);
 
-      // Save or update conversation in database
-      await db.insert(conversations)
-        .values({
-          configId,
-          sessionId,
-          messages: JSON.stringify(sessions[sessionId])
-        })
-        .onConflictDoUpdate({
-          target: [conversations.configId, conversations.sessionId],
-          set: { messages: JSON.stringify(sessions[sessionId]) }
-        });
+      // Save conversation in database
+      try {
+        await db
+          .insert(conversations)
+          .values({
+            configId,
+            sessionId,
+            messages: JSON.stringify(sessions[sessionId])
+          })
+          .onConflictDoUpdate({
+            target: [conversations.configId, conversations.sessionId],
+            set: { messages: JSON.stringify(sessions[sessionId]) }
+          });
+      } catch (error) {
+        console.error("Error saving conversation:", error);
+        // Continue with the chat even if saving fails
+      }
 
       // Set up SSE headers
       res.setHeader('Content-Type', 'text/event-stream');
@@ -290,7 +331,7 @@ Score: [1-10]
 [Brief one-line summary of overall performance]
 
 Chat transcript:
-${messagesToAnalyze.map(m => `${m.role}: ${m.content}`).join('\n')}`;
+${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
