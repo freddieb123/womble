@@ -42,7 +42,10 @@ export default function ConversationAnalysis() {
         configId = url.searchParams.get("configId");
       }
       
+      // Look for sessionId in search params
       sessionId = url.searchParams.get("sessionId");
+      
+      console.log('Extracted URL parameters:', { configId, sessionId, pathname: url.pathname, searchParams: Object.fromEntries(url.searchParams) });
       
       if (!configId) {
         throw new Error("Invalid chat URL - missing configId");
@@ -79,18 +82,32 @@ export default function ConversationAnalysis() {
       const conversationsResponse = await fetch(conversationsUrl);
       console.log('Response status:', conversationsResponse.status);
       
+      let responseText;
+      try {
+        responseText = await conversationsResponse.text();
+        console.log('Raw response:', responseText);
+      } catch (error) {
+        console.error('Error reading response:', error);
+        throw new Error('Failed to read server response');
+      }
+      
       if (!conversationsResponse.ok) {
         // If conversation is not found for the specific session, show error
         if (conversationsResponse.status === 404 && sessionId) {
           throw new Error("No conversation found for this chat link");
         }
-        const errorText = await conversationsResponse.text();
-        console.error('Failed to fetch conversations:', errorText);
-        throw new Error(`Failed to fetch conversations: ${errorText}`);
+        console.error('Failed to fetch conversations:', responseText);
+        throw new Error(`Failed to fetch conversations: ${responseText}`);
       }
       
-      const conversationsData = await conversationsResponse.json();
-      console.log('Received conversations data:', conversationsData);
+      let conversationsData;
+      try {
+        conversationsData = JSON.parse(responseText);
+        console.log('Parsed conversations data:', conversationsData);
+      } catch (error) {
+        console.error('Error parsing conversations data:', error);
+        throw new Error('Invalid response format from server');
+      }
       
       if (!Array.isArray(conversationsData)) {
         throw new Error("Invalid response format: expected an array of conversations");
