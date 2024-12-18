@@ -2,11 +2,12 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { chatConfigs } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
 import { type Request as ReqType, type Response as ResType } from "express";
+import { conversations } from "@db/schema";
 
 
 const chatConfigSchema = z.object({
@@ -142,6 +143,11 @@ export function registerRoutes(app: Express): Server {
       }
 
       const parsedConfig = configSchema.parse(config);
+      const configId = parseInt(new URL(req.url, `http://${req.headers.host}`).searchParams.get("configId") || "0");
+
+      if (!configId) {
+        return res.status(400).send("Config ID is required");
+      }
 
       // Initialize session if it doesn't exist
       if (!sessions[sessionId]) {
@@ -156,6 +162,18 @@ export function registerRoutes(app: Express): Server {
         timestamp: Date.now()
       };
       sessions[sessionId].push(userMessage);
+
+      // Save or update conversation in database
+      await db.insert(conversations)
+        .values({
+          configId,
+          sessionId,
+          messages: JSON.stringify(sessions[sessionId])
+        })
+        .onConflictDoUpdate({
+          target: [conversations.configId, conversations.sessionId],
+          set: { messages: JSON.stringify(sessions[sessionId]) }
+        });
 
       // Set up SSE headers
       res.setHeader('Content-Type', 'text/event-stream');
@@ -235,17 +253,30 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/chat-feedback", async (req: Request, res: Response) => {
     try {
       const { feedbackCriteria, messages } = req.body;
-      console.log('Received feedback request:', { feedbackCriteria, messageCount: messages?.length });
+      const sessionId = getSessionId(req);
+      const configId = parseInt(new URL(req.url, `http://${req.headers.host}`).searchParams.get("configId") || "0");
+
+      console.log('Received feedback request:', { feedbackCriteria, messageCount: messages?.length, configId, sessionId });
 
       if (!feedbackCriteria) {
         return res.status(400).json({ error: "Feedback criteria is required" });
       }
 
       // Use provided messages if available, otherwise fall back to session messages
-      const messagesToAnalyze = messages || (sessions[getSessionId(req)] || []);
+      const messagesToAnalyze = messages || (sessions[sessionId] || []);
 
       if (messagesToAnalyze.length === 0) {
         return res.status(400).json({ error: "No chat messages to analyze" });
+      }
+
+      if (configId) {
+        // Find the conversation in the database
+        const conversation = await db.query.conversations.findFirst({
+          where: and(
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId)
+          )
+        });
       }
 
       const prompt = `Analyze the user's interactions in this conversation based on these criteria: ${feedbackCriteria}
@@ -258,7 +289,7 @@ Score: [1-10]
 [Brief one-line summary of overall performance]
 
 Chat transcript:
-${sessionMessages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
+${messagesToAnalyze.map(m => `${m.role}: ${m.content}`).join('\n')}`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
@@ -273,7 +304,10 @@ ${sessionMessages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
         max_tokens: 1000,
       });
 
-      const response = completion.choices[0].message.content;
+      const response = completion.choices[0]?.message?.content;
+      if (!response) {
+        throw new Error("Failed to get response from OpenAI");
+      }
       
       // Extract score and summary
       const scoreMatch = response.match(/Score:\s*(\d+)/i);
@@ -290,12 +324,26 @@ ${sessionMessages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
         .filter(bullet => bullet.trim())
         .map(bullet => bullet.trim());
 
-      res.json({ 
+      const feedbackData = {
         bullets,
         score,
         summary,
-        rawFeedback: response 
-      });
+        rawFeedback: response
+      };
+
+      if (configId) {
+        // Update feedback in database
+        await db.update(conversations)
+          .set({ feedback: JSON.stringify(feedbackData) })
+          .where(
+            and(
+              eq(conversations.configId, configId),
+              eq(conversations.sessionId, sessionId)
+            )
+          );
+      }
+
+      res.json(feedbackData);
     } catch (error: any) {
       console.error("Error getting feedback:", error);
       res.status(500).json({ error: error.message });
@@ -304,14 +352,18 @@ ${sessionMessages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
 
   app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
     try {
-      const configId = req.params.configId;
-      // Get all conversations for this config by checking session IDs
-      const relevantSessions = Object.entries(sessions)
-        .filter(([sessionId]) => sessionId.includes(`configId=${configId}`))
-        .map(([_, messages]) => messages)
-        .filter(messages => messages.length > 0);
+      const configId = parseInt(req.params.configId);
+      if (isNaN(configId)) {
+        return res.status(400).json({ error: "Invalid config ID" });
+      }
 
-      res.json(relevantSessions);
+      const savedConversations = await db.query.conversations.findMany({
+        where: eq(conversations.configId, configId),
+        orderBy: [desc(conversations.createdAt)]
+      });
+
+      const conversationMessages = savedConversations.map(conv => JSON.parse(conv.messages as string));
+      res.json(conversationMessages);
     } catch (error: any) {
       console.error("Error fetching conversations:", error);
       res.status(500).json({ error: error.message });
