@@ -67,21 +67,9 @@ export default function ConversationAnalysis() {
       console.log('Fetching conversations from:', conversationsUrl);
       const conversationsResponse = await fetch(conversationsUrl);
       if (!conversationsResponse.ok) {
-        // If it's a 404 with a specific session, try fetching all conversations for the config
+        // If conversation is not found for the specific session, show error
         if (conversationsResponse.status === 404 && sessionId) {
-          console.log('Session not found, fetching all conversations for config');
-          const allConversationsResponse = await fetch(`/api/conversations/${configId}`);
-          if (!allConversationsResponse.ok) {
-            const errorText = await allConversationsResponse.text();
-            console.error('Failed to fetch all conversations:', errorText);
-            throw new Error(`Failed to fetch conversations: ${errorText}`);
-          }
-          const allConversationsData = await allConversationsResponse.json();
-          if (!Array.isArray(allConversationsData)) {
-            throw new Error("Invalid response format for conversations");
-          }
-          setConversations(allConversationsData);
-          return;
+          throw new Error("No conversation found for this chat link");
         }
         const errorText = await conversationsResponse.text();
         console.error('Failed to fetch conversations:', errorText);
