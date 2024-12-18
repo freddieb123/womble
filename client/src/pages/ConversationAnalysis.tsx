@@ -26,7 +26,7 @@ export default function ConversationAnalysis() {
       const configId = url.searchParams.get("configId");
       
       if (!configId) {
-        throw new Error("Invalid chat URL");
+        throw new Error("Invalid chat URL - missing configId");
       }
 
       setIsLoading(true);
@@ -34,20 +34,32 @@ export default function ConversationAnalysis() {
       // Fetch config to get feedback criteria
       const configResponse = await fetch(`/api/chat-configs/${configId}`);
       if (!configResponse.ok) {
-        throw new Error("Failed to fetch chat configuration");
+        throw new Error(`Failed to fetch chat configuration: ${await configResponse.text()}`);
       }
       const config = await configResponse.json();
+
+      if (!config.feedbackCriteria) {
+        throw new Error("This chat configuration has no feedback criteria set");
+      }
 
       // Fetch conversations
       const conversationsResponse = await fetch(`/api/conversations/${configId}`);
       if (!conversationsResponse.ok) {
-        throw new Error("Failed to fetch conversations");
+        throw new Error(`Failed to fetch conversations: ${await conversationsResponse.text()}`);
       }
       const conversationsData = await conversationsResponse.json();
+      
+      if (!Array.isArray(conversationsData) || conversationsData.length === 0) {
+        throw new Error("No conversations found for this chat configuration");
+      }
+
       setConversations(conversationsData);
+      console.log('Fetched conversations:', conversationsData);
 
       // Get feedback for each conversation
       const feedbackPromises = conversationsData.map(async (conversation: Message[]) => {
+        console.log('Processing conversation:', conversation);
+        
         const feedbackResponse = await fetch("/api/chat-feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -58,13 +70,18 @@ export default function ConversationAnalysis() {
         });
 
         if (!feedbackResponse.ok) {
-          throw new Error("Failed to get feedback");
+          const errorText = await feedbackResponse.text();
+          console.error('Feedback error:', errorText);
+          throw new Error(`Failed to get feedback: ${errorText}`);
         }
 
-        return feedbackResponse.json();
+        const feedback = await feedbackResponse.json();
+        console.log('Received feedback:', feedback);
+        return feedback;
       });
 
       const allFeedback = await Promise.all(feedbackPromises);
+      console.log('All feedback:', allFeedback);
       setFeedbacks(allFeedback);
     } catch (error) {
       toast({

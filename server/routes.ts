@@ -234,15 +234,17 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/chat-feedback", async (req: Request, res: Response) => {
     try {
-      const sessionId = getSessionId(req);
-      const sessionMessages = sessions[sessionId] || [];
-      const { feedbackCriteria } = req.body;
+      const { feedbackCriteria, messages } = req.body;
+      console.log('Received feedback request:', { feedbackCriteria, messageCount: messages?.length });
 
       if (!feedbackCriteria) {
         return res.status(400).json({ error: "Feedback criteria is required" });
       }
 
-      if (sessionMessages.length === 0) {
+      // Use provided messages if available, otherwise fall back to session messages
+      const messagesToAnalyze = messages || (sessions[getSessionId(req)] || []);
+
+      if (messagesToAnalyze.length === 0) {
         return res.status(400).json({ error: "No chat messages to analyze" });
       }
 
