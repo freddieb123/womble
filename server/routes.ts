@@ -184,19 +184,18 @@ export function registerRoutes(app: Express): Server {
         'Connection': 'keep-alive',
       });
 
-      // Get OpenAI streaming response with optimized settings
-      const isVoiceMode = req.query.mode === 'voice';
+      // Get OpenAI streaming response
       const stream = await openai.chat.completions.create({
-        model: isVoiceMode ? "gpt-4o-realtime-preview-2024-12-17" : "gpt-3.5-turbo",
+        model: "gpt-3.5-turbo",
         messages: apiMessages.map(msg => ({
           role: msg.role as 'system' | 'user' | 'assistant',
           content: msg.content
         })),
-        temperature: isVoiceMode ? 0.7 : parsedConfig.temperature,
-        max_tokens: isVoiceMode ? 50 : parsedConfig.maxTokens, // Even shorter responses for voice to improve latency
+        temperature: parsedConfig.temperature,
+        max_tokens: parsedConfig.maxTokens,
         stream: true,
-        presence_penalty: isVoiceMode ? 0.2 : 0.6, // Minimal penalty for voice to be more responsive
-        frequency_penalty: isVoiceMode ? 0.2 : 0.5, // Minimal penalty for voice to sound more natural
+        presence_penalty: 0.6,
+        frequency_penalty: 0.5,
         response_format: { type: "text" }
       });
 

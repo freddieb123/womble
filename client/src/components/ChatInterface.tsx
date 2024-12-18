@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import MessageBubble from "./MessageBubble";
@@ -14,110 +14,9 @@ interface Props {
 
 export default function ChatInterface({ config }: Props) {
   const [input, setInput] = useState("");
-  const [isRecording, setIsRecording] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
-  const [voiceOnlyMode, setVoiceOnlyMode] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const speechQueue = useRef<string[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  const speak = (text: string) => {
-    if (!voiceEnabled) return;
-    
-    // Clean up text: replace punctuation with pauses and remove explicit punctuation words
-    const cleanText = text
-      .replace(/([.!?])\s+/g, '$1\n') // Add pauses after punctuation
-      .replace(/\sexclamation mark\s/gi, '!') // Replace spoken punctuation with symbols
-      .replace(/\speriod\s/gi, '.') 
-      .replace(/\squestion mark\s/gi, '?')
-      .replace(/\scomma\s/gi, ',');
-    
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => {
-      setIsSpeaking(false);
-      // Process next item in queue if any
-      const nextText = speechQueue.current.shift();
-      if (nextText) speak(nextText);
-    };
-    
-    // Optimize speech settings based on mode
-    if (voiceOnlyMode) {
-      utterance.rate = 1.1; // Slightly faster for natural conversation
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
-    } else {
-      utterance.rate = 1.0; // Normal rate for text mode
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
-    }
-    
-    // If currently speaking, queue the text
-    // Otherwise speak immediately
-    if (window.speechSynthesis.speaking) {
-      // Queue longer phrases, ignore very short responses
-      if (cleanText.length > 2) {
-        speechQueue.current.push(cleanText);
-      }
-    } else {
-      window.speechSynthesis.speak(utterance);
-    }
-  };
-
-  // Stop speaking when component unmounts
-  useEffect(() => {
-    return () => {
-      window.speechSynthesis.cancel();
-    };
-  }, []);
-
-  useEffect(() => {
-    // Initialize speech recognition
-    if (window.SpeechRecognition || window.webkitSpeechRecognition) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-
-      recognitionRef.current.onresult = (event) => {
-        if (voiceOnlyMode) {
-          const lastResult = event.results[event.results.length - 1];
-          const transcript = lastResult[0].transcript;
-          
-          if (lastResult.isFinal) {
-            // Only send if the transcript is meaningful (not just noise)
-            if (transcript.trim().length > 2) {
-              sendMessage.mutate(transcript.trim());
-            }
-          }
-        } else {
-          const transcript = Array.from(event.results)
-            .map(result => result[0].transcript)
-            .join('');
-          setInput(transcript);
-        }
-      };
-
-      recognitionRef.current.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
-        setIsRecording(false);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to record audio. Please check your microphone permissions.",
-        });
-      };
-    }
-
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-    };
-  }, [toast]);
 
   const { data: chatState = { messages: [], isLoading: false, error: null } } = useQuery<ChatState>({
     queryKey: ["/api/messages"],
@@ -125,8 +24,7 @@ export default function ChatInterface({ config }: Props) {
 
   const sendMessage = useMutation({
     mutationFn: async (content: string) => {
-      const queryParams = voiceOnlyMode ? '?mode=voice' : '';
-      const response = await fetch(`/api/messages${queryParams}`, {
+      const response = await fetch("/api/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, config }),
@@ -186,18 +84,7 @@ export default function ChatInterface({ config }: Props) {
 
               assistantMessage.content += parsed.content;
               
-              // For voice mode, handle speech synthesis differently
-              if (voiceOnlyMode) {
-                // In voice mode, speak each chunk immediately for faster responses
-                speak(parsed.content);
-              } else {
-                // For text mode, wait for complete phrases
-                if (parsed.content.match(/[.!?,;]\s*$/) || parsed.content.length > 10) {
-                  speak(parsed.content);
-                }
-              }
-              
-              // Update UI immediately without waiting for speech
+              // Update UI immediately
               queryClient.setQueryData<ChatState>(["/api/messages"], (old) => ({
                 messages: [
                   ...(old?.messages || []).filter(m => m.id !== assistantMessage.id),
@@ -257,102 +144,24 @@ export default function ChatInterface({ config }: Props) {
         </div>
       </ScrollArea>
 
-      <div className="p-4 border-t flex gap-2">
-        {!voiceOnlyMode ? (
-          <form onSubmit={handleSubmit} className="flex gap-2 flex-1">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setVoiceEnabled(!voiceEnabled);
-                if (voiceEnabled) {
-                  window.speechSynthesis.cancel();
-                  setIsSpeaking(false);
-                  speechQueue.current = [];
-                }
-              }}
-              className={voiceEnabled ? "bg-blue-50" : ""}
-            >
-              {voiceEnabled ? (
-                <Volume2 className="h-4 w-4 text-blue-500" />
-              ) : (
-                <VolumeX className="h-4 w-4" />
-              )}
-            </Button>
-            <Input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your message..."
-              className="flex-1"
-              disabled={sendMessage.isPending}
-            />
-            <Button 
-              type="submit" 
-              disabled={sendMessage.isPending || !input.trim()}
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </form>
-        ) : (
-          <div className="flex-1 flex justify-center items-center">
-            <p className="text-sm text-muted-foreground">
-              {isRecording ? "Listening..." : "Click microphone to start speaking"}
-            </p>
-          </div>
-        )}
-        
-        <Button
-          type="button"
-          variant={voiceOnlyMode ? "default" : "outline"}
-          className={`${isRecording ? "bg-red-50" : ""} ${voiceOnlyMode ? "bg-blue-500 hover:bg-blue-600" : ""}`}
-          onClick={() => {
-            if (!recognitionRef.current) {
-              toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Speech recognition is not supported in your browser.",
-              });
-              return;
-            }
-
-            if (isRecording) {
-              recognitionRef.current.stop();
-              setIsRecording(false);
-            } else {
-              recognitionRef.current.start();
-              setIsRecording(true);
-              setInput("");
-            }
-            
-            if (!voiceOnlyMode) {
-              setVoiceOnlyMode(true);
-              setVoiceEnabled(true);
-            }
-          }}
-        >
-          {isRecording ? (
-            <MicOff className="h-4 w-4 text-red-500" />
-          ) : (
-            <Mic className={`h-4 w-4 ${voiceOnlyMode ? "text-white" : ""}`} />
-          )}
-        </Button>
-        
-        {voiceOnlyMode && !isRecording && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              setVoiceOnlyMode(false);
-              setIsRecording(false);
-              if (recognitionRef.current) {
-                recognitionRef.current.stop();
-              }
-            }}
+      <div className="p-4 border-t">
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Type your message..."
+            className="flex-1"
+            disabled={sendMessage.isPending}
+          />
+          <Button 
+            type="submit" 
+            disabled={sendMessage.isPending || !input.trim()}
           >
-            Exit Voice Mode
+            <Send className="h-4 w-4" />
           </Button>
-        )}
+        </form>
       </div>
+
       <div className="px-4 pb-4">
         <Button
           onClick={async () => {
