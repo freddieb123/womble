@@ -276,13 +276,17 @@ ${sessionMessages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
 
       const response = completion.choices[0].message.content;
       
-      // Extract score from the response (assuming it's at the end after "Score:" or similar)
-      const scoreMatch = response.match(/(\d+)(?:\s*\/\s*10|\s*out of\s*10)/i);
+      // Extract score and summary
+      const scoreMatch = response.match(/Score:\s*(\d+)/i);
       const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
       
-      // Get bullet points (everything before the score)
+      // Extract summary (the line after the score)
+      const summaryMatch = response.match(/Score:\s*\d+\s*\n([^\n]+)/i);
+      const summary = summaryMatch ? summaryMatch[1].trim() : null;
+      
+      // Get bullet points (everything before "Score:")
       const bullets = response
-        .split(/score:?\s*\d+(?:\s*\/\s*10|\s*out of\s*10)/i)[0]
+        .split(/Score:/i)[0]
         .split(/[•\-\*]\s+/)
         .filter(bullet => bullet.trim())
         .map(bullet => bullet.trim());
@@ -290,6 +294,7 @@ ${sessionMessages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
       res.json({ 
         bullets,
         score,
+        summary,
         rawFeedback: response 
       });
     } catch (error: any) {

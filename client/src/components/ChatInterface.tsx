@@ -16,7 +16,7 @@ interface Props {
 export default function ChatInterface({ config }: Props) {
   const [input, setInput] = useState("");
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [feedbackData, setFeedbackData] = useState<{ bullets: string[], score: number | null }>({ bullets: [], score: null });
+  const [feedbackData, setFeedbackData] = useState<{ bullets: string[], score: number | null, summary: string | null }>({ bullets: [], score: null, summary: null });
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -188,8 +188,8 @@ export default function ChatInterface({ config }: Props) {
                 throw new Error(await response.text());
               }
 
-              const { bullets, score, rawFeedback } = await response.json();
-              setFeedbackData({ bullets, score });
+              const { bullets, score, summary, rawFeedback } = await response.json();
+              setFeedbackData({ bullets, score, summary });
               setFeedbackOpen(true);
             } catch (error) {
               toast({
@@ -229,8 +229,11 @@ export default function ChatInterface({ config }: Props) {
                 ))}
             </div>
             <div className="border-t pt-4">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2">
                 <span className="text-2xl font-bold">{feedbackData.score}/10</span>
+                {feedbackData.summary && (
+                  <p className="text-sm text-muted-foreground">{feedbackData.summary}</p>
+                )}
               </div>
             </div>
           </div>
