@@ -251,9 +251,14 @@ export function registerRoutes(app: Express): Server {
 
       const prompt = `Analyze the user's interactions in this conversation based on these criteria: ${feedbackCriteria}
 
-Please provide:
-1. 2-3 bullet points (maximum 4) focusing ONLY on the user's communication style, responses, and how well they met the criteria
-2. A score from 1-10 (where 10 is perfect) based solely on how well the user's messages aligned with the criteria
+Please provide your feedback in exactly this format:
+
+FEEDBACK POINTS:
+• [2-4 bullet points focusing ONLY on the user's communication style and how well they met the criteria]
+
+OVERALL ASSESSMENT:
+Score: [1-10]
+[Brief one-line summary of overall performance]
 
 Chat transcript:
 ${sessionMessages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
@@ -263,7 +268,7 @@ ${sessionMessages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
         messages: [
           { 
             role: "system", 
-            content: "You are an expert at evaluating user communication. Focus solely on the user's messages and interactions, ignoring the AI assistant's responses. Address the user directly using 'you' in your feedback. For example: 'You maintained clear communication' instead of 'The user maintained clear communication'. Provide concise bullet points about their performance, followed by a score out of 10. Keep feedback brief and actionable."
+            content: "You are an expert at evaluating user communication. Focus solely on the user's messages and interactions, ignoring the AI assistant's responses. Address the user directly using 'you' in your feedback. For example: 'You maintained clear communication' instead of 'The user maintained clear communication'. Keep feedback points brief, clear, and actionable. Always follow the exact format specified, with 2-4 bullet points followed by a score and one-line summary."
           },
           { role: "user", content: prompt }
         ],

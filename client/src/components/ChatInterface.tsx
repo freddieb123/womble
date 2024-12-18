@@ -211,7 +211,7 @@ export default function ChatInterface({ config }: Props) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex justify-between items-center">
-              <span>Your Communication Score: {feedbackData.score}/10</span>
+              <span>Chat Feedback</span>
               <DialogClose asChild>
                 <Button variant="ghost" size="icon">
                   <X className="h-4 w-4" />
@@ -219,13 +219,24 @@ export default function ChatInterface({ config }: Props) {
               </DialogClose>
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            {feedbackData.bullets.map((bullet, index) => (
-              <div key={index} className="flex items-start gap-2">
-                <span>•</span>
-                <span>{bullet}</span>
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-sm font-semibold mb-3">Feedback Points:</h3>
+              <div className="space-y-3">
+                {feedbackData.bullets.map((bullet, index) => (
+                  <div key={index} className="flex items-start gap-2 text-sm">
+                    <span>•</span>
+                    <span>{bullet}</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-semibold mb-2">Overall Assessment:</h3>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-bold">{feedbackData.score}/10</span>
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
