@@ -230,8 +230,12 @@ export function registerRoutes(app: Express): Server {
         if (!sessionId) {
           throw new Error("No session ID provided in URL");
         }
+
+        // Extract or generate link_id from URL parameters
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const linkId = url.searchParams.get("linkId") || sessionId;
         
-        console.log('Saving conversation with sessionId:', sessionId);
+        console.log('Saving conversation with sessionId:', sessionId, 'linkId:', linkId);
         
         // Use the session ID from the URL params that we validated earlier
         const messagesJson = JSON.stringify(sessions[sessionId]);
@@ -275,6 +279,7 @@ export function registerRoutes(app: Express): Server {
             .values({
               configId,
               sessionId,
+              linkId,
               messages: messagesJson,
               createdAt: new Date(),
               updatedAt: new Date()
@@ -536,18 +541,24 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
     try {
       const configId = parseInt(req.params.configId);
       const sessionId = req.query.sessionId as string;
+      const linkId = req.query.linkId as string;
       
-      console.log('Fetching conversations for:', { configId, sessionId });
+      console.log('Fetching conversations for:', { configId, sessionId, linkId });
       
       if (isNaN(configId)) {
         console.log('Invalid configId:', configId);
         return res.status(400).json({ error: "Invalid config ID" });
       }
 
-      // Build the where clause based on whether sessionId is provided
-      const whereClause = sessionId
-        ? and(eq(conversations.configId, configId), eq(conversations.sessionId, sessionId))
-        : eq(conversations.configId, configId);
+      // Build the where clause based on provided parameters
+      let whereClause;
+      if (sessionId) {
+        whereClause = and(eq(conversations.configId, configId), eq(conversations.sessionId, sessionId));
+      } else if (linkId) {
+        whereClause = and(eq(conversations.configId, configId), eq(conversations.linkId, linkId));
+      } else {
+        whereClause = eq(conversations.configId, configId);
+      }
 
       console.log('Query parameters:', {
         configId,

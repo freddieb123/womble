@@ -21,14 +21,16 @@ export const conversations = pgTable("conversations", {
   id: serial("id").primaryKey(),
   configId: integer("config_id").notNull().references(() => chatConfigs.id),
   sessionId: text("session_id").notNull(),
+  linkId: text("link_id").notNull().default('legacy'),
   messages: jsonb("messages").notNull().default('[]'),
   feedback: jsonb("feedback").default('{}'),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => {
   return {
-    // Non-unique index for performance
+    // Non-unique indices for performance
     configSessionIdx: index("config_session_idx").on(table.configId, table.sessionId),
+    linkIdIdx: index("link_id_idx").on(table.linkId),
   };
 });
 
