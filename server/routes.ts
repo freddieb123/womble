@@ -60,7 +60,11 @@ export function registerRoutes(app: Express): Server {
     try {
       const url = new URL(req.url, `http://${req.headers.host}`);
       const configId = parseInt(url.searchParams.get("configId") || "");
-      const sessionId = url.searchParams.get("sessionId") || crypto.randomUUID();
+      const sessionId = url.searchParams.get("sessionId");
+
+      if (!sessionId) {
+        return res.status(400).json({ error: "Session ID is required" });
+      }
 
       console.log("Fetching messages for:", { configId, sessionId });
 
@@ -79,14 +83,15 @@ export function registerRoutes(app: Express): Server {
 
       console.log("Found conversation:", conversation ? "yes" : "no");
 
-      // Initialize session if it doesn't exist
-      if (!sessions[sessionId]) {
-        sessions[sessionId] = conversation ? 
-          (typeof conversation.messages === 'string' ? 
-            JSON.parse(conversation.messages) : 
-            conversation.messages) : 
-          [];
-        console.log("Initialized session with messages count:", sessions[sessionId].length);
+      // Initialize or update session with messages from the database
+      if (conversation) {
+        sessions[sessionId] = typeof conversation.messages === 'string' 
+          ? JSON.parse(conversation.messages) 
+          : conversation.messages;
+        console.log("Loaded existing conversation from database, messages count:", sessions[sessionId].length);
+      } else {
+        sessions[sessionId] = [];
+        console.log("No existing conversation found, initializing empty session:", sessionId);
       }
 
       const response = {
@@ -218,27 +223,54 @@ export function registerRoutes(app: Express): Server {
       };
       sessions[sessionId].push(userMessage);
 
-      // Save conversation in database
+      // Save or update conversation in database
       try {
         const messagesJson = JSON.stringify(sessions[sessionId]);
         
-        // Always create a new conversation
-        console.log('Creating new conversation:', {
-          configId,
-          sessionId,
-          messageCount: sessions[sessionId].length,
-          messageTypes: sessions[sessionId].map(m => m.role).join(', ')
+        // Check if conversation exists
+        const existingConversation = await db.query.conversations.findFirst({
+          where: and(
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId)
+          ),
         });
 
-        await db
-          .insert(conversations)
-          .values({
+        if (existingConversation) {
+          console.log('Updating existing conversation:', {
             configId,
             sessionId,
-            messages: messagesJson,
-            createdAt: new Date(),
-            updatedAt: new Date()
+            messageCount: sessions[sessionId].length,
+            messageTypes: sessions[sessionId].map(m => m.role).join(', ')
           });
+
+          await db
+            .update(conversations)
+            .set({
+              messages: messagesJson,
+              updatedAt: new Date()
+            })
+            .where(and(
+              eq(conversations.configId, configId),
+              eq(conversations.sessionId, sessionId)
+            ));
+        } else {
+          console.log('Creating new conversation:', {
+            configId,
+            sessionId,
+            messageCount: sessions[sessionId].length,
+            messageTypes: sessions[sessionId].map(m => m.role).join(', ')
+          });
+
+          await db
+            .insert(conversations)
+            .values({
+              configId,
+              sessionId,
+              messages: messagesJson,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            });
+        }
 
         // Verify the save
         const savedConversation = await db.query.conversations.findFirst({
