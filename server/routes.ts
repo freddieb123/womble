@@ -461,7 +461,13 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
         console.log('Using config-only query');
       }
 
-      console.log('Executing query with conditions:', JSON.stringify(query.where));
+      // Log query conditions in a safe way without circular references
+      console.log('Executing query for:', {
+        configId,
+        sessionId,
+        hasSessionFilter: !!sessionId
+      });
+      
       const savedConversations = await db.query.conversations.findMany(query);
       console.log('Found conversations:', savedConversations.length);
 
