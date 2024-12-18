@@ -48,7 +48,6 @@ export function registerRoutes(app: Express): Server {
     try {
       const url = new URL(req.url, `http://${req.headers.host}`);
       const configId = parseInt(url.searchParams.get("configId") || "");
-      const sessionId = url.searchParams.get("sessionId");
       const linkId = url.searchParams.get("linkId");
 
       if (isNaN(configId) || configId <= 0) {
@@ -61,26 +60,16 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Link ID is required" });
       }
 
-      console.log('Fetching messages:', { configId, sessionId, linkId });
+      console.log('Fetching messages:', { configId, linkId });
 
       // Try to get messages from database first
       let whereClause;
-      if (sessionId) {
-        // If sessionId is provided, get specific conversation
-        whereClause = and(
-          eq(conversations.configId, configId),
-          eq(conversations.sessionId, sessionId)
-        );
-      } else if (linkId) {
-        // If only linkId is provided, get latest conversation from that group
-        whereClause = and(
-          eq(conversations.configId, configId),
-          eq(conversations.linkId, linkId)
-        );
-      } else {
-        // Fallback to just configId
-        whereClause = eq(conversations.configId, configId);
-      }
+      
+      whereClause = and(
+        eq(conversations.configId, configId),
+        eq(conversations.linkId, linkId)
+      );
+      
 
       const conversation = await db.query.conversations.findFirst({
         where: whereClause,
@@ -89,12 +78,12 @@ export function registerRoutes(app: Express): Server {
 
       console.log("Found conversation:", conversation ? "yes" : "no", {
         configId,
-        sessionId,
         linkId,
         hasMessages: conversation?.messages ? true : false
       });
 
       // Initialize or update session with messages from the database
+      const sessionId = crypto.randomUUID(); // Generate a new session ID here
       if (conversation) {
         sessions[sessionId] = typeof conversation.messages === 'string' 
           ? JSON.parse(conversation.messages) 
@@ -208,7 +197,7 @@ export function registerRoutes(app: Express): Server {
       const { content, config } = req.body;
       const url = new URL(req.url, `http://${req.headers.host}`);
       const configId = parseInt(url.searchParams.get("configId") || "");
-      const linkId = url.searchParams.get("linkId");
+      const linkId = url.searchParams.get("linkId") || url.searchParams.get("sessionId"); // Support both for backward compatibility
       let sessionId = url.searchParams.get("sessionId");
 
       if (!linkId) {
@@ -735,7 +724,7 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
 
       // If no sessionId, get all conversations for the config
       const savedConversations = await db.query.conversations.findMany({
-        where: eq(conversations.configId, configId),
+        where: whereClause, // Use the where clause built earlier
         orderBy: [desc(conversations.createdAt)]
       });
 

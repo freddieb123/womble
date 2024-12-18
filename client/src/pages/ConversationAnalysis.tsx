@@ -42,8 +42,8 @@ export default function ConversationAnalysis() {
         configId = url.searchParams.get("configId");
       }
       
-      // Look for linkId in search params
-      linkId = url.searchParams.get("linkId");
+      // Look for linkId in search params (support both linkId and legacy sessionId)
+      linkId = url.searchParams.get("linkId") || url.searchParams.get("sessionId");
       
       console.log('Extracted URL parameters:', { configId, linkId, pathname: url.pathname, searchParams: Object.fromEntries(url.searchParams) });
       
