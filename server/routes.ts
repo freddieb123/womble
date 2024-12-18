@@ -227,16 +227,13 @@ export function registerRoutes(app: Express): Server {
 
       // Save or update conversation in database
       try {
-        // Always get the sessionId from URL params first
-        const url = new URL(req.url, `http://${req.headers.host}`);
-        const sessionId = url.searchParams.get("sessionId");
-        
         if (!sessionId) {
           throw new Error("No session ID provided in URL");
         }
         
         console.log('Saving conversation with sessionId:', sessionId);
         
+        // Use the session ID from the URL params that we validated earlier
         const messagesJson = JSON.stringify(sessions[sessionId]);
         
         // Check if conversation exists
