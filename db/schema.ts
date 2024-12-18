@@ -20,6 +20,7 @@ export const chatConfigs = pgTable("chat_configs", {
 export const conversations = pgTable("conversations", {
   id: serial("id").primaryKey(),
   configId: integer("config_id").notNull().references(() => chatConfigs.id),
+  linkId: text("link_id").notNull(),
   sessionId: text("session_id").notNull(),
   messages: jsonb("messages").notNull().default('[]'),
   feedback: jsonb("feedback").default('{}'),
@@ -27,8 +28,9 @@ export const conversations = pgTable("conversations", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => {
   return {
-    // Non-unique index for performance
+    // Non-unique indices for performance
     configSessionIdx: index("config_session_idx").on(table.configId, table.sessionId),
+    linkIdx: index("link_idx").on(table.linkId),
   };
 });
 
