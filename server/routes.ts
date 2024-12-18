@@ -225,22 +225,26 @@ export function registerRoutes(app: Express): Server {
 
       // Save or update conversation in database
       try {
-        const messagesJson = JSON.stringify(sessions[sessionId]);
+        // Always get the sessionId from URL/query params to ensure consistency
+        const currentSessionId = getSessionId(req);
+        console.log('Saving conversation with sessionId:', currentSessionId);
+        
+        const messagesJson = JSON.stringify(sessions[currentSessionId]);
         
         // Check if conversation exists
         const existingConversation = await db.query.conversations.findFirst({
           where: and(
             eq(conversations.configId, configId),
-            eq(conversations.sessionId, sessionId)
+            eq(conversations.sessionId, currentSessionId)
           ),
         });
 
         if (existingConversation) {
           console.log('Updating existing conversation:', {
             configId,
-            sessionId,
-            messageCount: sessions[sessionId].length,
-            messageTypes: sessions[sessionId].map(m => m.role).join(', ')
+            sessionId: currentSessionId,
+            messageCount: sessions[currentSessionId].length,
+            messageTypes: sessions[currentSessionId].map(m => m.role).join(', ')
           });
 
           await db
@@ -251,36 +255,45 @@ export function registerRoutes(app: Express): Server {
             })
             .where(and(
               eq(conversations.configId, configId),
-              eq(conversations.sessionId, sessionId)
+              eq(conversations.sessionId, currentSessionId)
             ));
         } else {
           console.log('Creating new conversation:', {
             configId,
-            sessionId,
-            messageCount: sessions[sessionId].length,
-            messageTypes: sessions[sessionId].map(m => m.role).join(', ')
+            sessionId: currentSessionId,
+            messageCount: sessions[currentSessionId].length,
+            messageTypes: sessions[currentSessionId].map(m => m.role).join(', ')
           });
 
-          await db
+          const result = await db
             .insert(conversations)
             .values({
               configId,
-              sessionId,
+              sessionId: currentSessionId,
               messages: messagesJson,
               createdAt: new Date(),
               updatedAt: new Date()
-            });
+            })
+            .returning();
+            
+          console.log('Created new conversation with ID:', result[0].id);
+
         }
 
         // Verify the save
         const savedConversation = await db.query.conversations.findFirst({
           where: and(
             eq(conversations.configId, configId),
-            eq(conversations.sessionId, sessionId)
+            eq(conversations.sessionId, currentSessionId)
           ),
         });
 
         if (!savedConversation) {
+          console.error('Failed to verify conversation save:', {
+            configId,
+            sessionId: currentSessionId,
+            attempted: true
+          });
           throw new Error("Failed to save conversation - verification failed");
         }
 
@@ -288,18 +301,22 @@ export function registerRoutes(app: Express): Server {
           ? JSON.parse(savedConversation.messages) 
           : savedConversation.messages;
 
-        console.log('Verified saved conversation:', {
+        console.log('Successfully verified saved conversation:', {
           id: savedConversation.id,
           sessionId: savedConversation.sessionId,
+          configId: savedConversation.configId,
           messageCount: Array.isArray(savedMessages) ? savedMessages.length : 0,
           lastMessage: Array.isArray(savedMessages) && savedMessages.length > 0 
             ? { role: savedMessages[savedMessages.length - 1].role } 
             : null
         });
       } catch (error) {
-        console.error("Error saving conversation:", error);
-        // Log the error but continue with the chat
-        // This ensures the user experience isn't interrupted even if saving fails
+        console.error("Error saving conversation:", {
+          error,
+          configId,
+          sessionId: currentSessionId,
+          messageCount: sessions[currentSessionId]?.length
+        });
       }
 
       // Set up SSE headers
