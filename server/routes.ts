@@ -192,19 +192,8 @@ export function registerRoutes(app: Express): Server {
 
       const parsedConfig = configSchema.parse(config);
 
-      // Initialize session if it doesn't exist
-      if (!sessions[sessionId]) {
-        // Try to get existing conversation from database
-        const existingConversation = await db.query.conversations.findFirst({
-          where: and(
-            eq(conversations.configId, configId),
-            eq(conversations.sessionId, sessionId)
-          ),
-        });
-
-        sessions[sessionId] = existingConversation ? 
-          JSON.parse(existingConversation.messages as string) : [];
-      }
+      // Create a new conversation for each chat session
+      sessions[sessionId] = [];
 
       // Add user message
       const userMessage = {
@@ -217,45 +206,25 @@ export function registerRoutes(app: Express): Server {
 
       // Save conversation in database
       try {
-        const existingConversation = await db.query.conversations.findFirst({
-          where: and(
-            eq(conversations.configId, configId),
-            eq(conversations.sessionId, sessionId)
-          ),
-        });
-
         const messagesJson = JSON.stringify(sessions[sessionId]);
         
-        // Log what we're about to save
-        console.log('Saving conversation:', {
+        // Always create a new conversation
+        console.log('Creating new conversation:', {
           configId,
           sessionId,
           messageCount: sessions[sessionId].length,
-          messageTypes: sessions[sessionId].map(m => m.role).join(', '),
-          isUpdate: !!existingConversation
+          messageTypes: sessions[sessionId].map(m => m.role).join(', ')
         });
 
-        if (existingConversation) {
-          await db
-            .update(conversations)
-            .set({
-              messages: messagesJson,
-              updatedAt: new Date() // Add this if you have an updatedAt column
-            })
-            .where(and(
-              eq(conversations.configId, configId),
-              eq(conversations.sessionId, sessionId)
-            ));
-        } else {
-          await db
-            .insert(conversations)
-            .values({
-              configId,
-              sessionId,
-              messages: messagesJson,
-              createdAt: new Date()
-            });
-        }
+        await db
+          .insert(conversations)
+          .values({
+            configId,
+            sessionId,
+            messages: messagesJson,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
 
         // Verify the save
         const savedConversation = await db.query.conversations.findFirst({
