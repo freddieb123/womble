@@ -221,17 +221,15 @@ export function registerRoutes(app: Express): Server {
       const { content, config } = req.body;
       const url = new URL(req.url, `http://${req.headers.host}`);
       const configId = parseInt(url.searchParams.get("configId") || "");
-      const urlSessionId = url.searchParams.get("sessionId");
+      const linkId = url.searchParams.get("linkId");
       
-      if (!urlSessionId) {
-        console.error('Missing sessionId in request parameters');
-        return res.status(400).json({ error: "Session ID is required for chat sessions" });
+      if (!linkId) {
+        console.error('Missing linkId in request parameters');
+        return res.status(400).json({ error: "Link ID is required for chat sessions" });
       }
       
-      // Use the URL's sessionId as the linkId for grouping related conversations
-      const linkId = urlSessionId;
       // Generate a new unique sessionId for this specific conversation instance
-      let sessionId = crypto.randomUUID();
+      const sessionId = crypto.randomUUID();
       
       console.log('Processing message:', {
         configId,
