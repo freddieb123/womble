@@ -29,8 +29,8 @@ const sessions: Record<string, any[]> = {};
 
 function getSessionId(req: Request): string {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  const configId = url.searchParams.get("configId");
-  return configId ? `configId=${configId}` : 'default';
+  const sessionId = url.searchParams.get("sessionId");
+  return sessionId || crypto.randomUUID();
 }
 
 const configSchema = z.object({
@@ -45,7 +45,7 @@ export function registerRoutes(app: Express): Server {
     try {
       const url = new URL(req.url, `http://${req.headers.host}`);
       const configId = parseInt(url.searchParams.get("configId") || "");
-      const sessionId = `configId=${configId}`;
+      const sessionId = url.searchParams.get("sessionId") || crypto.randomUUID();
 
       console.log("Fetching messages for:", { configId, sessionId });
 
@@ -177,7 +177,7 @@ export function registerRoutes(app: Express): Server {
       const { content, config } = req.body;
       const url = new URL(req.url, `http://${req.headers.host}`);
       const configId = parseInt(url.searchParams.get("configId") || "");
-      const sessionId = `configId=${configId}`;
+      const sessionId = url.searchParams.get("sessionId") || crypto.randomUUID();
       
       if (!content || typeof content !== "string") {
         return res.status(400).send("Message content is required");

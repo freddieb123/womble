@@ -23,8 +23,10 @@ export default function ChatInterface({ config }: Props) {
 
   const searchParams = new URLSearchParams(window.location.search);
   const configId = searchParams.get('configId');
+  const [sessionId] = useState(() => crypto.randomUUID()); // Generate unique session ID
+  
   const { data: chatState = { messages: [], isLoading: false, error: null } } = useQuery<ChatState>({
-    queryKey: [`/api/messages?configId=${configId}`],
+    queryKey: [`/api/messages?configId=${configId}&sessionId=${sessionId}`],
     enabled: !!configId,
   });
 
