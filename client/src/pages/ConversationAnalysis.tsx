@@ -21,14 +21,26 @@ export default function ConversationAnalysis() {
 
   const handleAnalyze = async () => {
     try {
-      // Extract configId from URL
-      const url = new URL(chatUrl);
+      // Validate and extract URL parameters
+      let url;
+      try {
+        url = new URL(chatUrl);
+      } catch (error) {
+        throw new Error("Invalid URL format");
+      }
+
       const configId = url.searchParams.get("configId");
       const sessionId = url.searchParams.get("sessionId");
       
       if (!configId) {
         throw new Error("Invalid chat URL - missing configId");
       }
+
+      if (!sessionId) {
+        throw new Error("Invalid chat URL - missing sessionId");
+      }
+
+      console.log("Analyzing conversation with:", { configId, sessionId, url: chatUrl });
 
       setIsLoading(true);
       console.log('Starting analysis with URL:', chatUrl);

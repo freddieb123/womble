@@ -451,8 +451,23 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
       console.log('Found conversations:', savedConversations.length);
 
       const conversationMessages = savedConversations.map(conv => {
-        const messages = typeof conv.messages === 'string' ? JSON.parse(conv.messages) : conv.messages;
-        console.log(`Processing conversation ${conv.sessionId}:`, { messageCount: messages.length });
+        let messages;
+        try {
+          // Handle double-escaped JSON strings
+          if (typeof conv.messages === 'string') {
+            const unescaped = conv.messages.replace(/^""|""$/g, '').replace(/\\"/g, '"');
+            messages = JSON.parse(unescaped);
+          } else {
+            messages = conv.messages;
+          }
+          console.log(`Processing conversation ${conv.sessionId}:`, { 
+            messageCount: Array.isArray(messages) ? messages.length : 0,
+            sampleMessage: Array.isArray(messages) && messages.length > 0 ? messages[0] : null
+          });
+        } catch (error) {
+          console.error(`Error parsing messages for session ${conv.sessionId}:`, error);
+          messages = [];
+        }
         return {
           sessionId: conv.sessionId,
           messages,
