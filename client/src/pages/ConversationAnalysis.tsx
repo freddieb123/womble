@@ -143,12 +143,12 @@ export default function ConversationAnalysis() {
                           ))}
                         </div>
                         <div className="border-t pt-4">
-                          <div className="flex flex-col gap-2">
-                            <span className="text-2xl font-bold">
+                          <div className="flex flex-col gap-2 bg-blue-50 p-4 rounded-lg">
+                            <span className="text-2xl font-bold text-blue-900">
                               {feedbacks[index].score}/10
                             </span>
                             {feedbacks[index].summary && (
-                              <p className="text-sm text-muted-foreground">
+                              <p className="text-sm text-blue-700">
                                 {feedbacks[index].summary}
                               </p>
                             )}
