@@ -249,11 +249,11 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "No chat messages to analyze" });
       }
 
-      const prompt = `Analyze this chat conversation based on these criteria: ${feedbackCriteria}
+      const prompt = `Analyze the user's interactions in this conversation based on these criteria: ${feedbackCriteria}
 
 Please provide:
-1. 2-3 bullet points (maximum 4) highlighting key observations
-2. A score from 1-10 (where 10 is perfect) based on how well the conversation met the criteria
+1. 2-3 bullet points (maximum 4) focusing ONLY on the user's communication style, responses, and how well they met the criteria
+2. A score from 1-10 (where 10 is perfect) based solely on how well the user's messages aligned with the criteria
 
 Chat transcript:
 ${sessionMessages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
@@ -263,7 +263,7 @@ ${sessionMessages.map(m => `${m.role}: ${m.content}`).join('\n')}`;
         messages: [
           { 
             role: "system", 
-            content: "You are an expert at providing concise feedback. Always respond with bullet points followed by a score out of 10. Keep bullets brief and actionable."
+            content: "You are an expert at evaluating user communication. Focus solely on the user's messages and interactions, ignoring the AI assistant's responses. Provide concise bullet points about the user's performance, followed by a score out of 10. Keep feedback brief and actionable."
           },
           { role: "user", content: prompt }
         ],
