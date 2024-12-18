@@ -197,15 +197,24 @@ export function registerRoutes(app: Express): Server {
       const { content, config } = req.body;
       const url = new URL(req.url, `http://${req.headers.host}`);
       const configId = parseInt(url.searchParams.get("configId") || "");
-      const linkId = url.searchParams.get("linkId") || url.searchParams.get("sessionId"); // Support both for backward compatibility
-      let sessionId = url.searchParams.get("sessionId");
-
-      if (!linkId) {
-        console.error('Missing linkId in request parameters');
-        return res.status(400).json({ error: "Link ID is required for chat sessions" });
+      const urlSessionId = url.searchParams.get("sessionId");
+      
+      if (!urlSessionId) {
+        console.error('Missing sessionId in request parameters');
+        return res.status(400).json({ error: "Session ID is required for chat sessions" });
       }
       
-      console.log('Processing message with linkId:', linkId);
+      // Use the URL's sessionId as the linkId to group related conversations
+      const linkId = urlSessionId;
+      // Generate a new unique sessionId for this specific conversation
+      const sessionId = crypto.randomUUID();
+      
+      console.log('Processing message:', {
+        configId,
+        urlSessionId,
+        linkId: urlSessionId,
+        newSessionId: sessionId
+      });
       
       // For new conversations, generate a session ID
       if (!sessionId) {
