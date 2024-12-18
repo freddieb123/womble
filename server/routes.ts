@@ -231,9 +231,12 @@ export function registerRoutes(app: Express): Server {
           throw new Error("No session ID provided in URL");
         }
 
-        // Extract or generate link_id from URL parameters
+        // Extract the linkId from URL parameters
         const url = new URL(req.url, `http://${req.headers.host}`);
-        const linkId = url.searchParams.get("linkId") || sessionId;
+        const linkId = url.searchParams.get("linkId");
+        if (!linkId) {
+          throw new Error("No link ID provided in URL");
+        }
         
         console.log('Saving conversation with sessionId:', sessionId, 'linkId:', linkId);
         
