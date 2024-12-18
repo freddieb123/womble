@@ -214,6 +214,13 @@ export function registerRoutes(app: Express): Server {
 
       // Save conversation in database
       try {
+        console.log('Attempting to save conversation:', {
+          configId,
+          sessionId,
+          messageCount: sessions[sessionId].length,
+          sampleMessage: sessions[sessionId][0]
+        });
+
         const existingConversation = await db.query.conversations.findFirst({
           where: and(
             eq(conversations.configId, configId),
@@ -221,31 +228,53 @@ export function registerRoutes(app: Express): Server {
           ),
         });
 
+        const messagesJson = JSON.stringify(sessions[sessionId]);
+        console.log('Messages to save:', {
+          messageCount: sessions[sessionId].length,
+          jsonLength: messagesJson.length,
+          sample: messagesJson.substring(0, 100) + '...'
+        });
+
         if (existingConversation) {
+          console.log('Updating existing conversation:', existingConversation.id);
           await db
             .update(conversations)
             .set({
-              messages: JSON.stringify(sessions[sessionId])
+              messages: messagesJson
             })
             .where(and(
               eq(conversations.configId, configId),
               eq(conversations.sessionId, sessionId)
             ));
         } else {
-          await db
+          console.log('Creating new conversation');
+          const result = await db
             .insert(conversations)
             .values({
               configId,
               sessionId,
-              messages: JSON.stringify(sessions[sessionId])
-            });
+              messages: messagesJson
+            })
+            .returning();
+          console.log('Created conversation:', result[0]);
         }
 
-        // Log success for debugging
-        console.log("Successfully saved conversation:", {
-          configId,
-          sessionId,
-          messageCount: sessions[sessionId].length
+        // Verify the save by immediately reading back
+        const savedConversation = await db.query.conversations.findFirst({
+          where: and(
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId)
+          ),
+        });
+        
+        console.log('Verified saved conversation:', {
+          id: savedConversation?.id,
+          sessionId: savedConversation?.sessionId,
+          messagesCount: savedConversation ? 
+            (typeof savedConversation.messages === 'string' ? 
+              JSON.parse(savedConversation.messages).length : 
+              savedConversation.messages.length) : 
+            0
         });
       } catch (error) {
         console.error("Error saving conversation:", error);
