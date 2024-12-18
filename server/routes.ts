@@ -204,10 +204,10 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Session ID is required for chat sessions" });
       }
       
-      // Use the URL's sessionId as the linkId to group related conversations
+      // Use the URL's sessionId as the linkId for grouping related conversations
       const linkId = urlSessionId;
-      // Generate a new unique sessionId for this specific conversation
-      const sessionId = crypto.randomUUID();
+      // Generate a new unique sessionId for this specific conversation instance
+      let sessionId = crypto.randomUUID();
       
       console.log('Processing message:', {
         configId,
