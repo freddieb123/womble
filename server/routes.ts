@@ -391,15 +391,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "No chat messages to analyze" });
       }
 
-      if (configId) {
-        // Find the conversation in the database
-        const conversation = await db.query.conversations.findFirst({
-          where: and(
-            eq(conversations.configId, configId),
-            eq(conversations.sessionId, sessionId)
-          )
-        });
-      }
+      // Remove duplicate conversation check since we already have it above
 
       const prompt = `Analyze the user's interactions in this conversation based on these criteria: ${feedbackCriteria}
 
@@ -484,40 +476,30 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
         return res.status(400).json({ error: "Invalid config ID" });
       }
 
-      // Log the exact values we're querying with
-      console.log('Query parameters:', { configId, sessionId, configIdType: typeof configId });
+      // Build the where clause based on whether sessionId is provided
+      const whereClause = sessionId
+        ? and(eq(conversations.configId, configId), eq(conversations.sessionId, sessionId))
+        : eq(conversations.configId, configId);
 
-      // Construct base query
-      let query;
-      if (sessionId) {
-        query = {
-          where: and(
-            eq(conversations.configId, configId),
-            eq(conversations.sessionId, sessionId)
-          ),
-          orderBy: [desc(conversations.createdAt)]
-        };
-        console.log('Using session-specific query');
-      } else {
-        query = {
-          where: eq(conversations.configId, configId),
-          orderBy: [desc(conversations.createdAt)]
-        };
-        console.log('Using config-only query');
-      }
-
-      // Log query conditions in a safe way without circular references
-      console.log('Executing query for:', {
+      console.log('Query parameters:', {
         configId,
         sessionId,
         hasSessionFilter: !!sessionId
       });
-      
-      const savedConversations = await db.query.conversations.findMany(query);
+
+      const savedConversations = await db.query.conversations.findMany({
+        where: whereClause,
+        orderBy: [desc(conversations.createdAt)]
+      });
+
       console.log('Found conversations:', savedConversations.length);
 
       if (savedConversations.length === 0) {
-        console.log('No conversations found for:', { configId, sessionId });
+        if (sessionId) {
+          console.log('No conversation found for session:', sessionId);
+          return res.status(404).json({ error: "Conversation not found" });
+        }
+        console.log('No conversations found for config:', configId);
         return res.json([]);
       }
 
