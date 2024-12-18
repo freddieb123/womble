@@ -20,6 +20,7 @@ export default function ConversationAnalysis() {
   const { toast } = useToast();
 
   const handleAnalyze = async () => {
+    setIsLoading(true);
     try {
       // Validate and extract URL parameters
       let url;
@@ -29,8 +30,19 @@ export default function ConversationAnalysis() {
         throw new Error("Invalid URL format");
       }
 
-      const configId = url.searchParams.get("configId");
-      const sessionId = url.searchParams.get("sessionId");
+      // Extract configId and sessionId from URL path or search params
+      let configId, sessionId;
+      
+      // Try to get configId from path first (e.g., /chat/13?sessionId=123)
+      const pathMatch = url.pathname.match(/\/chat\/(\d+)/);
+      if (pathMatch) {
+        configId = pathMatch[1];
+      } else {
+        // Fallback to search params
+        configId = url.searchParams.get("configId");
+      }
+      
+      sessionId = url.searchParams.get("sessionId");
       
       if (!configId) {
         throw new Error("Invalid chat URL - missing configId");
@@ -41,8 +53,6 @@ export default function ConversationAnalysis() {
       }
 
       console.log("Analyzing conversation with:", { configId, sessionId, url: chatUrl });
-
-      setIsLoading(true);
       console.log('Starting analysis with URL:', chatUrl);
       console.log('Extracted params:', { configId, sessionId });
 
@@ -65,7 +75,10 @@ export default function ConversationAnalysis() {
       // Fetch conversations
       const conversationsUrl = `/api/conversations/${configId}${sessionId ? `?sessionId=${sessionId}` : ''}`;
       console.log('Fetching conversations from:', conversationsUrl);
+      
       const conversationsResponse = await fetch(conversationsUrl);
+      console.log('Response status:', conversationsResponse.status);
+      
       if (!conversationsResponse.ok) {
         // If conversation is not found for the specific session, show error
         if (conversationsResponse.status === 404 && sessionId) {
@@ -75,11 +88,16 @@ export default function ConversationAnalysis() {
         console.error('Failed to fetch conversations:', errorText);
         throw new Error(`Failed to fetch conversations: ${errorText}`);
       }
+      
       const conversationsData = await conversationsResponse.json();
       console.log('Received conversations data:', conversationsData);
       
       if (!Array.isArray(conversationsData)) {
-        throw new Error("Invalid response format for conversations");
+        throw new Error("Invalid response format: expected an array of conversations");
+      }
+      
+      if (sessionId && conversationsData.length === 0) {
+        throw new Error("No conversation found for this chat link");
       }
 
       // Process conversations and their feedback
@@ -117,6 +135,7 @@ export default function ConversationAnalysis() {
 
       setConversations(processedConversations);
       console.log('Set conversations state with:', processedConversations.length, 'conversations');
+
     } catch (error) {
       toast({
         variant: "destructive",
@@ -158,7 +177,7 @@ export default function ConversationAnalysis() {
         ) : (
           <ScrollArea className="h-[calc(100vh-16rem)]">
             <div className="space-y-4">
-              {conversations.map((conversation, index) => (
+              {conversations.map((conversation) => (
                 <Card key={conversation.sessionId}>
                   <CardHeader>
                     <h2 className="text-lg font-semibold">
