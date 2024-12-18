@@ -14,7 +14,7 @@ interface ConversationFeedback {
 
 export default function ConversationAnalysis() {
   const [chatUrl, setChatUrl] = useState("");
-  const [conversations, setConversations] = useState<Message[][]>([]);
+  const [conversations, setConversations] = useState<{ sessionId: string; messages: Message[]; createdAt: string }[]>([]);
   const [feedbacks, setFeedbacks] = useState<ConversationFeedback[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -58,7 +58,7 @@ export default function ConversationAnalysis() {
       console.log('Fetched conversations:', conversationsData);
 
       // Get feedback for each conversation
-      const feedbackPromises = conversationsData.map(async (conversation: Message[]) => {
+      const feedbackPromises = conversationsData.map(async (conversation) => {
         console.log('Processing conversation:', conversation);
         
         const feedbackResponse = await fetch("/api/chat-feedback", {
@@ -66,7 +66,7 @@ export default function ConversationAnalysis() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             feedbackCriteria: config.feedbackCriteria,
-            messages: conversation
+            messages: conversation.messages
           }),
         });
 
@@ -126,11 +126,14 @@ export default function ConversationAnalysis() {
           <ScrollArea className="h-[calc(100vh-16rem)]">
             <div className="space-y-4">
               {conversations.map((conversation, index) => (
-                <Card key={index}>
+                <Card key={conversation.sessionId}>
                   <CardHeader>
                     <h2 className="text-lg font-semibold">
-                      Conversation {index + 1}
+                      Conversation from {new Date(conversation.createdAt).toLocaleString()}
                     </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Session ID: {conversation.sessionId}
+                    </p>
                   </CardHeader>
                   <CardContent>
                     {feedbacks[index] && (
