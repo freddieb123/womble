@@ -197,7 +197,11 @@ export function registerRoutes(app: Express): Server {
       const { content, config } = req.body;
       const url = new URL(req.url, `http://${req.headers.host}`);
       const configId = parseInt(url.searchParams.get("configId") || "");
-      const sessionId = getSessionId(req);
+      const sessionId = url.searchParams.get("sessionId");
+      
+      if (!sessionId) {
+        return res.status(400).json({ error: "Session ID is required in URL" });
+      }
       
       if (!content || typeof content !== "string") {
         return res.status(400).send("Message content is required");
