@@ -24,6 +24,7 @@ export default function ConversationAnalysis() {
       // Extract configId from URL
       const url = new URL(chatUrl);
       const configId = url.searchParams.get("configId");
+      const sessionId = url.searchParams.get("sessionId");
       
       if (!configId) {
         throw new Error("Invalid chat URL - missing configId");
@@ -43,7 +44,7 @@ export default function ConversationAnalysis() {
       }
 
       // Fetch conversations
-      const conversationsResponse = await fetch(`/api/conversations/${configId}`);
+      const conversationsResponse = await fetch(`/api/conversations/${configId}${sessionId ? `?sessionId=${sessionId}` : ''}`);
       if (!conversationsResponse.ok) {
         throw new Error(`Failed to fetch conversations: ${await conversationsResponse.text()}`);
       }

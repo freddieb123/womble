@@ -430,18 +430,27 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
   app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.configId);
+      const sessionId = req.query.sessionId as string;
+      
       if (isNaN(configId)) {
         return res.status(400).json({ error: "Invalid config ID" });
       }
 
-      const savedConversations = await db.query.conversations.findMany({
-        where: eq(conversations.configId, configId),
+      const query = {
+        where: sessionId 
+          ? and(eq(conversations.configId, configId), eq(conversations.sessionId, sessionId))
+          : eq(conversations.configId, configId),
         orderBy: [desc(conversations.createdAt)]
-      });
+      };
 
-      const conversationMessages = savedConversations.map(conv => 
-        typeof conv.messages === 'string' ? JSON.parse(conv.messages) : conv.messages
-      );
+      const savedConversations = await db.query.conversations.findMany(query);
+
+      const conversationMessages = savedConversations.map(conv => ({
+        sessionId: conv.sessionId,
+        messages: typeof conv.messages === 'string' ? JSON.parse(conv.messages) : conv.messages,
+        createdAt: conv.createdAt
+      }));
+      
       res.json(conversationMessages);
     } catch (error: any) {
       console.error("Error fetching conversations:", error);
