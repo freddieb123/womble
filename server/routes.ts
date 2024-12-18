@@ -28,23 +28,23 @@ const openai = new OpenAI({
 const sessions: Record<string, any[]> = {};
 
 function getSessionId(req: Request): string {
-  // First try to get sessionId from query parameters
+  // Try to get sessionId from URL search params first
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const urlSessionId = url.searchParams.get("sessionId");
+  if (urlSessionId) {
+    console.log('Found sessionId in URL search params:', urlSessionId);
+    return urlSessionId;
+  }
+  
+  // Then try query parameters
   if (req.query.sessionId) {
     console.log('Found sessionId in query params:', req.query.sessionId);
     return req.query.sessionId as string;
   }
   
-  // Then try to get it from URL search params
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  const sessionId = url.searchParams.get("sessionId");
-  if (sessionId) {
-    console.log('Found sessionId in URL search params:', sessionId);
-    return sessionId;
-  }
-  
-  // If no sessionId found, generate a new one
+  // Only generate a new one if no existing sessionId found
   const newSessionId = crypto.randomUUID();
-  console.log('Generated new sessionId:', newSessionId);
+  console.log('No existing sessionId found, generated new one:', newSessionId);
   return newSessionId;
 }
 
