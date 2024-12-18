@@ -31,31 +31,44 @@ export default function ConversationAnalysis() {
       }
 
       setIsLoading(true);
+      console.log('Starting analysis with URL:', chatUrl);
+      console.log('Extracted params:', { configId, sessionId });
 
       // Fetch config to get feedback criteria
+      console.log('Fetching chat configuration...');
       const configResponse = await fetch(`/api/chat-configs/${configId}`);
       if (!configResponse.ok) {
-        throw new Error(`Failed to fetch chat configuration: ${await configResponse.text()}`);
+        const errorText = await configResponse.text();
+        console.error('Failed to fetch config:', errorText);
+        throw new Error(`Failed to fetch chat configuration: ${errorText}`);
       }
       const config = await configResponse.json();
+      console.log('Received config:', config);
 
       if (!config.feedbackCriteria) {
+        console.error('No feedback criteria found in config');
         throw new Error("This chat configuration has no feedback criteria set");
       }
 
       // Fetch conversations
-      const conversationsResponse = await fetch(`/api/conversations/${configId}${sessionId ? `?sessionId=${sessionId}` : ''}`);
+      const conversationsUrl = `/api/conversations/${configId}${sessionId ? `?sessionId=${sessionId}` : ''}`;
+      console.log('Fetching conversations from:', conversationsUrl);
+      const conversationsResponse = await fetch(conversationsUrl);
       if (!conversationsResponse.ok) {
-        throw new Error(`Failed to fetch conversations: ${await conversationsResponse.text()}`);
+        const errorText = await conversationsResponse.text();
+        console.error('Failed to fetch conversations:', errorText);
+        throw new Error(`Failed to fetch conversations: ${errorText}`);
       }
       const conversationsData = await conversationsResponse.json();
+      console.log('Received conversations data:', conversationsData);
       
       if (!Array.isArray(conversationsData) || conversationsData.length === 0) {
+        console.error('No conversations found in response');
         throw new Error("No conversations found for this chat configuration");
       }
 
       setConversations(conversationsData);
-      console.log('Fetched conversations:', conversationsData);
+      console.log('Set conversations state with:', conversationsData.length, 'conversations');
 
       // Get feedback for each conversation
       const feedbackPromises = conversationsData.map(async (conversation) => {

@@ -432,7 +432,10 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
       const configId = parseInt(req.params.configId);
       const sessionId = req.query.sessionId as string;
       
+      console.log('Fetching conversations for:', { configId, sessionId });
+      
       if (isNaN(configId)) {
+        console.log('Invalid configId:', configId);
         return res.status(400).json({ error: "Invalid config ID" });
       }
 
@@ -443,14 +446,21 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
         orderBy: [desc(conversations.createdAt)]
       };
 
+      console.log('Executing query with conditions:', query.where);
       const savedConversations = await db.query.conversations.findMany(query);
+      console.log('Found conversations:', savedConversations.length);
 
-      const conversationMessages = savedConversations.map(conv => ({
-        sessionId: conv.sessionId,
-        messages: typeof conv.messages === 'string' ? JSON.parse(conv.messages) : conv.messages,
-        createdAt: conv.createdAt
-      }));
+      const conversationMessages = savedConversations.map(conv => {
+        const messages = typeof conv.messages === 'string' ? JSON.parse(conv.messages) : conv.messages;
+        console.log(`Processing conversation ${conv.sessionId}:`, { messageCount: messages.length });
+        return {
+          sessionId: conv.sessionId,
+          messages,
+          createdAt: conv.createdAt
+        };
+      });
       
+      console.log('Returning processed conversations:', conversationMessages.length);
       res.json(conversationMessages);
     } catch (error: any) {
       console.error("Error fetching conversations:", error);
