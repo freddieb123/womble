@@ -439,7 +439,9 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
         orderBy: [desc(conversations.createdAt)]
       });
 
-      const conversationMessages = savedConversations.map(conv => JSON.parse(conv.messages as string));
+      const conversationMessages = savedConversations.map(conv => 
+        typeof conv.messages === 'string' ? JSON.parse(conv.messages) : conv.messages
+      );
       res.json(conversationMessages);
     } catch (error: any) {
       console.error("Error fetching conversations:", error);
