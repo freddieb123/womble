@@ -439,33 +439,71 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
         return res.status(400).json({ error: "Invalid config ID" });
       }
 
-      const query = {
-        where: sessionId 
-          ? and(eq(conversations.configId, configId), eq(conversations.sessionId, sessionId))
-          : eq(conversations.configId, configId),
-        orderBy: [desc(conversations.createdAt)]
-      };
+      // Log the exact values we're querying with
+      console.log('Query parameters:', { configId, sessionId, configIdType: typeof configId });
 
-      console.log('Executing query with conditions:', query.where);
+      // Construct base query
+      let query;
+      if (sessionId) {
+        query = {
+          where: and(
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId)
+          ),
+          orderBy: [desc(conversations.createdAt)]
+        };
+        console.log('Using session-specific query');
+      } else {
+        query = {
+          where: eq(conversations.configId, configId),
+          orderBy: [desc(conversations.createdAt)]
+        };
+        console.log('Using config-only query');
+      }
+
+      console.log('Executing query with conditions:', JSON.stringify(query.where));
       const savedConversations = await db.query.conversations.findMany(query);
       console.log('Found conversations:', savedConversations.length);
+
+      if (savedConversations.length === 0) {
+        console.log('No conversations found for:', { configId, sessionId });
+        return res.json([]);
+      }
 
       const conversationMessages = savedConversations.map(conv => {
         let messages;
         try {
-          // Handle double-escaped JSON strings
           if (typeof conv.messages === 'string') {
-            const unescaped = conv.messages.replace(/^""|""$/g, '').replace(/\\"/g, '"');
-            messages = JSON.parse(unescaped);
+            // First try parsing as is
+            try {
+              messages = JSON.parse(conv.messages);
+            } catch {
+              // If that fails, try handling double-escaped JSON
+              const unescaped = conv.messages
+                .replace(/^""|""$/g, '') // Remove leading/trailing double quotes
+                .replace(/\\"/g, '"')     // Replace escaped quotes
+                .replace(/\\\\/g, '\\');  // Replace double backslashes
+              messages = JSON.parse(unescaped);
+            }
           } else {
             messages = conv.messages;
           }
-          console.log(`Processing conversation ${conv.sessionId}:`, { 
-            messageCount: Array.isArray(messages) ? messages.length : 0,
-            sampleMessage: Array.isArray(messages) && messages.length > 0 ? messages[0] : null
+
+          if (!Array.isArray(messages)) {
+            console.error(`Invalid messages format for session ${conv.sessionId}:`, messages);
+            messages = [];
+          }
+
+          console.log(`Successfully processed conversation ${conv.sessionId}:`, { 
+            messageCount: messages.length,
+            sampleMessage: messages.length > 0 ? {
+              id: messages[0].id,
+              role: messages[0].role,
+              contentPreview: messages[0].content.substring(0, 50)
+            } : null
           });
         } catch (error) {
-          console.error(`Error parsing messages for session ${conv.sessionId}:`, error);
+          console.error(`Error processing messages for session ${conv.sessionId}:`, error);
           messages = [];
         }
         return {
