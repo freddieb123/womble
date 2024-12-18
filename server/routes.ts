@@ -30,9 +30,9 @@ const openai = new OpenAI({
 const sessions: Record<string, any[]> = {};
 
 function getSessionId(req: Request): string {
-  // Use query parameters as session identifier
   const url = new URL(req.url, `http://${req.headers.host}`);
-  return url.searchParams.toString() || 'default';
+  const configId = url.searchParams.get("configId");
+  return configId ? `configId=${configId}` : 'default';
 }
 
 const configSchema = z.object({
@@ -136,18 +136,19 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/messages", async (req, res) => {
     try {
       const { content, config } = req.body;
-      const sessionId = getSessionId(req);
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const configId = parseInt(url.searchParams.get("configId") || "");
+      const sessionId = `configId=${configId}`;
       
       if (!content || typeof content !== "string") {
         return res.status(400).send("Message content is required");
       }
 
-      const parsedConfig = configSchema.parse(config);
-      const configId = parseInt(new URL(req.url, `http://${req.headers.host}`).searchParams.get("configId") || "0");
-
-      if (!configId) {
-        return res.status(400).send("Config ID is required");
+      if (isNaN(configId) || configId <= 0) {
+        return res.status(400).json({ error: "Valid config ID is required" });
       }
+
+      const parsedConfig = configSchema.parse(config);
 
       // Initialize session if it doesn't exist
       if (!sessions[sessionId]) {
