@@ -51,13 +51,13 @@ export default function ConversationAnalysis() {
         throw new Error("Invalid chat URL - missing configId");
       }
 
-      if (!sessionId) {
-        throw new Error("Invalid chat URL - missing sessionId");
+      if (!linkId) {
+        throw new Error("Invalid chat URL - missing linkId");
       }
 
-      console.log("Analyzing conversation with:", { configId, sessionId, url: chatUrl });
+      console.log("Analyzing conversation with:", { configId, linkId, url: chatUrl });
       console.log('Starting analysis with URL:', chatUrl);
-      console.log('Extracted params:', { configId, sessionId });
+      console.log('Extracted params:', { configId, linkId });
 
       // Fetch config to get feedback criteria
       console.log('Fetching chat configuration...');
