@@ -47,7 +47,10 @@ export function registerRoutes(app: Express): Server {
       const configId = parseInt(url.searchParams.get("configId") || "");
       const sessionId = `configId=${configId}`;
 
+      console.log("Fetching messages for:", { configId, sessionId });
+
       if (isNaN(configId) || configId <= 0) {
+        console.log("Invalid configId:", configId);
         return res.status(400).json({ error: "Valid config ID is required" });
       }
 
@@ -59,16 +62,26 @@ export function registerRoutes(app: Express): Server {
         ),
       });
 
+      console.log("Found conversation:", conversation ? "yes" : "no");
+
       // Initialize session if it doesn't exist
       if (!sessions[sessionId]) {
-        sessions[sessionId] = conversation ? JSON.parse(conversation.messages as string) : [];
+        sessions[sessionId] = conversation ? 
+          (typeof conversation.messages === 'string' ? 
+            JSON.parse(conversation.messages) : 
+            conversation.messages) : 
+          [];
+        console.log("Initialized session with messages count:", sessions[sessionId].length);
       }
 
-      res.json({
+      const response = {
         messages: sessions[sessionId],
         isLoading: false,
         error: null
-      });
+      };
+
+      console.log("Returning messages count:", response.messages.length);
+      res.json(response);
     } catch (error) {
       console.error("Error fetching messages:", error);
       res.status(500).json({
@@ -201,17 +214,39 @@ export function registerRoutes(app: Express): Server {
 
       // Save conversation in database
       try {
-        await db
-          .insert(conversations)
-          .values({
-            configId,
-            sessionId,
-            messages: JSON.stringify(sessions[sessionId])
-          })
-          .onConflictDoUpdate({
-            target: [conversations.configId, conversations.sessionId],
-            set: { messages: JSON.stringify(sessions[sessionId]) }
-          });
+        const existingConversation = await db.query.conversations.findFirst({
+          where: and(
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId)
+          ),
+        });
+
+        if (existingConversation) {
+          await db
+            .update(conversations)
+            .set({
+              messages: JSON.stringify(sessions[sessionId])
+            })
+            .where(and(
+              eq(conversations.configId, configId),
+              eq(conversations.sessionId, sessionId)
+            ));
+        } else {
+          await db
+            .insert(conversations)
+            .values({
+              configId,
+              sessionId,
+              messages: JSON.stringify(sessions[sessionId])
+            });
+        }
+
+        // Log success for debugging
+        console.log("Successfully saved conversation:", {
+          configId,
+          sessionId,
+          messageCount: sessions[sessionId].length
+        });
       } catch (error) {
         console.error("Error saving conversation:", error);
         // Continue with the chat even if saving fails
