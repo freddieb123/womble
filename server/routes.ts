@@ -49,29 +49,45 @@ export function registerRoutes(app: Express): Server {
       const url = new URL(req.url, `http://${req.headers.host}`);
       const configId = parseInt(url.searchParams.get("configId") || "");
       const sessionId = url.searchParams.get("sessionId");
-
-      if (!sessionId) {
-        return res.status(400).json({ error: "Session ID is required in URL" });
-      }
-
-      console.log('Fetching messages with URL sessionId:', sessionId);
-
-      console.log("Fetching messages for:", { configId, sessionId });
+      const linkId = url.searchParams.get("linkId");
 
       if (isNaN(configId) || configId <= 0) {
         console.log("Invalid configId:", configId);
         return res.status(400).json({ error: "Valid config ID is required" });
       }
 
+      console.log('Fetching messages:', { configId, sessionId, linkId });
+
       // Try to get messages from database first
-      const conversation = await db.query.conversations.findFirst({
-        where: and(
+      let whereClause;
+      if (sessionId) {
+        // If sessionId is provided, get specific conversation
+        whereClause = and(
           eq(conversations.configId, configId),
           eq(conversations.sessionId, sessionId)
-        ),
+        );
+      } else if (linkId) {
+        // If only linkId is provided, get latest conversation from that group
+        whereClause = and(
+          eq(conversations.configId, configId),
+          eq(conversations.linkId, linkId)
+        );
+      } else {
+        // Fallback to just configId
+        whereClause = eq(conversations.configId, configId);
+      }
+
+      const conversation = await db.query.conversations.findFirst({
+        where: whereClause,
+        orderBy: [desc(conversations.createdAt)]
       });
 
-      console.log("Found conversation:", conversation ? "yes" : "no");
+      console.log("Found conversation:", conversation ? "yes" : "no", {
+        configId,
+        sessionId,
+        linkId,
+        hasMessages: conversation?.messages ? true : false
+      });
 
       // Initialize or update session with messages from the database
       if (conversation) {
@@ -187,15 +203,20 @@ export function registerRoutes(app: Express): Server {
       const { content, config } = req.body;
       const url = new URL(req.url, `http://${req.headers.host}`);
       const configId = parseInt(url.searchParams.get("configId") || "");
-      const sessionId = url.searchParams.get("sessionId");
+      const linkId = url.searchParams.get("linkId") || 'legacy';
+      let sessionId = url.searchParams.get("sessionId");
       
+      // For new conversations, generate a session ID
       if (!sessionId) {
-        return res.status(400).json({ error: "Session ID is required in URL" });
+        sessionId = crypto.randomUUID();
+        console.log('Generated new sessionId:', sessionId);
       }
       
       if (!content || typeof content !== "string") {
         return res.status(400).send("Message content is required");
       }
+
+      console.log('Processing message:', { configId, sessionId, linkId });
 
       if (isNaN(configId) || configId <= 0) {
         return res.status(400).json({ error: "Valid config ID is required" });
@@ -205,132 +226,136 @@ export function registerRoutes(app: Express): Server {
 
       console.log('Processing message with sessionId:', sessionId);
       
-      // Initialize or get session array
+      // Ensure the sessions object exists and initialize if needed
       if (!sessions[sessionId]) {
         console.log('Initializing new session:', sessionId);
         sessions[sessionId] = [];
       }
 
-      // Add user message
+      // Create and add user message
       const userMessage = {
         id: crypto.randomUUID(),
         content,
         role: 'user' as const,
         timestamp: Date.now()
       };
+
+      // Add message to session storage
       sessions[sessionId].push(userMessage);
-      console.log('Added user message to session:', {
+      
+      console.log('Added message to session:', {
         sessionId,
+        linkId,
         messageId: userMessage.id,
-        messagesCount: sessions[sessionId].length
+        messageCount: sessions[sessionId].length
       });
 
       // Save or update conversation in database
-      try {
-        if (!sessionId) {
-          throw new Error("No session ID provided in URL");
-        }
+        try {
+          if (!sessionId) {
+            throw new Error("Session ID is required at this point");
+          }
 
-        // Extract the linkId from URL parameters
-        const url = new URL(req.url, `http://${req.headers.host}`);
-        const linkId = url.searchParams.get("linkId");
-        if (!linkId) {
-          throw new Error("No link ID provided in URL");
-        }
-        
-        console.log('Saving conversation with sessionId:', sessionId, 'linkId:', linkId);
-        
-        // Use the session ID from the URL params that we validated earlier
-        const messagesJson = JSON.stringify(sessions[sessionId]);
-        
-        // Check if conversation exists
-        const existingConversation = await db.query.conversations.findFirst({
-          where: and(
-            eq(conversations.configId, configId),
-            eq(conversations.sessionId, sessionId)
-          ),
-        });
-
-        if (existingConversation) {
-          console.log('Updating existing conversation:', {
+          console.log('Saving conversation:', {
             configId,
             sessionId,
-            messageCount: sessions[sessionId].length,
-            messageTypes: sessions[sessionId].map(m => m.role).join(', ')
+            linkId,
+            messageCount: sessions[sessionId].length
           });
 
-          await db
-            .update(conversations)
-            .set({
-              messages: messagesJson,
-              updatedAt: new Date()
-            })
-            .where(and(
+          // Use the session ID for this chat
+          const messagesJson = JSON.stringify(sessions[sessionId]);
+          
+          // Check if conversation exists
+          const existingConversation = await db.query.conversations.findFirst({
+            where: and(
               eq(conversations.configId, configId),
               eq(conversations.sessionId, sessionId)
-            ));
-        } else {
-          console.log('Creating new conversation:', {
-            configId,
-            sessionId,
-            messageCount: sessions[sessionId].length,
-            messageTypes: sessions[sessionId].map(m => m.role).join(', ')
+            ),
           });
 
-          const result = await db
-            .insert(conversations)
-            .values({
+          if (existingConversation) {
+            console.log('Updating existing conversation:', {
+              configId,
+              sessionId: sessionId,
+              linkId,
+              messageCount: sessions[sessionId].length,
+              messageTypes: sessions[sessionId].map(m => m.role).join(', ')
+            });
+
+            await db
+              .update(conversations)
+              .set({
+                messages: messagesJson,
+                updatedAt: new Date()
+              })
+              .where(and(
+                eq(conversations.configId, configId),
+                eq(conversations.sessionId, sessionId)
+              ));
+          } else {
+            console.log('Creating new conversation:', {
+              configId,
+              sessionId: sessionId,
+              linkId,
+              messageCount: sessions[sessionId].length,
+              messageTypes: sessions[sessionId].map(m => m.role).join(', ')
+            });
+
+            const result = await db
+              .insert(conversations)
+              .values({
+                configId,
+                sessionId: sessionId,
+                linkId,
+                messages: messagesJson,
+                createdAt: new Date(),
+                updatedAt: new Date()
+              })
+              .returning();
+              
+            console.log('Created new conversation with ID:', result[0].id);
+
+          }
+
+          // Verify the save
+          const savedConversation = await db.query.conversations.findFirst({
+            where: and(
+              eq(conversations.configId, configId),
+              eq(conversations.sessionId, sessionId)
+            ),
+          });
+
+          if (!savedConversation) {
+            console.error('Failed to verify conversation save:', {
               configId,
               sessionId,
-              linkId,
-              messages: messagesJson,
-              createdAt: new Date(),
-              updatedAt: new Date()
-            })
-            .returning();
-            
-          console.log('Created new conversation with ID:', result[0].id);
+              attempted: true
+            });
+            throw new Error("Failed to save conversation - verification failed");
+          }
 
-        }
+          const savedMessages = typeof savedConversation.messages === 'string' 
+            ? JSON.parse(savedConversation.messages) 
+            : savedConversation.messages;
 
-        // Verify the save
-        const savedConversation = await db.query.conversations.findFirst({
-          where: and(
-            eq(conversations.configId, configId),
-            eq(conversations.sessionId, sessionId)
-          ),
-        });
-
-        if (!savedConversation) {
-          console.error('Failed to verify conversation save:', {
+          console.log('Successfully verified saved conversation:', {
+            id: savedConversation.id,
+            sessionId: savedConversation.sessionId,
+            configId: savedConversation.configId,
+            messageCount: Array.isArray(savedMessages) ? savedMessages.length : 0,
+            lastMessage: Array.isArray(savedMessages) && savedMessages.length > 0 
+              ? { role: savedMessages[savedMessages.length - 1].role } 
+              : null
+          });
+        } catch (error) {
+          console.error("Error saving conversation:", {
+            error,
             configId,
             sessionId,
-            attempted: true
+            messageCount: sessions[sessionId]?.length
           });
-          throw new Error("Failed to save conversation - verification failed");
         }
-
-        const savedMessages = typeof savedConversation.messages === 'string' 
-          ? JSON.parse(savedConversation.messages) 
-          : savedConversation.messages;
-
-        console.log('Successfully verified saved conversation:', {
-          id: savedConversation.id,
-          sessionId: savedConversation.sessionId,
-          configId: savedConversation.configId,
-          messageCount: Array.isArray(savedMessages) ? savedMessages.length : 0,
-          lastMessage: Array.isArray(savedMessages) && savedMessages.length > 0 
-            ? { role: savedMessages[savedMessages.length - 1].role } 
-            : null
-        });
-      } catch (error) {
-        console.error("Error saving conversation:", {
-          error,
-          configId,
-          sessionId,
-          messageCount: sessions[sessionId]?.length
-        });
-      }
 
       // Set up SSE headers
       res.setHeader('Content-Type', 'text/event-stream');
@@ -555,12 +580,25 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
 
       // Build the where clause based on provided parameters
       let whereClause;
+      
       if (sessionId) {
-        whereClause = and(eq(conversations.configId, configId), eq(conversations.sessionId, sessionId));
+        // If sessionId is provided, fetch that specific conversation
+        whereClause = and(
+          eq(conversations.configId, configId),
+          eq(conversations.sessionId, sessionId)
+        );
+        console.log('Fetching specific conversation for sessionId:', sessionId);
       } else if (linkId) {
-        whereClause = and(eq(conversations.configId, configId), eq(conversations.linkId, linkId));
+        // If linkId is provided, fetch all conversations in that group
+        whereClause = and(
+          eq(conversations.configId, configId),
+          eq(conversations.linkId, linkId)
+        );
+        console.log('Fetching all conversations for linkId:', linkId);
       } else {
+        // Otherwise, fetch all conversations for this config
         whereClause = eq(conversations.configId, configId);
+        console.log('Fetching all conversations for configId:', configId);
       }
 
       console.log('Query parameters:', {

@@ -28,9 +28,10 @@ export const conversations = pgTable("conversations", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => {
   return {
-    // Non-unique indices for performance
+    // Index for finding all conversations in a group (same link_id)
+    linkIdConfigIdx: index("link_id_config_idx").on(table.linkId, table.configId),
+    // Index for finding specific conversations
     configSessionIdx: index("config_session_idx").on(table.configId, table.sessionId),
-    linkIdIdx: index("link_id_idx").on(table.linkId),
   };
 });
 
