@@ -28,6 +28,9 @@ const openai = new OpenAI({
 const sessions: Record<string, any[]> = {};
 
 function getSessionId(req: Request): string {
+  if (req.query.sessionId) {
+    return req.query.sessionId as string;
+  }
   const url = new URL(req.url, `http://${req.headers.host}`);
   const sessionId = url.searchParams.get("sessionId");
   return sessionId || crypto.randomUUID();
@@ -358,20 +361,33 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/chat-feedback", async (req: Request, res: Response) => {
     try {
-      const { feedbackCriteria, messages } = req.body;
+      const { feedbackCriteria } = req.body;
       const sessionId = getSessionId(req);
       const configId = parseInt(new URL(req.url, `http://${req.headers.host}`).searchParams.get("configId") || "0");
 
-      console.log('Received feedback request:', { feedbackCriteria, messageCount: messages?.length, configId, sessionId });
+      console.log('Received feedback request:', { feedbackCriteria, configId, sessionId });
 
       if (!feedbackCriteria) {
         return res.status(400).json({ error: "Feedback criteria is required" });
       }
 
-      // Use provided messages if available, otherwise fall back to session messages
-      const messagesToAnalyze = messages || (sessions[sessionId] || []);
+      // Fetch the conversation from database
+      const conversation = await db.query.conversations.findFirst({
+        where: and(
+          eq(conversations.configId, configId),
+          eq(conversations.sessionId, sessionId)
+        ),
+      });
 
-      if (messagesToAnalyze.length === 0) {
+      if (!conversation) {
+        return res.status(400).json({ error: "Conversation not found" });
+      }
+
+      const messagesToAnalyze = typeof conversation.messages === 'string' 
+        ? JSON.parse(conversation.messages)
+        : conversation.messages;
+
+      if (!Array.isArray(messagesToAnalyze) || messagesToAnalyze.length === 0) {
         return res.status(400).json({ error: "No chat messages to analyze" });
       }
 
