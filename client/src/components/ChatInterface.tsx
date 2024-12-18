@@ -21,13 +21,21 @@ export default function ChatInterface({ config }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const searchParams = new URLSearchParams(window.location.search);
+  const configId = searchParams.get('configId');
   const { data: chatState = { messages: [], isLoading: false, error: null } } = useQuery<ChatState>({
-    queryKey: ["/api/messages"],
+    queryKey: ["/api/messages", { configId }],
+    enabled: !!configId,
   });
 
   const sendMessage = useMutation({
     mutationFn: async (content: string) => {
-      const response = await fetch("/api/messages", {
+      const url = new URL("/api/messages", window.location.origin);
+      const searchParams = new URLSearchParams(window.location.search);
+      const configId = searchParams.get('configId');
+      url.searchParams.set('configId', configId || '');
+      
+      const response = await fetch(url.toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, config }),
@@ -178,7 +186,12 @@ export default function ChatInterface({ config }: Props) {
             }
 
             try {
-              const response = await fetch("/api/chat-feedback", {
+              const url = new URL("/api/chat-feedback", window.location.origin);
+              const searchParams = new URLSearchParams(window.location.search);
+              const configId = searchParams.get('configId');
+              url.searchParams.set('configId', configId || '');
+
+              const response = await fetch(url.toString(), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ feedbackCriteria: config.feedbackCriteria }),
