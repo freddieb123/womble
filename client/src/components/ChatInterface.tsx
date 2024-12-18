@@ -220,19 +220,15 @@ export default function ChatInterface({ config }: Props) {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
-            <div>
-              <h3 className="text-sm font-semibold mb-3">Feedback Points:</h3>
-              <div className="space-y-3">
+            <div className="space-y-3">
                 {feedbackData.bullets.map((bullet, index) => (
                   <div key={index} className="flex items-start gap-2 text-sm">
                     <span>•</span>
                     <span>{bullet}</span>
                   </div>
                 ))}
-              </div>
             </div>
             <div className="border-t pt-4">
-              <h3 className="text-sm font-semibold mb-2">Overall Assessment:</h3>
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold">{feedbackData.score}/10</span>
               </div>

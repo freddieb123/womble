@@ -253,10 +253,8 @@ export function registerRoutes(app: Express): Server {
 
 Please provide your feedback in exactly this format:
 
-FEEDBACK POINTS:
 • [2-4 bullet points focusing ONLY on the user's communication style and how well they met the criteria]
 
-OVERALL ASSESSMENT:
 Score: [1-10]
 [Brief one-line summary of overall performance]
 
