@@ -9,7 +9,6 @@ export default function ChatLinkCreator() {
   const [selectedConfigId, setSelectedConfigId] = useState<number | null>(null);
   const [generatedLink, setGeneratedLink] = useState<string>("");
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   // Fetch available chat configurations
   interface ChatConfig {
@@ -24,6 +23,12 @@ export default function ChatLinkCreator() {
 
   const handleCreateLink = async (configId: number) => {
     try {
+      // First verify the config exists
+      const configResponse = await fetch(`/api/chat-configs/${configId}`);
+      if (!configResponse.ok) {
+        throw new Error("Invalid chat configuration");
+      }
+
       const response = await fetch("/api/chat-links", {
         method: "POST",
         headers: {
@@ -33,10 +38,16 @@ export default function ChatLinkCreator() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to create chat link");
+        const error = await response.text();
+        throw new Error(error || "Failed to create chat link");
       }
 
       const data = await response.json();
+      if (!data.url) {
+        throw new Error("Invalid response format");
+      }
+
+      // Construct the full URL with origin
       const fullUrl = `${window.location.origin}${data.url}`;
       setGeneratedLink(fullUrl);
 
