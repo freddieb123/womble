@@ -212,11 +212,9 @@ export default function ChatInterface({ config }: Props) {
           <DialogHeader>
             <DialogTitle className="flex justify-between items-center">
               <span>Chat Feedback</span>
-              <DialogClose asChild>
-                <Button variant="ghost" size="icon">
-                  <X className="h-4 w-4" />
-                </Button>
-              </DialogClose>
+              <Button variant="ghost" size="icon" onClick={() => setFeedbackOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
