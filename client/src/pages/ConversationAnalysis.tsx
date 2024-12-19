@@ -58,6 +58,15 @@ export default function ConversationAnalysis() {
 
       // Get feedback for each conversation
       const feedbackPromises = conversationsData.map(async (conversation: Message[]) => {
+        // Validate conversation has at least one complete exchange
+        const hasUserMessage = conversation.some(m => m.role === 'user');
+        const hasAssistantMessage = conversation.some(m => m.role === 'assistant');
+        
+        if (!hasUserMessage || !hasAssistantMessage) {
+          console.warn('Skipping conversation without complete exchange');
+          return null;
+        }
+
         console.log('Processing conversation:', conversation);
         
         const feedbackResponse = await fetch("/api/chat-feedback", {
@@ -72,6 +81,9 @@ export default function ConversationAnalysis() {
         if (!feedbackResponse.ok) {
           const errorText = await feedbackResponse.text();
           console.error('Feedback error:', errorText);
+          if (errorText.includes('Please have at least one complete exchange')) {
+            return null;
+          }
           throw new Error(`Failed to get feedback: ${errorText}`);
         }
 
@@ -82,7 +94,14 @@ export default function ConversationAnalysis() {
 
       const allFeedback = await Promise.all(feedbackPromises);
       console.log('All feedback:', allFeedback);
-      setFeedbacks(allFeedback);
+      // Filter out null responses
+      const validFeedback = allFeedback.filter(feedback => feedback !== null);
+      
+      if (validFeedback.length === 0) {
+        throw new Error("No valid conversations found to analyze. Each conversation must have at least one user message and one assistant response.");
+      }
+      
+      setFeedbacks(validFeedback);
     } catch (error) {
       toast({
         variant: "destructive",
