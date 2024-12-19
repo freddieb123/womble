@@ -99,6 +99,7 @@ export function registerRoutes(app: Express): Server {
         title: parsedConfig.title,
         systemPrompt: parsedConfig.systemPrompt,
         userInstructions: parsedConfig.userInstructions,
+        feedbackCriteria: parsedConfig.feedbackCriteria,
       }).returning();
 
       console.log("Saved chat config:", result[0]);
