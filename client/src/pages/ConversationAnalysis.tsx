@@ -12,9 +12,14 @@ interface ConversationFeedback {
   summary: string | null;
 }
 
+interface ConversationData {
+  messages: Message[];
+  userName: string | null;
+}
+
 export default function ConversationAnalysis() {
   const [chatUrl, setChatUrl] = useState("");
-  const [conversations, setConversations] = useState<Message[][]>([]);
+  const [conversations, setConversations] = useState<ConversationData[]>([]);
   const [feedbacks, setFeedbacks] = useState<ConversationFeedback[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -57,10 +62,10 @@ export default function ConversationAnalysis() {
       console.log('Fetched conversations:', conversationsData);
 
       // Get feedback for each conversation
-      const feedbackPromises = conversationsData.map(async (conversation: Message[]) => {
+      const feedbackPromises = conversationsData.map(async (conversation: ConversationData) => {
         // Validate conversation has at least one complete exchange
-        const hasUserMessage = conversation.some(m => m.role === 'user');
-        const hasAssistantMessage = conversation.some(m => m.role === 'assistant');
+        const hasUserMessage = conversation.messages.some(m => m.role === 'user');
+        const hasAssistantMessage = conversation.messages.some(m => m.role === 'assistant');
         
         if (!hasUserMessage || !hasAssistantMessage) {
           console.warn('Skipping conversation without complete exchange');
@@ -74,7 +79,7 @@ export default function ConversationAnalysis() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             feedbackCriteria: config.feedbackCriteria,
-            messages: conversation
+            messages: conversation.messages
           }),
         });
 
