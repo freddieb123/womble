@@ -261,8 +261,13 @@ export function registerRoutes(app: Express): Server {
       res.setHeader('Connection', 'keep-alive');
 
       // Prepare messages for OpenAI API
+      const userName = url.searchParams.get('userName');
+      const enhancedSystemPrompt = userName 
+        ? `${parsedConfig.systemPrompt}\nThe user's name is ${userName}. Address them by their name naturally in your responses when appropriate.`
+        : parsedConfig.systemPrompt;
+
       const apiMessages = [
-        { role: "system", content: parsedConfig.systemPrompt },
+        { role: "system", content: enhancedSystemPrompt },
         ...sessions[sessionId].map(m => ({
           role: m.role,
           content: m.content
