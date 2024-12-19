@@ -105,14 +105,15 @@ export default function ChatInterface({ config }: Props) {
               assistantMessage.content += parsed.content;
               
               // Update UI immediately
-              queryClient.setQueryData<ChatState>([`/api/messages?configId=${configId}&sessionId=${sessionId}`], (old) => ({
-                messages: [
-                  ...(old?.messages || []).filter(m => m.id !== assistantMessage.id),
-                  { ...assistantMessage }
-                ],
-                isLoading: false,
-                error: null
-              }));
+              queryClient.setQueryData<ChatState>([`/api/messages?configId=${configId}&sessionId=${sessionId}`], (old) => {
+                const existingMessages = old?.messages || [];
+                const updatedMessages = existingMessages.filter(m => m.id !== assistantMessage.id);
+                return {
+                  messages: [...updatedMessages, { ...assistantMessage }],
+                  isLoading: false,
+                  error: null
+                };
+              });
             } catch (e) {
               console.error('Error parsing SSE data:', e);
             }
