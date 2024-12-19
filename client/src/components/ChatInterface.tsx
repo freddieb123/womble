@@ -178,52 +178,77 @@ export default function ChatInterface({ config }: Props) {
 
       <div className="px-4 pb-4">
         <Button
-          onClick={async () => {
-            if (!config.feedbackCriteria) {
-              toast({
-                variant: "destructive",
-                title: "Error",
-                description: "No feedback criteria specified for this chat configuration.",
-              });
-              return;
-            }
-
-            try {
-              const url = new URL("/api/chat-feedback", window.location.origin);
-              const searchParams = new URLSearchParams(window.location.search);
-              const configId = searchParams.get('configId');
-              url.searchParams.set('configId', configId || '');
-
-              const response = await fetch(url.toString(), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                  feedbackCriteria: config.feedbackCriteria,
-                  messages: chatState.messages 
-                }),
-              });
-
-              if (!response.ok) {
-                throw new Error(await response.text());
+            onClick={async () => {
+              // Check for feedback criteria
+              if (!config.feedbackCriteria) {
+                toast({
+                  variant: "destructive",
+                  title: "Error",
+                  description: "No feedback criteria specified for this chat configuration.",
+                });
+                return;
               }
 
-              const { bullets, score, summary, rawFeedback } = await response.json();
-              setFeedbackData({ bullets, score, summary });
-              setFeedbackOpen(true);
-            } catch (error) {
-              toast({
-                variant: "destructive",
-                title: "Error",
-                description: error instanceof Error ? error.message : "Failed to get feedback",
-              });
-            }
-          }}
-          variant="outline"
-          className="w-full"
-          disabled={chatState.messages.length === 0}
-        >
-          Get Feedback
-        </Button>
+              // Validate conversation state
+              if (chatState.messages.length === 0) {
+                toast({
+                  variant: "destructive",
+                  title: "No Messages",
+                  description: "Please have a conversation first before requesting feedback.",
+                });
+                return;
+              }
+
+              // Check for complete exchange
+              const hasUserMessage = chatState.messages.some(m => m.role === 'user');
+              const hasAssistantMessage = chatState.messages.some(m => m.role === 'assistant');
+              if (!hasUserMessage || !hasAssistantMessage) {
+                toast({
+                  variant: "destructive",
+                  title: "Incomplete Conversation",
+                  description: "Please complete at least one exchange before requesting feedback.",
+                });
+                return;
+              }
+
+              try {
+                const url = new URL("/api/chat-feedback", window.location.origin);
+                const searchParams = new URLSearchParams(window.location.search);
+                const configId = searchParams.get('configId');
+                url.searchParams.set('configId', configId || '');
+
+                const response = await fetch(url.toString(), {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ 
+                    feedbackCriteria: config.feedbackCriteria,
+                    messages: chatState.messages 
+                  }),
+                });
+
+                if (!response.ok) {
+                  const errorText = await response.text();
+                  console.error('Feedback error:', errorText);
+                  throw new Error(errorText);
+                }
+
+                const { bullets, score, summary } = await response.json();
+                setFeedbackData({ bullets, score, summary });
+                setFeedbackOpen(true);
+              } catch (error) {
+                toast({
+                  variant: "destructive",
+                  title: "Error",
+                  description: error instanceof Error ? error.message : "Failed to get feedback",
+                });
+              }
+            }}
+            variant="outline"
+            className="w-full"
+            disabled={chatState.messages.length === 0}
+          >
+            Get Feedback
+          </Button>
       </div>
 
       <Dialog open={feedbackOpen}>
