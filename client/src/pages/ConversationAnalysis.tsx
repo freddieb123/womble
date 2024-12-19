@@ -147,8 +147,8 @@ export default function ConversationAnalysis() {
                 <Card key={index}>
                   <CardHeader>
                     <h2 className="text-lg font-semibold">
-                      {conversation[0]?.userName 
-                        ? `${conversation[0].userName}'s Conversation` 
+                      {conversation.userName 
+                        ? `${conversation.userName}'s Conversation` 
                         : `Conversation ${index + 1}`}
                     </h2>
                   </CardHeader>
