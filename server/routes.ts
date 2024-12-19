@@ -233,11 +233,13 @@ export function registerRoutes(app: Express): Server {
               eq(conversations.sessionId, sessionId)
             ));
         } else {
+          const userName = url.searchParams.get('userName');
           await db
             .insert(conversations)
             .values({
               configId,
               sessionId,
+              userName,
               messages: JSON.stringify(sessions[sessionId])
             });
         }

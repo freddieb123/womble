@@ -21,6 +21,7 @@ export const conversations = pgTable("conversations", {
   id: serial("id").primaryKey(),
   configId: integer("config_id").notNull().references(() => chatConfigs.id),
   sessionId: text("session_id").notNull(),
+  userName: text("user_name"),
   messages: jsonb("messages").notNull().default('[]'),
   feedback: jsonb("feedback").default('{}'),
   createdAt: timestamp("created_at").defaultNow().notNull(),

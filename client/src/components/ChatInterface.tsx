@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import MessageBubble from "./MessageBubble";
+import UserNameModal from "./UserNameModal";
 import type { Message, ChatState, AdminConfig } from "@/lib/types";
 
 interface Props {
@@ -24,6 +25,8 @@ export default function ChatInterface({ config }: Props) {
   const searchParams = new URLSearchParams(window.location.search);
   const configId = searchParams.get('configId');
   const [sessionId] = useState(() => crypto.randomUUID()); // Generate unique session ID
+  const [showNameModal, setShowNameModal] = useState(true);
+  const [userName, setUserName] = useState<string | null>(null);
   
   const { data: chatState = { messages: [], isLoading: false, error: null } } = useQuery<ChatState>({
     queryKey: [`/api/messages?configId=${configId}&sessionId=${sessionId}`],
@@ -37,6 +40,9 @@ export default function ChatInterface({ config }: Props) {
       const configId = searchParams.get('configId');
       url.searchParams.set('configId', configId || '');
       url.searchParams.set('sessionId', sessionId);
+      if (userName) {
+        url.searchParams.set('userName', userName);
+      }
       
       const response = await fetch(url.toString(), {
         method: "POST",
@@ -143,6 +149,13 @@ export default function ChatInterface({ config }: Props) {
 
   return (
     <div className="flex flex-col h-[600px]">
+      <UserNameModal 
+        open={showNameModal} 
+        onSubmit={(name) => {
+          setUserName(name);
+          setShowNameModal(false);
+        }} 
+      />
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         <div className="space-y-4">
           {chatState.messages.map((message: Message) => (
