@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Send, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import MessageBubble from "./MessageBubble";
 import UserNameModal from "./UserNameModal";
 import type { Message, ChatState, AdminConfig } from "@/lib/types";
