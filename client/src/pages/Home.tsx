@@ -190,53 +190,58 @@ export default function Home() {
                       <CardTitle>{config.title}</CardTitle>
                       <CardDescription>Created on: {new Date(config.createdAt).toLocaleDateString()}</CardDescription>
                     </div>
-                    <Dialog open={editingConfig?.id === config.id} onOpenChange={(open) => !open && setEditingConfig(null)}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={() => setEditingConfig(config)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
-                        <DialogHeader>
-                          <DialogTitle>Edit Configuration</DialogTitle>
-                        </DialogHeader>
-                        {editingConfig && (
-                          <>
-                            <ScrollArea className="flex-1 -mx-6 px-6">
-                              <div className="py-4">
-                                <AdminPanel
-                                  config={{
-                                    title: editingConfig.title,
-                                    systemPrompt: editingConfig.systemPrompt,
-                                    userInstructions: editingConfig.userInstructions || "",
-                                    feedbackCriteria: editingConfig.feedbackCriteria || "",
-                                    temperature: 0.7,
-                                    maxTokens: 1000,
-                                  }}
-                                  onConfigChange={(updatedConfig) => {
-                                    setEditingConfig({
-                                      ...editingConfig,
-                                      title: updatedConfig.title,
-                                      systemPrompt: updatedConfig.systemPrompt,
-                                      userInstructions: updatedConfig.userInstructions || null,
-                                      feedbackCriteria: updatedConfig.feedbackCriteria || null,
-                                    });
-                                  }}
-                                />
+                    <div className="flex flex-col items-end gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        {config.conversationCount} conversation{config.conversationCount !== 1 ? 's' : ''}
+                      </span>
+                      <Dialog open={editingConfig?.id === config.id} onOpenChange={(open) => !open && setEditingConfig(null)}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="icon" onClick={() => setEditingConfig(config)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
+                          <DialogHeader>
+                            <DialogTitle>Edit Configuration</DialogTitle>
+                          </DialogHeader>
+                          {editingConfig && (
+                            <>
+                              <ScrollArea className="flex-1 -mx-6 px-6">
+                                <div className="py-4">
+                                  <AdminPanel
+                                    config={{
+                                      title: editingConfig.title,
+                                      systemPrompt: editingConfig.systemPrompt,
+                                      userInstructions: editingConfig.userInstructions || "",
+                                      feedbackCriteria: editingConfig.feedbackCriteria || "",
+                                      temperature: 0.7,
+                                      maxTokens: 1000,
+                                    }}
+                                    onConfigChange={(updatedConfig) => {
+                                      setEditingConfig({
+                                        ...editingConfig,
+                                        title: updatedConfig.title,
+                                        systemPrompt: updatedConfig.systemPrompt,
+                                        userInstructions: updatedConfig.userInstructions || null,
+                                        feedbackCriteria: updatedConfig.feedbackCriteria || null,
+                                      });
+                                    }}
+                                  />
+                                </div>
+                              </ScrollArea>
+                              <div className="mt-4 pt-4 border-t flex justify-end">
+                                <Button
+                                  onClick={() => editingConfig && updateConfig.mutate(editingConfig)}
+                                  disabled={updateConfig.isPending}
+                                >
+                                  Update Configuration
+                                </Button>
                               </div>
-                            </ScrollArea>
-                            <div className="mt-4 pt-4 border-t flex justify-end">
-                              <Button
-                                onClick={() => editingConfig && updateConfig.mutate(editingConfig)}
-                                disabled={updateConfig.isPending}
-                              >
-                                Update Configuration
-                              </Button>
-                            </div>
-                          </>
-                        )}
-                      </DialogContent>
-                    </Dialog>
+                            </>
+                          )}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -254,20 +259,15 @@ export default function Home() {
                         <p className="text-sm text-gray-600">{config.userInstructions}</p>
                       </div>
                     )}
-                    <div className="flex items-center justify-between">
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={() => handleCopyLink(config.id)}>
-                          <Copy className="h-4 w-4 mr-2" />
-                          Copy Link
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => handleOpenChat(config.id)}>
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                          Open Chat
-                        </Button>
-                      </div>
-                      <span className="text-sm text-muted-foreground">
-                        {config.conversationCount} conversation{config.conversationCount !== 1 ? 's' : ''}
-                      </span>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => handleCopyLink(config.id)}>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy Link
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handleOpenChat(config.id)}>
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Open Chat
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
