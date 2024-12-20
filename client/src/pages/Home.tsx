@@ -16,6 +16,7 @@ type ChatConfig = {
   userInstructions: string | null;
   feedbackCriteria: string | null;
   createdAt: string;
+  conversationCount: number;
 };
 
 export default function Home() {
@@ -29,7 +30,7 @@ export default function Home() {
     temperature: 0.7,
     maxTokens: 1000
   });
-  
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -49,12 +50,12 @@ export default function Home() {
           feedbackCriteria: config.feedbackCriteria,
         }),
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to save configuration");
       }
-      
+
       return response.json();
     },
     onSuccess: () => {
@@ -88,12 +89,12 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(configToUpdate),
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to update configuration");
       }
-      
+
       return response.json();
     },
     onSuccess: () => {
@@ -186,7 +187,12 @@ export default function Home() {
                 <CardHeader className="pb-4">
                   <div className="flex justify-between items-start">
                     <div>
-                      <CardTitle>{config.title}</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <CardTitle>{config.title}</CardTitle>
+                        <span className="text-sm text-muted-foreground">
+                          {config.conversationCount} conversation{config.conversationCount !== 1 ? 's' : ''}
+                        </span>
+                      </div>
                       <CardDescription>Created on: {new Date(config.createdAt).toLocaleDateString()}</CardDescription>
                     </div>
                     <Dialog open={editingConfig?.id === config.id} onOpenChange={(open) => !open && setEditingConfig(null)}>

@@ -7,7 +7,6 @@ import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
 
-
 const chatConfigSchema = z.object({
   title: z.string().min(1, "Title is required"),
   systemPrompt: z.string().min(1, "System prompt is required"),
@@ -134,9 +133,21 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/chat-configs", async (_req, res) => {
     try {
       const configs = await db.query.chatConfigs.findMany({
-        orderBy: (chatConfigs, { desc }) => [desc(chatConfigs.createdAt)]
+        orderBy: (chatConfigs, { desc }) => [desc(chatConfigs.createdAt)],
+        with: {
+          conversations: true,
+        }
       });
-      res.json(configs);
+
+      // Transform the response to include conversation count
+      const configsWithCount = configs.map(config => ({
+        ...config,
+        conversationCount: config.conversations.length,
+        // Remove the conversations array from the response as we only need the count
+        conversations: undefined
+      }));
+
+      res.json(configsWithCount);
     } catch (error: any) {
       console.error("Error fetching chat configs:", error);
       res.status(500).json({ error: error.message });
