@@ -1,13 +1,19 @@
 import { useState } from "react";
 import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Copy, ExternalLink } from "lucide-react";
+import { Plus, Pencil, Copy, ExternalLink, MoreVertical } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import AdminPanel from "@/components/AdminPanel";
 import type { AdminConfig } from "@/lib/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type ChatConfig = {
   id: number;
@@ -133,6 +139,18 @@ export default function Home() {
     window.open(`${window.location.origin}/chat?configId=${configId}`, '_blank');
   };
 
+  const handleDuplicate = (configToDuplicate: ChatConfig) => {
+    setConfig({
+      title: `${configToDuplicate.title} (Copy)`,
+      systemPrompt: configToDuplicate.systemPrompt,
+      userInstructions: configToDuplicate.userInstructions || "",
+      feedbackCriteria: configToDuplicate.feedbackCriteria || "",
+      temperature: 0.7,
+      maxTokens: 1000,
+    });
+    setIsCreateOpen(true);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
@@ -194,53 +212,68 @@ export default function Home() {
                       <span className="text-sm text-muted-foreground">
                         {config.conversationCount} conversation{config.conversationCount !== 1 ? 's' : ''}
                       </span>
-                      <Dialog open={editingConfig?.id === config.id} onOpenChange={(open) => !open && setEditingConfig(null)}>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="icon" onClick={() => setEditingConfig(config)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
-                          <DialogHeader>
-                            <DialogTitle>Edit Configuration</DialogTitle>
-                          </DialogHeader>
-                          {editingConfig && (
-                            <>
-                              <ScrollArea className="flex-1 -mx-6 px-6">
-                                <div className="py-4">
-                                  <AdminPanel
-                                    config={{
-                                      title: editingConfig.title,
-                                      systemPrompt: editingConfig.systemPrompt,
-                                      userInstructions: editingConfig.userInstructions || "",
-                                      feedbackCriteria: editingConfig.feedbackCriteria || "",
-                                      temperature: 0.7,
-                                      maxTokens: 1000,
-                                    }}
-                                    onConfigChange={(updatedConfig) => {
-                                      setEditingConfig({
-                                        ...editingConfig,
-                                        title: updatedConfig.title,
-                                        systemPrompt: updatedConfig.systemPrompt,
-                                        userInstructions: updatedConfig.userInstructions || null,
-                                        feedbackCriteria: updatedConfig.feedbackCriteria || null,
-                                      });
-                                    }}
-                                  />
+                      <div className="flex gap-2">
+                        <Dialog open={editingConfig?.id === config.id} onOpenChange={(open) => !open && setEditingConfig(null)}>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="icon" onClick={() => setEditingConfig(config)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
+                            <DialogHeader>
+                              <DialogTitle>Edit Configuration</DialogTitle>
+                            </DialogHeader>
+                            {editingConfig && (
+                              <>
+                                <ScrollArea className="flex-1 -mx-6 px-6">
+                                  <div className="py-4">
+                                    <AdminPanel
+                                      config={{
+                                        title: editingConfig.title,
+                                        systemPrompt: editingConfig.systemPrompt,
+                                        userInstructions: editingConfig.userInstructions || "",
+                                        feedbackCriteria: editingConfig.feedbackCriteria || "",
+                                        temperature: 0.7,
+                                        maxTokens: 1000,
+                                      }}
+                                      onConfigChange={(updatedConfig) => {
+                                        setEditingConfig({
+                                          ...editingConfig,
+                                          title: updatedConfig.title,
+                                          systemPrompt: updatedConfig.systemPrompt,
+                                          userInstructions: updatedConfig.userInstructions || null,
+                                          feedbackCriteria: updatedConfig.feedbackCriteria || null,
+                                        });
+                                      }}
+                                    />
+                                  </div>
+                                </ScrollArea>
+                                <div className="mt-4 pt-4 border-t flex justify-end">
+                                  <Button
+                                    onClick={() => editingConfig && updateConfig.mutate(editingConfig)}
+                                    disabled={updateConfig.isPending}
+                                  >
+                                    Update Configuration
+                                  </Button>
                                 </div>
-                              </ScrollArea>
-                              <div className="mt-4 pt-4 border-t flex justify-end">
-                                <Button
-                                  onClick={() => editingConfig && updateConfig.mutate(editingConfig)}
-                                  disabled={updateConfig.isPending}
-                                >
-                                  Update Configuration
-                                </Button>
-                              </div>
-                            </>
-                          )}
-                        </DialogContent>
-                      </Dialog>
+                              </>
+                            )}
+                          </DialogContent>
+                        </Dialog>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="icon">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleDuplicate(config)}>
+                              <Copy className="h-4 w-4 mr-2" />
+                              Duplicate
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
