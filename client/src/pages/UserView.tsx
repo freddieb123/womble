@@ -30,7 +30,7 @@ export default function UserView() {
           <Card className="p-6">
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-red-500" />
-              <p className="text-sm text-red-700">No configuration ID provided</p>
+              <p className="text-sm text-red-700">No GPT ID provided</p>
             </div>
           </Card>
         </div>
@@ -44,7 +44,7 @@ export default function UserView() {
         <div className="max-w-4xl mx-auto">
           <Card className="p-6">
             <div className="flex items-center justify-center h-[600px]">
-              <div className="animate-pulse text-blue-900">Loading configuration...</div>
+              <div className="animate-pulse text-blue-900">Loading GPT...</div>
             </div>
           </Card>
         </div>
@@ -60,7 +60,7 @@ export default function UserView() {
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-red-500" />
               <p className="text-sm text-red-700">
-                Failed to load chat configuration: {error instanceof Error ? error.message : 'Unknown error'}
+                Failed to load GPT: {error instanceof Error ? error.message : 'Unknown error'}
               </p>
             </div>
           </Card>

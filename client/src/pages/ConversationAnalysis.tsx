@@ -47,7 +47,7 @@ export default function ConversationAnalysis() {
         const conversationsData = await conversationsResponse.json();
 
         if (!Array.isArray(conversationsData) || conversationsData.length === 0) {
-          throw new Error("No conversations found for this chat configuration");
+          throw new Error("No conversations found for this chat GPT");
         }
 
         setConversations(conversationsData);
@@ -111,7 +111,7 @@ export default function ConversationAnalysis() {
         <div className="max-w-4xl mx-auto">
           <Card>
             <CardContent className="p-6">
-              <div className="text-center text-red-600">No configuration ID provided</div>
+              <div className="text-center text-red-600">No GPT ID provided</div>
             </CardContent>
           </Card>
         </div>

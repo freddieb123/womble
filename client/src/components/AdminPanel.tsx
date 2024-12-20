@@ -11,7 +11,7 @@ interface Props {
 export default function AdminPanel({ config, onConfigChange }: Props) {
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold text-blue-900">Admin Controls</h2>
+      
       
       <div className="space-y-4">
         <div className="space-y-2">
@@ -24,11 +24,11 @@ export default function AdminPanel({ config, onConfigChange }: Props) {
               ...config,
               title: e.target.value
             })}
-            placeholder="Enter a title for this chat configuration..."
+            placeholder="Enter a title for this GPT..."
             className="w-full px-3 py-2 border rounded-md"
           />
           <p className="text-sm text-muted-foreground">
-            Give your chat configuration a memorable title.
+            Give your GPT a memorable title.
           </p>
         </div>
 

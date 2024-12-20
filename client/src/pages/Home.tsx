@@ -61,7 +61,7 @@ export default function Home() {
     queryFn: async () => {
       const response = await fetch(`/api/chat-configs${showDeleted ? '?showDeleted=true' : ''}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch configurations');
+        throw new Error('Failed to fetch GPT');
       }
       return response.json();
     }
@@ -82,7 +82,7 @@ export default function Home() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to save configuration");
+        throw new Error(error.error || "Failed to save GPT");
       }
 
       return response.json();
@@ -99,7 +99,7 @@ export default function Home() {
         maxTokens: 1000
       });
       toast({
-        description: "Configuration saved successfully!",
+        description: "GPT saved successfully!",
       });
     },
     onError: (error: Error) => {
@@ -121,7 +121,7 @@ export default function Home() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to update configuration");
+        throw new Error(error.error || "Failed to update GPT");
       }
 
       return response.json();
@@ -130,7 +130,7 @@ export default function Home() {
       queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
       setEditingConfig(null);
       toast({
-        description: "Configuration updated successfully!",
+        description: "GPT updated successfully!",
       });
     },
     onError: (error: Error) => {
@@ -150,7 +150,7 @@ export default function Home() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to delete configuration");
+        throw new Error(error.error || "Failed to delete GPT");
       }
 
       return response.json();
@@ -159,7 +159,7 @@ export default function Home() {
       queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
       setDeletingConfig(null);
       toast({
-        description: "Configuration deleted successfully!",
+        description: "GPT deleted successfully!",
       });
     },
     onError: (error: Error) => {
@@ -179,7 +179,7 @@ export default function Home() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to restore configuration");
+        throw new Error(error.error || "Failed to restore GPT");
       }
 
       return response.json();
@@ -187,7 +187,7 @@ export default function Home() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
       toast({
-        description: "Configuration restored successfully!",
+        description: "GPT restored successfully!",
       });
     },
     onError: (error: Error) => {
@@ -240,7 +240,7 @@ export default function Home() {
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
         <div className="max-w-4xl mx-auto">
           <Card className="p-6">
-            <CardContent>Loading configurations...</CardContent>
+            <CardContent>Loading GPTs...</CardContent>
           </Card>
         </div>
       </div>
@@ -252,7 +252,7 @@ export default function Home() {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-blue-900">AI Chat Configurations</h1>
+            <h1 className="text-2xl font-bold text-blue-900">Durable Skills GPTs</h1>
             <Switch
               checked={showDeleted}
               onCheckedChange={setShowDeleted}
@@ -266,12 +266,12 @@ export default function Home() {
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
-                New Configuration
+                New GPT
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
               <DialogHeader>
-                <DialogTitle>Create New Configuration</DialogTitle>
+                <DialogTitle>Create New GPT</DialogTitle>
               </DialogHeader>
               <ScrollArea className="flex-1 -mx-6 px-6">
                 <div className="py-4">
@@ -280,7 +280,7 @@ export default function Home() {
               </ScrollArea>
               <div className="pt-4 border-t flex justify-end">
                 <Button onClick={() => saveConfig.mutate()} disabled={saveConfig.isPending}>
-                  Save Configuration
+                  Save GPT
                 </Button>
               </div>
             </DialogContent>
@@ -346,7 +346,7 @@ export default function Home() {
                       <Dialog open={editingConfig?.id === config.id} onOpenChange={(open) => !open && setEditingConfig(null)}>
                         <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
                           <DialogHeader>
-                            <DialogTitle>Edit Configuration</DialogTitle>
+                            <DialogTitle>Edit GPT</DialogTitle>
                           </DialogHeader>
                           {editingConfig && (
                             <>
@@ -378,7 +378,7 @@ export default function Home() {
                                   onClick={() => editingConfig && updateConfig.mutate(editingConfig)}
                                   disabled={updateConfig.isPending}
                                 >
-                                  Update Configuration
+                                  Update GPT
                                 </Button>
                               </div>
                             </>
@@ -438,7 +438,7 @@ export default function Home() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the configuration
+              This action cannot be undone. This will permanently delete the GPT
               "{deletingConfig?.title}" and all associated conversations.
             </AlertDialogDescription>
           </AlertDialogHeader>
