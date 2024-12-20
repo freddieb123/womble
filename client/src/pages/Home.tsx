@@ -212,68 +212,65 @@ export default function Home() {
                       <span className="text-sm text-muted-foreground">
                         {config.conversationCount} conversation{config.conversationCount !== 1 ? 's' : ''}
                       </span>
-                      <div className="flex gap-2">
-                        <Dialog open={editingConfig?.id === config.id} onOpenChange={(open) => !open && setEditingConfig(null)}>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="icon" onClick={() => setEditingConfig(config)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
-                            <DialogHeader>
-                              <DialogTitle>Edit Configuration</DialogTitle>
-                            </DialogHeader>
-                            {editingConfig && (
-                              <>
-                                <ScrollArea className="flex-1 -mx-6 px-6">
-                                  <div className="py-4">
-                                    <AdminPanel
-                                      config={{
-                                        title: editingConfig.title,
-                                        systemPrompt: editingConfig.systemPrompt,
-                                        userInstructions: editingConfig.userInstructions || "",
-                                        feedbackCriteria: editingConfig.feedbackCriteria || "",
-                                        temperature: 0.7,
-                                        maxTokens: 1000,
-                                      }}
-                                      onConfigChange={(updatedConfig) => {
-                                        setEditingConfig({
-                                          ...editingConfig,
-                                          title: updatedConfig.title,
-                                          systemPrompt: updatedConfig.systemPrompt,
-                                          userInstructions: updatedConfig.userInstructions || null,
-                                          feedbackCriteria: updatedConfig.feedbackCriteria || null,
-                                        });
-                                      }}
-                                    />
-                                  </div>
-                                </ScrollArea>
-                                <div className="mt-4 pt-4 border-t flex justify-end">
-                                  <Button
-                                    onClick={() => editingConfig && updateConfig.mutate(editingConfig)}
-                                    disabled={updateConfig.isPending}
-                                  >
-                                    Update Configuration
-                                  </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="icon">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setEditingConfig(config)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDuplicate(config)}>
+                            <Copy className="h-4 w-4 mr-2" />
+                            Duplicate
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <Dialog open={editingConfig?.id === config.id} onOpenChange={(open) => !open && setEditingConfig(null)}>
+                        <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
+                          <DialogHeader>
+                            <DialogTitle>Edit Configuration</DialogTitle>
+                          </DialogHeader>
+                          {editingConfig && (
+                            <>
+                              <ScrollArea className="flex-1 -mx-6 px-6">
+                                <div className="py-4">
+                                  <AdminPanel
+                                    config={{
+                                      title: editingConfig.title,
+                                      systemPrompt: editingConfig.systemPrompt,
+                                      userInstructions: editingConfig.userInstructions || "",
+                                      feedbackCriteria: editingConfig.feedbackCriteria || "",
+                                      temperature: 0.7,
+                                      maxTokens: 1000,
+                                    }}
+                                    onConfigChange={(updatedConfig) => {
+                                      setEditingConfig({
+                                        ...editingConfig,
+                                        title: updatedConfig.title,
+                                        systemPrompt: updatedConfig.systemPrompt,
+                                        userInstructions: updatedConfig.userInstructions || null,
+                                        feedbackCriteria: updatedConfig.feedbackCriteria || null,
+                                      });
+                                    }}
+                                  />
                                 </div>
-                              </>
-                            )}
-                          </DialogContent>
-                        </Dialog>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleDuplicate(config)}>
-                              <Copy className="h-4 w-4 mr-2" />
-                              Duplicate
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                              </ScrollArea>
+                              <div className="mt-4 pt-4 border-t flex justify-end">
+                                <Button
+                                  onClick={() => editingConfig && updateConfig.mutate(editingConfig)}
+                                  disabled={updateConfig.isPending}
+                                >
+                                  Update Configuration
+                                </Button>
+                              </div>
+                            </>
+                          )}
+                        </DialogContent>
+                      </Dialog>
                     </div>
                   </div>
                 </CardHeader>
