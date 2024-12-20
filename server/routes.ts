@@ -143,11 +143,11 @@ export function registerRoutes(app: Express): Server {
           lastUsedAt: sql<string>`
             COALESCE(
               (
-                SELECT MAX(conversations.created_at)
+                SELECT MAX(conversations.created_at)::timestamp
                 FROM ${conversations}
                 WHERE conversations.config_id = ${chatConfigs.id}
               ),
-              ${chatConfigs.createdAt}
+              ${chatConfigs.createdAt}::timestamp
             )
           `.as('last_used_at')
         })
