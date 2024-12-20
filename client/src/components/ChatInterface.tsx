@@ -266,23 +266,28 @@ export default function ChatInterface({ config }: Props) {
       </div>
 
       <Dialog open={feedbackOpen}>
-        <DialogContent className="sm:max-w-md [&_[data-dialog-close]]:hidden">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex justify-between items-center">
               <span>Chat Feedback</span>
-              <Button variant="ghost" size="icon" onClick={() => setFeedbackOpen(false)}>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-6 w-6 p-0" 
+                onClick={() => setFeedbackOpen(false)}
+              >
                 <X className="h-4 w-4" />
               </Button>
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
             <div className="space-y-3">
-                {feedbackData.bullets.map((bullet, index) => (
-                  <div key={index} className="flex items-start gap-2 text-sm">
-                    <span>•</span>
-                    <span>{bullet}</span>
-                  </div>
-                ))}
+              {feedbackData.bullets.map((bullet, index) => (
+                <div key={index} className="flex items-start gap-2 text-sm">
+                  <span>•</span>
+                  <span>{bullet}</span>
+                </div>
+              ))}
             </div>
             <div className="border-t pt-4">
               <div className="flex flex-col gap-2">
