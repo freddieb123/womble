@@ -208,10 +208,7 @@ export default function Home() {
                       <CardTitle>{config.title}</CardTitle>
                       <CardDescription>Created on: {new Date(config.createdAt).toLocaleDateString()}</CardDescription>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <span className="text-sm text-muted-foreground">
-                        {config.conversationCount} conversation{config.conversationCount !== 1 ? 's' : ''}
-                      </span>
+                    <div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" size="icon">
@@ -289,15 +286,20 @@ export default function Home() {
                         <p className="text-sm text-gray-600">{config.userInstructions}</p>
                       </div>
                     )}
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => handleCopyLink(config.id)}>
-                        <Copy className="h-4 w-4 mr-2" />
-                        Copy Link
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleOpenChat(config.id)}>
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Open Chat
-                      </Button>
+                    <div className="flex justify-between items-center">
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => handleCopyLink(config.id)}>
+                          <Copy className="h-4 w-4 mr-2" />
+                          Copy Link
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleOpenChat(config.id)}>
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Open Chat
+                        </Button>
+                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        {config.conversationCount} conversation{config.conversationCount !== 1 ? 's' : ''}
+                      </span>
                     </div>
                   </div>
                 </CardContent>
