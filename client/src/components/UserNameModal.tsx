@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 
 interface UserNameModalProps {
   open: boolean;
@@ -22,7 +23,18 @@ export default function UserNameModal({ open, onSubmit }: UserNameModalProps) {
     <Dialog open={open}>
       <DialogContent className="sm:max-w-md" hideClose>
         <DialogHeader>
-          <DialogTitle>Welcome!</DialogTitle>
+          <DialogTitle className="flex justify-between items-center">
+            <span>Welcome!</span>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-6 w-6 p-0 hover:bg-transparent" 
+              onClick={() => onSubmit(name.trim())}
+              disabled={!name.trim()}
+            >
+              <X className="h-4 w-4 text-white" />
+            </Button>
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           <Input

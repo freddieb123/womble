@@ -344,7 +344,7 @@ export default function ChatInterface({ config }: Props) {
                 className="h-6 w-6 p-0 hover:bg-transparent" 
                 onClick={() => setFeedbackOpen(false)}
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4 text-white" />
               </Button>
             </DialogTitle>
           </DialogHeader>
