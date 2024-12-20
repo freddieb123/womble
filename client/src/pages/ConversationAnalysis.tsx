@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { RefreshCw } from "lucide-react";
 import type { Message } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 
@@ -20,6 +22,7 @@ export default function ConversationAnalysis() {
   const [conversations, setConversations] = useState<ConversationData[]>([]);
   const [feedbacks, setFeedbacks] = useState<ConversationFeedback[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
   const { toast } = useToast();
 
   // Get configId from URL
@@ -31,6 +34,48 @@ export default function ConversationAnalysis() {
     queryKey: [`/api/chat-configs/${configId}`],
     enabled: !!configId,
   });
+
+  const regenerateFeedback = async (conversationIndex: number) => {
+    if (!config?.feedbackCriteria || !conversations[conversationIndex]) return;
+
+    try {
+      setRegeneratingIndex(conversationIndex);
+
+      const feedbackResponse = await fetch("/api/chat-feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          feedbackCriteria: config.feedbackCriteria,
+          messages: conversations[conversationIndex].messages
+        }),
+      });
+
+      if (!feedbackResponse.ok) {
+        const errorText = await feedbackResponse.text();
+        throw new Error(`Failed to get feedback: ${errorText}`);
+      }
+
+      const newFeedback = await feedbackResponse.json();
+      setFeedbacks(prevFeedbacks => {
+        const newFeedbacks = [...prevFeedbacks];
+        newFeedbacks[conversationIndex] = newFeedback;
+        return newFeedbacks;
+      });
+
+      toast({
+        title: "Feedback Updated",
+        description: "Successfully regenerated feedback for this conversation.",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to regenerate feedback",
+      });
+    } finally {
+      setRegeneratingIndex(null);
+    }
+  };
 
   useEffect(() => {
     const fetchAndAnalyze = async () => {
@@ -136,11 +181,24 @@ export default function ConversationAnalysis() {
               {conversations.map((conversation, index) => (
                 <Card key={index}>
                   <CardHeader>
-                    <h2 className="text-lg font-semibold">
-                      {conversation.userName 
-                        ? `${conversation.userName}'s Conversation` 
-                        : `Conversation ${index + 1}`}
-                    </h2>
+                    <div className="flex justify-between items-center">
+                      <h2 className="text-lg font-semibold">
+                        {conversation.userName 
+                          ? `${conversation.userName}'s Conversation` 
+                          : `Conversation ${index + 1}`}
+                      </h2>
+                      {feedbacks[index] && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => regenerateFeedback(index)}
+                          disabled={regeneratingIndex === index}
+                        >
+                          <RefreshCw className={`h-4 w-4 mr-2 ${regeneratingIndex === index ? 'animate-spin' : ''}`} />
+                          {regeneratingIndex === index ? 'Regenerating...' : 'Regenerate Feedback'}
+                        </Button>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent>
                     {feedbacks[index] && (
