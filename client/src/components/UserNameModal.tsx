@@ -20,7 +20,7 @@ export default function UserNameModal({ open, onSubmit }: UserNameModalProps) {
 
   return (
     <Dialog open={open}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" hideClose>
         <DialogHeader>
           <DialogTitle>Welcome!</DialogTitle>
         </DialogHeader>
