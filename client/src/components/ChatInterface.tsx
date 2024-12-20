@@ -94,13 +94,13 @@ export default function ChatInterface({ config }: Props) {
       if (userName) {
         url.searchParams.set('userName', userName);
       }
-      
+
       const response = await fetch(url.toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, config }),
       });
-      
+
       if (!response.ok) {
         throw new Error(await response.text());
       }
@@ -112,7 +112,7 @@ export default function ChatInterface({ config }: Props) {
         role: 'user',
         timestamp: Date.now()
       };
-      
+
       queryClient.setQueryData<ChatState>([`/api/messages?configId=${configId}&sessionId=${sessionId}`], (old) => ({
         messages: [...(old?.messages || []), userMessage],
         isLoading: false,
@@ -154,7 +154,7 @@ export default function ChatInterface({ config }: Props) {
               }
 
               assistantMessage.content += parsed.content;
-              
+
               // Update UI immediately
               queryClient.setQueryData<ChatState>([`/api/messages?configId=${configId}&sessionId=${sessionId}`], (old) => {
                 const existingMessages = old?.messages || [];
@@ -344,7 +344,7 @@ export default function ChatInterface({ config }: Props) {
                 className="h-6 w-6 p-0" 
                 onClick={() => setFeedbackOpen(false)}
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4 text-white" />
               </Button>
             </DialogTitle>
           </DialogHeader>
