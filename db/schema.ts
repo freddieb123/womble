@@ -8,7 +8,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
 });
 
-export const chatConfigs = pgTable("chat_configs", {
+export const chatGPTs = pgTable("chat_gpts", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   systemPrompt: text("system_prompt").notNull(),
@@ -21,7 +21,7 @@ export const chatConfigs = pgTable("chat_configs", {
 
 export const conversations = pgTable("conversations", {
   id: serial("id").primaryKey(),
-  configId: integer("config_id").notNull().references(() => chatConfigs.id),
+  gptId: integer("gpt_id").notNull().references(() => chatGPTs.id),
   sessionId: text("session_id").notNull(),
   userName: text("user_name"),
   messages: jsonb("messages").notNull().default('[]'),
@@ -29,34 +29,34 @@ export const conversations = pgTable("conversations", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => {
   return {
-    configSessionIdx: unique("config_session_idx").on(table.configId, table.sessionId),
+    gptSessionIdx: unique("gpt_session_idx").on(table.gptId, table.sessionId),
   };
 });
 
 // Relations
-export const chatConfigsRelations = relations(chatConfigs, ({ many }) => ({
+export const chatGPTsRelations = relations(chatGPTs, ({ many }) => ({
   conversations: many(conversations),
 }));
 
 export const conversationsRelations = relations(conversations, ({ one }) => ({
-  config: one(chatConfigs, {
-    fields: [conversations.configId],
-    references: [chatConfigs.id],
+  gpt: one(chatGPTs, {
+    fields: [conversations.gptId],
+    references: [chatGPTs.id],
   }),
 }));
 
 // Schemas
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
-export const insertChatConfigSchema = createInsertSchema(chatConfigs);
-export const selectChatConfigSchema = createSelectSchema(chatConfigs);
+export const insertGPTSchema = createInsertSchema(chatGPTs);
+export const selectGPTSchema = createSelectSchema(chatGPTs);
 export const insertConversationSchema = createInsertSchema(conversations);
 export const selectConversationSchema = createSelectSchema(conversations);
 
 // Types
 export type InsertUser = typeof users.$inferInsert;
 export type SelectUser = typeof users.$inferSelect;
-export type InsertChatConfig = typeof chatConfigs.$inferInsert;
-export type SelectChatConfig = typeof chatConfigs.$inferSelect;
+export type InsertGPT = typeof chatGPTs.$inferInsert;
+export type SelectGPT = typeof chatGPTs.$inferSelect;
 export type InsertConversation = typeof conversations.$inferInsert;
 export type SelectConversation = typeof conversations.$inferSelect;

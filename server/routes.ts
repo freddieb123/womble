@@ -1,13 +1,13 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
-import { chatConfigs, conversations } from "@db/schema";
+import { chatGPTs, conversations } from "@db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
 
-const chatConfigSchema = z.object({
+const chatGPTSchema = z.object({
   title: z.string().min(1, "Title is required"),
   systemPrompt: z.string().min(1, "System prompt is required"),
   userInstructions: z.string().nullable(),
@@ -32,31 +32,30 @@ function getSessionId(req: Request): string {
   return sessionId || crypto.randomUUID();
 }
 
-const configSchema = z.object({
+const gptSchema = z.object({
   systemPrompt: z.string(),
   temperature: z.number().min(0).max(2),
   maxTokens: z.number().min(100).max(4000)
 });
 
-
 export function registerRoutes(app: Express): Server {
   app.get("/api/messages", async (req: Request, res: Response) => {
     try {
       const url = new URL(req.url, `http://${req.headers.host}`);
-      const configId = parseInt(url.searchParams.get("configId") || "");
+      const gptId = parseInt(url.searchParams.get("gptId") || "");
       const sessionId = url.searchParams.get("sessionId") || crypto.randomUUID();
 
-      console.log("Fetching messages for:", { configId, sessionId });
+      console.log("Fetching messages for:", { gptId, sessionId });
 
-      if (isNaN(configId) || configId <= 0) {
-        console.log("Invalid configId:", configId);
-        return res.status(400).json({ error: "Valid config ID is required" });
+      if (isNaN(gptId) || gptId <= 0) {
+        console.log("Invalid gptId:", gptId);
+        return res.status(400).json({ error: "Valid GPT ID is required" });
       }
 
       // Try to get messages from database first
       const conversation = await db.query.conversations.findFirst({
         where: and(
-          eq(conversations.configId, configId),
+          eq(conversations.gptId, gptId),
           eq(conversations.sessionId, sessionId)
         ),
       });
@@ -91,148 +90,149 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/chat-configs", async (req, res) => {
+  app.post("/api/chat-gpts", async (req, res) => {
     try {
-      const parsedConfig = chatConfigSchema.parse(req.body);
-      const result = await db.insert(chatConfigs).values({
-        title: parsedConfig.title,
-        systemPrompt: parsedConfig.systemPrompt,
-        userInstructions: parsedConfig.userInstructions,
-        feedbackCriteria: parsedConfig.feedbackCriteria,
+      const parsedGPT = chatGPTSchema.parse(req.body);
+      const result = await db.insert(chatGPTs).values({
+        title: parsedGPT.title,
+        systemPrompt: parsedGPT.systemPrompt,
+        userInstructions: parsedGPT.userInstructions,
+        feedbackCriteria: parsedGPT.feedbackCriteria,
       }).returning();
 
-      console.log("Saved chat config:", result[0]);
+      console.log("Saved GPT model:", result[0]);
       res.json(result[0]);
     } catch (error: any) {
-      console.error("Error saving chat config:", error);
+      console.error("Error saving GPT model:", error);
       res.status(400).json({ error: error.message });
     }
   });
 
-  app.get("/api/chat-configs/:id", async (req, res) => {
+  app.get("/api/chat-gpts/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ error: "Invalid ID" });
       }
 
-      const config = await db.query.chatConfigs.findFirst({
-        where: eq(chatConfigs.id, id),
+      const gpt = await db.query.chatGPTs.findFirst({
+        where: eq(chatGPTs.id, id),
       });
 
-      if (!config) {
-        return res.status(404).json({ error: "Configuration not found" });
+      if (!gpt) {
+        return res.status(404).json({ error: "GPT model not found" });
       }
 
-      res.json(config);
+      res.json(gpt);
     } catch (error: any) {
-      console.error("Error fetching chat config:", error);
+      console.error("Error fetching GPT model:", error);
       res.status(500).json({ error: error.message });
     }
   });
-  app.get("/api/chat-configs", async (req, res) => {
+
+  app.get("/api/chat-gpts", async (req, res) => {
     try {
       const showDeleted = req.query.showDeleted === 'true';
-      const query = db.query.chatConfigs.findMany({
-        where: showDeleted ? undefined : eq(chatConfigs.deleted, false),
-        orderBy: (chatConfigs, { desc }) => [desc(chatConfigs.createdAt)],
+      const query = db.query.chatGPTs.findMany({
+        where: showDeleted ? undefined : eq(chatGPTs.deleted, false),
+        orderBy: (chatGPTs, { desc }) => [desc(chatGPTs.createdAt)],
         with: {
           conversations: true,
         }
       });
 
-      const configs = await query;
+      const gpts = await query;
 
-      const configsWithCount = configs.map(config => ({
-        ...config,
-        conversationCount: config.conversations.length,
+      const gptsWithCount = gpts.map(gpt => ({
+        ...gpt,
+        conversationCount: gpt.conversations.length,
         conversations: undefined
       }));
 
-      res.json(configsWithCount);
+      res.json(gptsWithCount);
     } catch (error: any) {
-      console.error("Error fetching chat configs:", error);
+      console.error("Error fetching GPT models:", error);
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.put("/api/chat-configs/:id", async (req, res) => {
+  app.put("/api/chat-gpts/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ error: "Invalid ID" });
       }
 
-      const parsedConfig = chatConfigSchema.parse(req.body);
-      const result = await db.update(chatConfigs)
+      const parsedGPT = chatGPTSchema.parse(req.body);
+      const result = await db.update(chatGPTs)
         .set({
-          title: parsedConfig.title,
-          systemPrompt: parsedConfig.systemPrompt,
-          userInstructions: parsedConfig.userInstructions,
-          feedbackCriteria: parsedConfig.feedbackCriteria,
+          title: parsedGPT.title,
+          systemPrompt: parsedGPT.systemPrompt,
+          userInstructions: parsedGPT.userInstructions,
+          feedbackCriteria: parsedGPT.feedbackCriteria,
         })
-        .where(eq(chatConfigs.id, id))
+        .where(eq(chatGPTs.id, id))
         .returning();
 
       if (!result.length) {
-        return res.status(404).json({ error: "Configuration not found" });
+        return res.status(404).json({ error: "GPT model not found" });
       }
 
       res.json(result[0]);
     } catch (error: any) {
-      console.error("Error updating chat config:", error);
+      console.error("Error updating GPT model:", error);
       res.status(400).json({ error: error.message });
     }
   });
 
-  app.delete("/api/chat-configs/:id", async (req, res) => {
+  app.delete("/api/chat-gpts/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ error: "Invalid ID" });
       }
 
-      const result = await db.update(chatConfigs)
+      const result = await db.update(chatGPTs)
         .set({
           deleted: true,
           deletedAt: new Date()
         })
-        .where(eq(chatConfigs.id, id))
+        .where(eq(chatGPTs.id, id))
         .returning();
 
       if (!result.length) {
-        return res.status(404).json({ error: "Configuration not found" });
+        return res.status(404).json({ error: "GPT model not found" });
       }
 
       res.json(result[0]);
     } catch (error: any) {
-      console.error("Error soft deleting chat config:", error);
+      console.error("Error soft deleting GPT model:", error);
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.post("/api/chat-configs/:id/restore", async (req, res) => {
+  app.post("/api/chat-gpts/:id/restore", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ error: "Invalid ID" });
       }
 
-      const result = await db.update(chatConfigs)
+      const result = await db.update(chatGPTs)
         .set({
           deleted: false,
           deletedAt: null
         })
-        .where(eq(chatConfigs.id, id))
+        .where(eq(chatGPTs.id, id))
         .returning();
 
       if (!result.length) {
-        return res.status(404).json({ error: "Configuration not found" });
+        return res.status(404).json({ error: "GPT model not found" });
       }
 
       res.json(result[0]);
     } catch (error: any) {
-      console.error("Error restoring chat config:", error);
+      console.error("Error restoring GPT model:", error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -441,14 +441,14 @@ export function registerRoutes(app: Express): Server {
       }
 
       const prompt = `Analyze the user's interactions in this conversation based on these criteria: ${feedbackCriteria}
-
+      
 Please provide your feedback in exactly this format:
-
+      
 • [2-4 bullet points focusing ONLY on the user's communication style and how well they met the criteria]
-
+      
 Score: [1-10]
 [Brief one-line summary of overall performance]
-
+      
 Chat transcript:
 ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}`;
 
