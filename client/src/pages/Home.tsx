@@ -187,12 +187,7 @@ export default function Home() {
                 <CardHeader className="pb-4">
                   <div className="flex justify-between items-start">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <CardTitle>{config.title}</CardTitle>
-                        <span className="text-sm text-muted-foreground">
-                          {config.conversationCount} conversation{config.conversationCount !== 1 ? 's' : ''}
-                        </span>
-                      </div>
+                      <CardTitle>{config.title}</CardTitle>
                       <CardDescription>Created on: {new Date(config.createdAt).toLocaleDateString()}</CardDescription>
                     </div>
                     <Dialog open={editingConfig?.id === config.id} onOpenChange={(open) => !open && setEditingConfig(null)}>
@@ -259,15 +254,20 @@ export default function Home() {
                         <p className="text-sm text-gray-600">{config.userInstructions}</p>
                       </div>
                     )}
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => handleCopyLink(config.id)}>
-                        <Copy className="h-4 w-4 mr-2" />
-                        Copy Link
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleOpenChat(config.id)}>
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Open Chat
-                      </Button>
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => handleCopyLink(config.id)}>
+                          <Copy className="h-4 w-4 mr-2" />
+                          Copy Link
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleOpenChat(config.id)}>
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Open Chat
+                        </Button>
+                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        {config.conversationCount} conversation{config.conversationCount !== 1 ? 's' : ''}
+                      </span>
                     </div>
                   </div>
                 </CardContent>
