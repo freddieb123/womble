@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 
-type ChatGPT = {
+type ChatConfig = {
   id: number;
   title: string;
   systemPrompt: string;
@@ -41,10 +41,10 @@ type ChatGPT = {
 
 export default function Home() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editingGPT, setEditingGPT] = useState<ChatGPT | null>(null);
-  const [deletingGPT, setDeletingGPT] = useState<ChatGPT | null>(null);
+  const [editingConfig, setEditingConfig] = useState<ChatConfig | null>(null);
+  const [deletingConfig, setDeletingConfig] = useState<ChatConfig | null>(null);
   const [showDeleted, setShowDeleted] = useState(false);
-  const [gptConfig, setGPTConfig] = useState<AdminConfig>({
+  const [config, setConfig] = useState<AdminConfig>({
     title: "",
     systemPrompt: "You are a helpful AI assistant.",
     userInstructions: "",
@@ -56,41 +56,41 @@ export default function Home() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: gpts, isLoading } = useQuery<ChatGPT[]>({
-    queryKey: ['/api/chat-gpts', showDeleted],
+  const { data: configs, isLoading } = useQuery<ChatConfig[]>({
+    queryKey: ['/api/chat-configs', showDeleted],
     queryFn: async () => {
-      const response = await fetch(`/api/chat-gpts${showDeleted ? '?showDeleted=true' : ''}`);
+      const response = await fetch(`/api/chat-configs${showDeleted ? '?showDeleted=true' : ''}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch GPT models');
+        throw new Error('Failed to fetch configurations');
       }
       return response.json();
     }
   });
 
-  const saveGPT = useMutation({
+  const saveConfig = useMutation({
     mutationFn: async () => {
-      const response = await fetch("/api/chat-gpts", {
+      const response = await fetch("/api/chat-configs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: gptConfig.title,
-          systemPrompt: gptConfig.systemPrompt,
-          userInstructions: gptConfig.userInstructions,
-          feedbackCriteria: gptConfig.feedbackCriteria,
+          title: config.title,
+          systemPrompt: config.systemPrompt,
+          userInstructions: config.userInstructions,
+          feedbackCriteria: config.feedbackCriteria,
         }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to save GPT model");
+        throw new Error(error.error || "Failed to save configuration");
       }
 
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/chat-gpts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
       setIsCreateOpen(false);
-      setGPTConfig({
+      setConfig({
         title: "",
         systemPrompt: "You are a helpful AI assistant.",
         userInstructions: "",
@@ -99,7 +99,7 @@ export default function Home() {
         maxTokens: 1000
       });
       toast({
-        description: "GPT model saved successfully!",
+        description: "Configuration saved successfully!",
       });
     },
     onError: (error: Error) => {
@@ -111,26 +111,26 @@ export default function Home() {
     },
   });
 
-  const updateGPT = useMutation({
-    mutationFn: async (gptToUpdate: ChatGPT) => {
-      const response = await fetch(`/api/chat-gpts/${gptToUpdate.id}`, {
+  const updateConfig = useMutation({
+    mutationFn: async (configToUpdate: ChatConfig) => {
+      const response = await fetch(`/api/chat-configs/${configToUpdate.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(gptToUpdate),
+        body: JSON.stringify(configToUpdate),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to update GPT model");
+        throw new Error(error.error || "Failed to update configuration");
       }
 
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/chat-gpts'] });
-      setEditingGPT(null);
+      queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
+      setEditingConfig(null);
       toast({
-        description: "GPT model updated successfully!",
+        description: "Configuration updated successfully!",
       });
     },
     onError: (error: Error) => {
@@ -142,24 +142,24 @@ export default function Home() {
     },
   });
 
-  const deleteGPT = useMutation({
-    mutationFn: async (gptToDelete: ChatGPT) => {
-      const response = await fetch(`/api/chat-gpts/${gptToDelete.id}`, {
+  const deleteConfig = useMutation({
+    mutationFn: async (configToDelete: ChatConfig) => {
+      const response = await fetch(`/api/chat-configs/${configToDelete.id}`, {
         method: "DELETE",
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to delete GPT model");
+        throw new Error(error.error || "Failed to delete configuration");
       }
 
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/chat-gpts'] });
-      setDeletingGPT(null);
+      queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
+      setDeletingConfig(null);
       toast({
-        description: "GPT model deleted successfully!",
+        description: "Configuration deleted successfully!",
       });
     },
     onError: (error: Error) => {
@@ -171,23 +171,23 @@ export default function Home() {
     },
   });
 
-  const restoreGPT = useMutation({
-    mutationFn: async (gptToRestore: ChatGPT) => {
-      const response = await fetch(`/api/chat-gpts/${gptToRestore.id}/restore`, {
+  const restoreConfig = useMutation({
+    mutationFn: async (configToRestore: ChatConfig) => {
+      const response = await fetch(`/api/chat-configs/${configToRestore.id}/restore`, {
         method: "POST",
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to restore GPT model");
+        throw new Error(error.error || "Failed to restore configuration");
       }
 
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/chat-gpts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
       toast({
-        description: "GPT model restored successfully!",
+        description: "Configuration restored successfully!",
       });
     },
     onError: (error: Error) => {
@@ -199,9 +199,9 @@ export default function Home() {
     },
   });
 
-  const handleCopyLink = async (gptId: number) => {
+  const handleCopyLink = async (configId: number) => {
     try {
-      const url = `${window.location.origin}/chat?gptId=${gptId}`;
+      const url = `${window.location.origin}/chat?configId=${configId}`;
       await navigator.clipboard.writeText(url);
       toast({
         description: "Link copied to clipboard!",
@@ -215,20 +215,20 @@ export default function Home() {
     }
   };
 
-  const handleOpenChat = (gptId: number) => {
-    window.open(`${window.location.origin}/chat?gptId=${gptId}`, '_blank');
+  const handleOpenChat = (configId: number) => {
+    window.open(`${window.location.origin}/chat?configId=${configId}`, '_blank');
   };
 
-  const handleViewFeedback = (gptId: number) => {
-    window.open(`${window.location.origin}/analysis?gptId=${gptId}`, '_blank');
+  const handleViewFeedback = (configId: number) => {
+    window.open(`${window.location.origin}/analysis?configId=${configId}`, '_blank');
   };
 
-  const handleDuplicate = (gptToDuplicate: ChatGPT) => {
-    setGPTConfig({
-      title: `${gptToDuplicate.title} (Copy)`,
-      systemPrompt: gptToDuplicate.systemPrompt,
-      userInstructions: gptToDuplicate.userInstructions || "",
-      feedbackCriteria: gptToDuplicate.feedbackCriteria || "",
+  const handleDuplicate = (configToDuplicate: ChatConfig) => {
+    setConfig({
+      title: `${configToDuplicate.title} (Copy)`,
+      systemPrompt: configToDuplicate.systemPrompt,
+      userInstructions: configToDuplicate.userInstructions || "",
+      feedbackCriteria: configToDuplicate.feedbackCriteria || "",
       temperature: 0.7,
       maxTokens: 1000,
     });
@@ -240,7 +240,7 @@ export default function Home() {
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
         <div className="max-w-4xl mx-auto">
           <Card className="p-6">
-            <CardContent>Loading GPT models...</CardContent>
+            <CardContent>Loading configurations...</CardContent>
           </Card>
         </div>
       </div>
@@ -252,35 +252,35 @@ export default function Home() {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-blue-900">AI GPT Models</h1>
+            <h1 className="text-2xl font-bold text-blue-900">AI Chat Configurations</h1>
             <Switch
               checked={showDeleted}
               onCheckedChange={setShowDeleted}
               className="ml-4"
             />
             <span className="text-sm text-muted-foreground">
-              Show deleted GPT models
+              Show deleted configs
             </span>
           </div>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
-                New GPT Model
+                New Configuration
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
               <DialogHeader>
-                <DialogTitle>Create New GPT Model</DialogTitle>
+                <DialogTitle>Create New Configuration</DialogTitle>
               </DialogHeader>
               <ScrollArea className="flex-1 -mx-6 px-6">
                 <div className="py-4">
-                  <AdminPanel config={gptConfig} onConfigChange={setGPTConfig} />
+                  <AdminPanel config={config} onConfigChange={setConfig} />
                 </div>
               </ScrollArea>
               <div className="pt-4 border-t flex justify-end">
-                <Button onClick={() => saveGPT.mutate()} disabled={saveGPT.isPending}>
-                  Save GPT Model
+                <Button onClick={() => saveConfig.mutate()} disabled={saveConfig.isPending}>
+                  Save Configuration
                 </Button>
               </div>
             </DialogContent>
@@ -289,20 +289,20 @@ export default function Home() {
 
         <ScrollArea className="h-[calc(100vh-12rem)]">
           <div className="space-y-4">
-            {gpts?.map((gpt) => (
+            {configs?.map((config) => (
               <Card 
-                key={gpt.id} 
-                className={`p-6 ${gpt.deleted ? 'opacity-60' : ''}`}
+                key={config.id} 
+                className={`p-6 ${config.deleted ? 'opacity-60' : ''}`}
               >
                 <CardHeader className="pb-4">
                   <div className="flex justify-between items-start">
                     <div>
-                      <CardTitle>{gpt.title}</CardTitle>
+                      <CardTitle>{config.title}</CardTitle>
                       <CardDescription>
-                        Created on: {new Date(gpt.createdAt).toLocaleDateString()}
-                        {gpt.deleted && gpt.deletedAt && (
+                        Created on: {new Date(config.createdAt).toLocaleDateString()}
+                        {config.deleted && config.deletedAt && (
                           <span className="text-red-500 ml-2">
-                            (Deleted on: {new Date(gpt.deletedAt).toLocaleDateString()})
+                            (Deleted on: {new Date(config.deletedAt).toLocaleDateString()})
                           </span>
                         )}
                       </CardDescription>
@@ -315,19 +315,19 @@ export default function Home() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          {!gpt.deleted ? (
+                          {!config.deleted ? (
                             <>
-                              <DropdownMenuItem onClick={() => setEditingGPT(gpt)}>
+                              <DropdownMenuItem onClick={() => setEditingConfig(config)}>
                                 <Pencil className="h-4 w-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDuplicate(gpt)}>
+                              <DropdownMenuItem onClick={() => handleDuplicate(config)}>
                                 <Copy className="h-4 w-4 mr-2" />
                                 Duplicate
                               </DropdownMenuItem>
                               <DropdownMenuItem 
                                 className="text-red-600"
-                                onClick={() => setDeletingGPT(gpt)}
+                                onClick={() => setDeletingConfig(config)}
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
@@ -335,7 +335,7 @@ export default function Home() {
                             </>
                           ) : (
                             <DropdownMenuItem 
-                              onClick={() => restoreGPT.mutate(gpt)}
+                              onClick={() => restoreConfig.mutate(config)}
                             >
                               <ArrowUpCircle className="h-4 w-4 mr-2" />
                               Restore
@@ -343,27 +343,27 @@ export default function Home() {
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      <Dialog open={editingGPT?.id === gpt.id} onOpenChange={(open) => !open && setEditingGPT(null)}>
+                      <Dialog open={editingConfig?.id === config.id} onOpenChange={(open) => !open && setEditingConfig(null)}>
                         <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
                           <DialogHeader>
-                            <DialogTitle>Edit GPT Model</DialogTitle>
+                            <DialogTitle>Edit Configuration</DialogTitle>
                           </DialogHeader>
-                          {editingGPT && (
+                          {editingConfig && (
                             <>
                               <ScrollArea className="flex-1 -mx-6 px-6">
                                 <div className="py-4">
                                   <AdminPanel
                                     config={{
-                                      title: editingGPT.title,
-                                      systemPrompt: editingGPT.systemPrompt,
-                                      userInstructions: editingGPT.userInstructions || "",
-                                      feedbackCriteria: editingGPT.feedbackCriteria || "",
+                                      title: editingConfig.title,
+                                      systemPrompt: editingConfig.systemPrompt,
+                                      userInstructions: editingConfig.userInstructions || "",
+                                      feedbackCriteria: editingConfig.feedbackCriteria || "",
                                       temperature: 0.7,
                                       maxTokens: 1000,
                                     }}
                                     onConfigChange={(updatedConfig) => {
-                                      setEditingGPT({
-                                        ...editingGPT,
+                                      setEditingConfig({
+                                        ...editingConfig,
                                         title: updatedConfig.title,
                                         systemPrompt: updatedConfig.systemPrompt,
                                         userInstructions: updatedConfig.userInstructions || null,
@@ -375,10 +375,10 @@ export default function Home() {
                               </ScrollArea>
                               <div className="mt-4 pt-4 border-t flex justify-end">
                                 <Button
-                                  onClick={() => editingGPT && updateGPT.mutate(editingGPT)}
-                                  disabled={updateGPT.isPending}
+                                  onClick={() => editingConfig && updateConfig.mutate(editingConfig)}
+                                  disabled={updateConfig.isPending}
                                 >
-                                  Update GPT Model
+                                  Update Configuration
                                 </Button>
                               </div>
                             </>
@@ -393,34 +393,34 @@ export default function Home() {
                     <div>
                       <h3 className="font-semibold mb-1">System Prompt</h3>
                       <p className="text-sm text-gray-600">
-                        {gpt.systemPrompt.split(' ').slice(0, 30).join(' ')}
-                        {gpt.systemPrompt.split(' ').length > 30 ? '...' : ''}
+                        {config.systemPrompt.split(' ').slice(0, 30).join(' ')}
+                        {config.systemPrompt.split(' ').length > 30 ? '...' : ''}
                       </p>
                     </div>
-                    {gpt.userInstructions && (
+                    {config.userInstructions && (
                       <div>
                         <h3 className="font-semibold mb-1">User Instructions</h3>
-                        <p className="text-sm text-gray-600">{gpt.userInstructions}</p>
+                        <p className="text-sm text-gray-600">{config.userInstructions}</p>
                       </div>
                     )}
                     <div className="flex justify-between items-center">
                       <div className="flex gap-2">
-                        <Button size="sm" onClick={() => handleCopyLink(gpt.id)}>
+                        <Button size="sm" onClick={() => handleCopyLink(config.id)}>
                           <Copy className="h-4 w-4 mr-2" />
                           Copy Link
                         </Button>
                         <Button
                           size="sm"
                           variant="secondary"
-                          onClick={() => handleViewFeedback(gpt.id)}
-                          disabled={!gpt.feedbackCriteria || gpt.conversationCount === 0}
+                          onClick={() => handleViewFeedback(config.id)}
+                          disabled={!config.feedbackCriteria || config.conversationCount === 0}
                         >
                           <BarChart2 className="h-4 w-4 mr-2" />
                           View Current Feedback
                         </Button>
                       </div>
                       <span className="text-sm text-muted-foreground">
-                        {gpt.conversationCount} conversation{gpt.conversationCount !== 1 ? 's' : ''}
+                        {config.conversationCount} conversation{config.conversationCount !== 1 ? 's' : ''}
                       </span>
                     </div>
                   </div>
@@ -431,22 +431,22 @@ export default function Home() {
         </ScrollArea>
       </div>
       <AlertDialog 
-        open={deletingGPT !== null}
-        onOpenChange={(open) => !open && setDeletingGPT(null)}
+        open={deletingConfig !== null}
+        onOpenChange={(open) => !open && setDeletingConfig(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the GPT model
-              "{deletingGPT?.title}" and all associated conversations.
+              This action cannot be undone. This will permanently delete the configuration
+              "{deletingConfig?.title}" and all associated conversations.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
-              onClick={() => deletingGPT && deleteGPT.mutate(deletingGPT)}
+              onClick={() => deletingConfig && deleteConfig.mutate(deletingConfig)}
             >
               Delete
             </AlertDialogAction>
