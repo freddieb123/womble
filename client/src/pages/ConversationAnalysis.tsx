@@ -22,7 +22,7 @@ export default function ConversationAnalysis() {
   const [conversations, setConversations] = useState<ConversationData[]>([]);
   const [feedbacks, setFeedbacks] = useState<ConversationFeedback[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const { toast } = useToast();
 
   // Get configId from URL
@@ -35,36 +35,46 @@ export default function ConversationAnalysis() {
     enabled: !!configId,
   });
 
-  const regenerateFeedback = async (conversationIndex: number) => {
-    if (!config?.feedbackCriteria || !conversations[conversationIndex]) return;
+  const regenerateAllFeedback = async () => {
+    if (!config?.feedbackCriteria || conversations.length === 0) return;
 
     try {
-      setRegeneratingIndex(conversationIndex);
+      setIsRegenerating(true);
 
-      const feedbackResponse = await fetch("/api/chat-feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          feedbackCriteria: config.feedbackCriteria,
-          messages: conversations[conversationIndex].messages
-        }),
-      });
+      const newFeedbacks = await Promise.all(
+        conversations.map(async (conversation) => {
+          const hasUserMessage = conversation.messages.some(m => m.role === 'user');
+          const hasAssistantMessage = conversation.messages.some(m => m.role === 'assistant');
 
-      if (!feedbackResponse.ok) {
-        const errorText = await feedbackResponse.text();
-        throw new Error(`Failed to get feedback: ${errorText}`);
-      }
+          if (!hasUserMessage || !hasAssistantMessage) {
+            console.warn('Skipping conversation without complete exchange');
+            return null;
+          }
 
-      const newFeedback = await feedbackResponse.json();
-      setFeedbacks(prevFeedbacks => {
-        const newFeedbacks = [...prevFeedbacks];
-        newFeedbacks[conversationIndex] = newFeedback;
-        return newFeedbacks;
-      });
+          const feedbackResponse = await fetch("/api/chat-feedback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              feedbackCriteria: config.feedbackCriteria,
+              messages: conversation.messages
+            }),
+          });
+
+          if (!feedbackResponse.ok) {
+            const errorText = await feedbackResponse.text();
+            throw new Error(`Failed to get feedback: ${errorText}`);
+          }
+
+          return feedbackResponse.json();
+        })
+      );
+
+      const validFeedbacks = newFeedbacks.filter(feedback => feedback !== null);
+      setFeedbacks(validFeedbacks);
 
       toast({
         title: "Feedback Updated",
-        description: "Successfully regenerated feedback for this conversation.",
+        description: "Successfully regenerated feedback for all conversations.",
       });
     } catch (error) {
       toast({
@@ -73,7 +83,7 @@ export default function ConversationAnalysis() {
         description: error instanceof Error ? error.message : "Failed to regenerate feedback",
       });
     } finally {
-      setRegeneratingIndex(null);
+      setIsRegenerating(false);
     }
   };
 
@@ -167,7 +177,17 @@ export default function ConversationAnalysis() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold text-blue-900 mb-6">Conversation Analysis</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-blue-900">Conversation Analysis</h1>
+          <Button
+            variant="outline"
+            onClick={regenerateAllFeedback}
+            disabled={isRegenerating || conversations.length === 0}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRegenerating ? 'animate-spin' : ''}`} />
+            {isRegenerating ? 'Regenerating...' : 'Regenerate All Feedback'}
+          </Button>
+        </div>
 
         {isLoading ? (
           <Card>
@@ -181,24 +201,11 @@ export default function ConversationAnalysis() {
               {conversations.map((conversation, index) => (
                 <Card key={index}>
                   <CardHeader>
-                    <div className="flex justify-between items-center">
-                      <h2 className="text-lg font-semibold">
-                        {conversation.userName 
-                          ? `${conversation.userName}'s Conversation` 
-                          : `Conversation ${index + 1}`}
-                      </h2>
-                      {feedbacks[index] && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => regenerateFeedback(index)}
-                          disabled={regeneratingIndex === index}
-                        >
-                          <RefreshCw className={`h-4 w-4 mr-2 ${regeneratingIndex === index ? 'animate-spin' : ''}`} />
-                          {regeneratingIndex === index ? 'Regenerating...' : 'Regenerate Feedback'}
-                        </Button>
-                      )}
-                    </div>
+                    <h2 className="text-lg font-semibold">
+                      {conversation.userName 
+                        ? `${conversation.userName}'s Conversation` 
+                        : `Conversation ${index + 1}`}
+                    </h2>
                   </CardHeader>
                   <CardContent>
                     {feedbacks[index] && (
