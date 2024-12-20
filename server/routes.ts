@@ -520,23 +520,23 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
       }
 
       // Construct the prompt for hint generation
-      const prompt = `Given the following conversation and context, provide a brief, one-sentence suggestion for what the user should do next to improve their interaction.
+      const prompt = `Based on the following conversation and context, provide a brief, encouraging suggestion directly to the user about their next message or action.
 
 Context:
 ${userInstructions ? `Instructions: ${userInstructions}` : ''}
 Feedback Criteria: ${feedbackCriteria}
 
-Conversation:
+Conversation so far:
 ${messages.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}
 
-Provide a single, clear sentence suggesting what the user should do next to better meet the feedback criteria. Keep it encouraging and actionable. Focus on practical communication advice.`;
+Provide a single, friendly sentence starting with "Try to" or "Consider" that directly tells the user what they could do next. Focus on practical communication advice that aligns with the feedback criteria.`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: [
           { 
             role: "system", 
-            content: "You are a helpful communication coach. Provide brief, actionable suggestions to help users improve their conversation skills. Keep responses to one clear sentence, starting with an action verb."
+            content: "You are a friendly communication coach speaking directly to the user. Always phrase your suggestions in second person ('you' form) and keep them actionable and encouraging. Start with 'Try to' or 'Consider' and focus on immediate next steps the user can take."
           },
           { role: "user", content: prompt }
         ],
