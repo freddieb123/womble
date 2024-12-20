@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Message } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
 
 interface ConversationFeedback {
   bullets: string[];
@@ -18,126 +17,112 @@ interface ConversationData {
 }
 
 export default function ConversationAnalysis() {
-  const [chatUrl, setChatUrl] = useState("");
   const [conversations, setConversations] = useState<ConversationData[]>([]);
   const [feedbacks, setFeedbacks] = useState<ConversationFeedback[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleAnalyze = async () => {
-    try {
-      // Extract configId from URL
-      const url = new URL(chatUrl);
-      const configId = url.searchParams.get("configId");
-      
-      if (!configId) {
-        throw new Error("Invalid chat URL - missing configId");
-      }
+  // Get configId from URL
+  const searchParams = new URLSearchParams(window.location.search);
+  const configId = searchParams.get('configId');
 
-      setIsLoading(true);
+  // Fetch config data
+  const { data: config } = useQuery({
+    queryKey: [`/api/chat-configs/${configId}`],
+    enabled: !!configId,
+  });
 
-      // Fetch config to get feedback criteria
-      const configResponse = await fetch(`/api/chat-configs/${configId}`);
-      if (!configResponse.ok) {
-        throw new Error(`Failed to fetch chat configuration: ${await configResponse.text()}`);
-      }
-      const config = await configResponse.json();
+  useEffect(() => {
+    const fetchAndAnalyze = async () => {
+      if (!configId || !config?.feedbackCriteria) return;
 
-      if (!config.feedbackCriteria) {
-        throw new Error("This chat configuration has no feedback criteria set");
-      }
+      try {
+        setIsLoading(true);
 
-      // Fetch conversations
-      const conversationsResponse = await fetch(`/api/conversations/${configId}`);
-      if (!conversationsResponse.ok) {
-        throw new Error(`Failed to fetch conversations: ${await conversationsResponse.text()}`);
-      }
-      const conversationsData = await conversationsResponse.json();
-      
-      if (!Array.isArray(conversationsData) || conversationsData.length === 0) {
-        throw new Error("No conversations found for this chat configuration");
-      }
+        // Fetch conversations
+        const conversationsResponse = await fetch(`/api/conversations/${configId}`);
+        if (!conversationsResponse.ok) {
+          throw new Error(`Failed to fetch conversations: ${await conversationsResponse.text()}`);
+        }
+        const conversationsData = await conversationsResponse.json();
 
-      setConversations(conversationsData);
-      console.log('Fetched conversations:', conversationsData);
-
-      // Get feedback for each conversation
-      const feedbackPromises = conversationsData.map(async (conversation: ConversationData) => {
-        // Validate conversation has at least one complete exchange
-        const hasUserMessage = conversation.messages.some(m => m.role === 'user');
-        const hasAssistantMessage = conversation.messages.some(m => m.role === 'assistant');
-        
-        if (!hasUserMessage || !hasAssistantMessage) {
-          console.warn('Skipping conversation without complete exchange');
-          return null;
+        if (!Array.isArray(conversationsData) || conversationsData.length === 0) {
+          throw new Error("No conversations found for this chat configuration");
         }
 
-        console.log('Processing conversation:', conversation);
-        
-        const feedbackResponse = await fetch("/api/chat-feedback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            feedbackCriteria: config.feedbackCriteria,
-            messages: conversation.messages
-          }),
-        });
+        setConversations(conversationsData);
 
-        if (!feedbackResponse.ok) {
-          const errorText = await feedbackResponse.text();
-          console.error('Feedback error:', errorText);
-          if (errorText.includes('Please have at least one complete exchange')) {
+        // Get feedback for each conversation
+        const feedbackPromises = conversationsData.map(async (conversation: ConversationData) => {
+          const hasUserMessage = conversation.messages.some(m => m.role === 'user');
+          const hasAssistantMessage = conversation.messages.some(m => m.role === 'assistant');
+
+          if (!hasUserMessage || !hasAssistantMessage) {
+            console.warn('Skipping conversation without complete exchange');
             return null;
           }
-          throw new Error(`Failed to get feedback: ${errorText}`);
+
+          const feedbackResponse = await fetch("/api/chat-feedback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              feedbackCriteria: config.feedbackCriteria,
+              messages: conversation.messages
+            }),
+          });
+
+          if (!feedbackResponse.ok) {
+            const errorText = await feedbackResponse.text();
+            console.error('Feedback error:', errorText);
+            if (errorText.includes('Please have at least one complete exchange')) {
+              return null;
+            }
+            throw new Error(`Failed to get feedback: ${errorText}`);
+          }
+
+          return feedbackResponse.json();
+        });
+
+        const allFeedback = await Promise.all(feedbackPromises);
+        const validFeedback = allFeedback.filter(feedback => feedback !== null);
+
+        if (validFeedback.length === 0) {
+          throw new Error("No valid conversations found to analyze. Each conversation must have at least one user message and one assistant response.");
         }
 
-        const feedback = await feedbackResponse.json();
-        console.log('Received feedback:', feedback);
-        return feedback;
-      });
-
-      const allFeedback = await Promise.all(feedbackPromises);
-      console.log('All feedback:', allFeedback);
-      // Filter out null responses
-      const validFeedback = allFeedback.filter(feedback => feedback !== null);
-      
-      if (validFeedback.length === 0) {
-        throw new Error("No valid conversations found to analyze. Each conversation must have at least one user message and one assistant response.");
+        setFeedbacks(validFeedback);
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to analyze conversations",
+        });
+      } finally {
+        setIsLoading(false);
       }
-      
-      setFeedbacks(validFeedback);
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to analyze conversations",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
+
+    fetchAndAnalyze();
+  }, [configId, config, toast]);
+
+  if (!configId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
+        <div className="max-w-4xl mx-auto">
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-center text-red-600">No configuration ID provided</div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-2xl font-bold text-blue-900 mb-6">Conversation Analysis</h1>
-
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="flex gap-4">
-              <Input
-                value={chatUrl}
-                onChange={(e) => setChatUrl(e.target.value)}
-                placeholder="Paste chat URL here..."
-                className="flex-1"
-              />
-              <Button onClick={handleAnalyze} disabled={!chatUrl || isLoading}>
-                Generate Feedback
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
         {isLoading ? (
           <Card>

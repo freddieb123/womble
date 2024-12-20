@@ -295,14 +295,14 @@ export default function Home() {
                           <ExternalLink className="h-4 w-4 mr-2" />
                           Open Chat
                         </Button>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="secondary"
                           onClick={() => handleViewFeedback(config.id)}
                           disabled={!config.feedbackCriteria || config.conversationCount === 0}
                         >
                           <BarChart2 className="h-4 w-4 mr-2" />
-                          View Feedback
+                          View Current Feedback
                         </Button>
                       </div>
                       <span className="text-sm text-muted-foreground">
