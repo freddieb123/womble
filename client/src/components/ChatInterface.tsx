@@ -334,7 +334,7 @@ export default function ChatInterface({ config }: Props) {
       </div>
 
       <Dialog open={feedbackOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md [&_.DialogClose]:text-white">
           <DialogHeader>
             <DialogTitle className="flex justify-between items-center">
               <span>Chat Feedback</span>
