@@ -511,6 +511,51 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
     }
   });
 
+  app.post("/api/chat-hint", async (req: Request, res: Response) => {
+    try {
+      const { feedbackCriteria, userInstructions, messages } = req.body;
+
+      if (!feedbackCriteria) {
+        return res.status(400).json({ error: "Feedback criteria is required" });
+      }
+
+      // Construct the prompt for hint generation
+      const prompt = `Given the following conversation and context, provide a brief, one-sentence suggestion for what the user should do next to improve their interaction.
+
+Context:
+${userInstructions ? `Instructions: ${userInstructions}` : ''}
+Feedback Criteria: ${feedbackCriteria}
+
+Conversation:
+${messages.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}
+
+Provide a single, clear sentence suggesting what the user should do next to better meet the feedback criteria. Keep it encouraging and actionable. Focus on practical communication advice.`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [
+          { 
+            role: "system", 
+            content: "You are a helpful communication coach. Provide brief, actionable suggestions to help users improve their conversation skills. Keep responses to one clear sentence, starting with an action verb."
+          },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 100,
+      });
+
+      const hint = completion.choices[0]?.message?.content?.trim();
+      if (!hint) {
+        throw new Error("Failed to generate hint");
+      }
+
+      res.json({ message: hint });
+    } catch (error: any) {
+      console.error("Error getting hint:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.configId);

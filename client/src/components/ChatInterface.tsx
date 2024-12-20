@@ -2,10 +2,16 @@ import { useState, useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, X } from "lucide-react";
+import { Send, X, Lightbulb } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import MessageBubble from "./MessageBubble";
 import UserNameModal from "./UserNameModal";
 import type { Message, ChatState, AdminConfig } from "@/lib/types";
@@ -18,20 +24,65 @@ export default function ChatInterface({ config }: Props) {
   const [input, setInput] = useState("");
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackData, setFeedbackData] = useState<{ bullets: string[], score: number | null, summary: string | null }>({ bullets: [], score: null, summary: null });
+  const [isGettingHint, setIsGettingHint] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const searchParams = new URLSearchParams(window.location.search);
   const configId = searchParams.get('configId');
-  const [sessionId] = useState(() => crypto.randomUUID()); // Generate unique session ID
+  const [sessionId] = useState(() => crypto.randomUUID());
   const [showNameModal, setShowNameModal] = useState(true);
   const [userName, setUserName] = useState<string | null>(null);
-  
+
   const { data: chatState = { messages: [], isLoading: false, error: null } } = useQuery<ChatState>({
     queryKey: [`/api/messages?configId=${configId}&sessionId=${sessionId}`],
     enabled: !!configId,
   });
+
+  const hasEnoughMessages = chatState.messages.length >= 5;
+
+  const getHint = async () => {
+    if (!config.feedbackCriteria) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No feedback criteria specified for this chat."
+      });
+      return;
+    }
+
+    try {
+      setIsGettingHint(true);
+      const response = await fetch("/api/chat-hint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          feedbackCriteria: config.feedbackCriteria,
+          userInstructions: config.userInstructions,
+          messages: chatState.messages
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const hint = await response.json();
+      toast({
+        title: "Hint",
+        description: hint.message,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to get hint",
+      });
+    } finally {
+      setIsGettingHint(false);
+    }
+  };
 
   const sendMessage = useMutation({
     mutationFn: async (content: string) => {
@@ -190,79 +241,96 @@ export default function ChatInterface({ config }: Props) {
         </form>
       </div>
 
-      <div className="px-4 pb-4">
-        <Button
-            onClick={async () => {
-              // Check for feedback criteria
-              if (!config.feedbackCriteria) {
-                toast({
-                  variant: "destructive",
-                  title: "Error",
-                  description: "No feedback criteria specified for this chat configuration.",
-                });
-                return;
-              }
-
-              // Validate conversation state
-              if (chatState.messages.length === 0) {
-                toast({
-                  variant: "destructive",
-                  title: "No Messages",
-                  description: "Please have a conversation first before requesting feedback.",
-                });
-                return;
-              }
-
-              // Check for complete exchange
-              const hasUserMessage = chatState.messages.some(m => m.role === 'user');
-              const hasAssistantMessage = chatState.messages.some(m => m.role === 'assistant');
-              if (!hasUserMessage || !hasAssistantMessage) {
-                toast({
-                  variant: "destructive",
-                  title: "Incomplete Conversation",
-                  description: "Please complete at least one exchange before requesting feedback.",
-                });
-                return;
-              }
-
-              try {
-                const url = new URL("/api/chat-feedback", window.location.origin);
-                const searchParams = new URLSearchParams(window.location.search);
-                const configId = searchParams.get('configId');
-                url.searchParams.set('configId', configId || '');
-
-                const response = await fetch(url.toString(), {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ 
-                    feedbackCriteria: config.feedbackCriteria,
-                    messages: chatState.messages 
-                  }),
-                });
-
-                if (!response.ok) {
-                  const errorText = await response.text();
-                  console.error('Feedback error:', errorText);
-                  throw new Error(errorText);
-                }
-
-                const { bullets, score, summary } = await response.json();
-                setFeedbackData({ bullets, score, summary });
-                setFeedbackOpen(true);
-              } catch (error) {
-                toast({
-                  variant: "destructive",
-                  title: "Error",
-                  description: error instanceof Error ? error.message : "Failed to get feedback",
-                });
-              }
-            }}
+      <div className="px-4 pb-4 space-y-2">
+        <div className="flex gap-2">
+          <Button
+            onClick={getHint}
             variant="outline"
-            className="w-full"
-            disabled={chatState.messages.length === 0}
+            className="flex-1"
+            disabled={isGettingHint}
           >
-            Get Feedback
+            <Lightbulb className="h-4 w-4 mr-2" />
+            {isGettingHint ? 'Getting hint...' : 'Get Hint'}
           </Button>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex-1">
+                  <Button
+                    onClick={async () => {
+                      // Existing feedback logic
+                      if (!config.feedbackCriteria) {
+                        toast({
+                          variant: "destructive",
+                          title: "Error",
+                          description: "No feedback criteria specified for this chat configuration.",
+                        });
+                        return;
+                      }
+
+                      if (chatState.messages.length === 0) {
+                        toast({
+                          variant: "destructive",
+                          title: "No Messages",
+                          description: "Please have a conversation first before requesting feedback.",
+                        });
+                        return;
+                      }
+
+                      const hasUserMessage = chatState.messages.some(m => m.role === 'user');
+                      const hasAssistantMessage = chatState.messages.some(m => m.role === 'assistant');
+                      if (!hasUserMessage || !hasAssistantMessage) {
+                        toast({
+                          variant: "destructive",
+                          title: "Incomplete Conversation",
+                          description: "Please complete at least one exchange before requesting feedback.",
+                        });
+                        return;
+                      }
+
+                      try {
+                        const response = await fetch("/api/chat-feedback", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ 
+                            feedbackCriteria: config.feedbackCriteria,
+                            messages: chatState.messages 
+                          }),
+                        });
+
+                        if (!response.ok) {
+                          throw new Error(await response.text());
+                        }
+
+                        const { bullets, score, summary } = await response.json();
+                        setFeedbackData({ bullets, score, summary });
+                        setFeedbackOpen(true);
+                      } catch (error) {
+                        toast({
+                          variant: "destructive",
+                          title: "Error",
+                          description: error instanceof Error ? error.message : "Failed to get feedback",
+                        });
+                      }
+                    }}
+                    variant="outline"
+                    disabled={!hasEnoughMessages}
+                    className="w-full"
+                  >
+                    Get Feedback
+                  </Button>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{hasEnoughMessages 
+                  ? "Get feedback on your conversation" 
+                  : "Have a longer conversation (at least 5 messages) to get meaningful feedback"}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </div>
 
       <Dialog open={feedbackOpen}>
