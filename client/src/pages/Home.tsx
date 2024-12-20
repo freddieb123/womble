@@ -291,10 +291,6 @@ export default function Home() {
                           <Copy className="h-4 w-4 mr-2" />
                           Copy Link
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => handleOpenChat(config.id)}>
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                          Open Chat
-                        </Button>
                         <Button
                           size="sm"
                           variant="secondary"
