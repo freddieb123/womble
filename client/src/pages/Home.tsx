@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Copy, ExternalLink, MoreVertical, BarChart2, Trash2 } from "lucide-react";
+import { Plus, Pencil, Copy, ExternalLink, MoreVertical, BarChart2, Trash2, ArrowUpCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import AdminPanel from "@/components/AdminPanel";
@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
 
 type ChatConfig = {
   id: number;
@@ -34,12 +35,15 @@ type ChatConfig = {
   feedbackCriteria: string | null;
   createdAt: string;
   conversationCount: number;
+  deleted?: boolean;
+  deletedAt?: string;
 };
 
 export default function Home() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingConfig, setEditingConfig] = useState<ChatConfig | null>(null);
   const [deletingConfig, setDeletingConfig] = useState<ChatConfig | null>(null);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [config, setConfig] = useState<AdminConfig>({
     title: "",
     systemPrompt: "You are a helpful AI assistant.",
@@ -53,7 +57,14 @@ export default function Home() {
   const queryClient = useQueryClient();
 
   const { data: configs, isLoading } = useQuery<ChatConfig[]>({
-    queryKey: ['/api/chat-configs'],
+    queryKey: ['/api/chat-configs', showDeleted],
+    queryFn: async () => {
+      const response = await fetch(`/api/chat-configs${showDeleted ? '?showDeleted=true' : ''}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch configurations');
+      }
+      return response.json();
+    }
   });
 
   const saveConfig = useMutation({
@@ -160,6 +171,34 @@ export default function Home() {
     },
   });
 
+  const restoreConfig = useMutation({
+    mutationFn: async (configToRestore: ChatConfig) => {
+      const response = await fetch(`/api/chat-configs/${configToRestore.id}/restore`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to restore configuration");
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
+      toast({
+        description: "Configuration restored successfully!",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
   const handleCopyLink = async (configId: number) => {
     try {
       const url = `${window.location.origin}/chat?configId=${configId}`;
@@ -212,7 +251,17 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-blue-900">AI Chat Configurations</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-bold text-blue-900">AI Chat Configurations</h1>
+            <Switch
+              checked={showDeleted}
+              onCheckedChange={setShowDeleted}
+              className="ml-4"
+            />
+            <span className="text-sm text-muted-foreground">
+              Show deleted configs
+            </span>
+          </div>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -241,12 +290,22 @@ export default function Home() {
         <ScrollArea className="h-[calc(100vh-12rem)]">
           <div className="space-y-4">
             {configs?.map((config) => (
-              <Card key={config.id} className="p-6">
+              <Card 
+                key={config.id} 
+                className={`p-6 ${config.deleted ? 'opacity-60' : ''}`}
+              >
                 <CardHeader className="pb-4">
                   <div className="flex justify-between items-start">
                     <div>
                       <CardTitle>{config.title}</CardTitle>
-                      <CardDescription>Created on: {new Date(config.createdAt).toLocaleDateString()}</CardDescription>
+                      <CardDescription>
+                        Created on: {new Date(config.createdAt).toLocaleDateString()}
+                        {config.deleted && config.deletedAt && (
+                          <span className="text-red-500 ml-2">
+                            (Deleted on: {new Date(config.deletedAt).toLocaleDateString()})
+                          </span>
+                        )}
+                      </CardDescription>
                     </div>
                     <div>
                       <DropdownMenu>
@@ -256,21 +315,32 @@ export default function Home() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setEditingConfig(config)}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDuplicate(config)}>
-                            <Copy className="h-4 w-4 mr-2" />
-                            Duplicate
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="text-red-600"
-                            onClick={() => setDeletingConfig(config)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
+                          {!config.deleted ? (
+                            <>
+                              <DropdownMenuItem onClick={() => setEditingConfig(config)}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDuplicate(config)}>
+                                <Copy className="h-4 w-4 mr-2" />
+                                Duplicate
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="text-red-600"
+                                onClick={() => setDeletingConfig(config)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </>
+                          ) : (
+                            <DropdownMenuItem 
+                              onClick={() => restoreConfig.mutate(config)}
+                            >
+                              <ArrowUpCircle className="h-4 w-4 mr-2" />
+                              Restore
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                       <Dialog open={editingConfig?.id === config.id} onOpenChange={(open) => !open && setEditingConfig(null)}>

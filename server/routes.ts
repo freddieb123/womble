@@ -130,20 +130,22 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: error.message });
     }
   });
-  app.get("/api/chat-configs", async (_req, res) => {
+  app.get("/api/chat-configs", async (req, res) => {
     try {
-      const configs = await db.query.chatConfigs.findMany({
+      const showDeleted = req.query.showDeleted === 'true';
+      const query = db.query.chatConfigs.findMany({
+        where: showDeleted ? undefined : eq(chatConfigs.deleted, false),
         orderBy: (chatConfigs, { desc }) => [desc(chatConfigs.createdAt)],
         with: {
           conversations: true,
         }
       });
 
-      // Transform the response to include conversation count
+      const configs = await query;
+
       const configsWithCount = configs.map(config => ({
         ...config,
         conversationCount: config.conversations.length,
-        // Remove the conversations array from the response as we only need the count
         conversations: undefined
       }));
 
@@ -183,6 +185,57 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.delete("/api/chat-configs/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid ID" });
+      }
+
+      const result = await db.update(chatConfigs)
+        .set({
+          deleted: true,
+          deletedAt: new Date()
+        })
+        .where(eq(chatConfigs.id, id))
+        .returning();
+
+      if (!result.length) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+
+      res.json(result[0]);
+    } catch (error: any) {
+      console.error("Error soft deleting chat config:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/chat-configs/:id/restore", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid ID" });
+      }
+
+      const result = await db.update(chatConfigs)
+        .set({
+          deleted: false,
+          deletedAt: null
+        })
+        .where(eq(chatConfigs.id, id))
+        .returning();
+
+      if (!result.length) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+
+      res.json(result[0]);
+    } catch (error: any) {
+      console.error("Error restoring chat config:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   app.post("/api/messages", async (req, res) => {
     try {

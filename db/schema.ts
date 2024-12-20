@@ -15,6 +15,8 @@ export const chatConfigs = pgTable("chat_configs", {
   userInstructions: text("user_instructions"),
   feedbackCriteria: text("feedback_criteria"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  deleted: boolean("deleted").default(false).notNull(),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const conversations = pgTable("conversations", {
