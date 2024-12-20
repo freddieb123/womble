@@ -8,7 +8,6 @@ import AdminPanel from "@/components/AdminPanel";
 import type { AdminConfig } from "@/lib/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { formatDistanceToNow } from "date-fns";
 
 type ChatConfig = {
   id: number;
@@ -17,7 +16,6 @@ type ChatConfig = {
   userInstructions: string | null;
   feedbackCriteria: string | null;
   createdAt: string;
-  lastUsedAt: string;
 };
 
 export default function Home() {
@@ -31,7 +29,7 @@ export default function Home() {
     temperature: 0.7,
     maxTokens: 1000
   });
-
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -51,12 +49,12 @@ export default function Home() {
           feedbackCriteria: config.feedbackCriteria,
         }),
       });
-
+      
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to save configuration");
       }
-
+      
       return response.json();
     },
     onSuccess: () => {
@@ -90,12 +88,12 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(configToUpdate),
       });
-
+      
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to update configuration");
       }
-
+      
       return response.json();
     },
     onSuccess: () => {
@@ -189,9 +187,7 @@ export default function Home() {
                   <div className="flex justify-between items-start">
                     <div>
                       <CardTitle>{config.title}</CardTitle>
-                      <CardDescription>
-                        Last used: {formatDistanceToNow(new Date(config.lastUsedAt), { addSuffix: true })}
-                      </CardDescription>
+                      <CardDescription>Created on: {new Date(config.createdAt).toLocaleDateString()}</CardDescription>
                     </div>
                     <Dialog open={editingConfig?.id === config.id} onOpenChange={(open) => !open && setEditingConfig(null)}>
                       <DialogTrigger asChild>
