@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Copy, ExternalLink, MoreVertical, BarChart2 } from "lucide-react";
+import { Plus, Pencil, Copy, ExternalLink, MoreVertical, BarChart2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import AdminPanel from "@/components/AdminPanel";
@@ -14,6 +14,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type ChatConfig = {
   id: number;
@@ -28,6 +39,7 @@ type ChatConfig = {
 export default function Home() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingConfig, setEditingConfig] = useState<ChatConfig | null>(null);
+  const [deletingConfig, setDeletingConfig] = useState<ChatConfig | null>(null);
   const [config, setConfig] = useState<AdminConfig>({
     title: "",
     systemPrompt: "You are a helpful AI assistant.",
@@ -108,6 +120,35 @@ export default function Home() {
       setEditingConfig(null);
       toast({
         description: "Configuration updated successfully!",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const deleteConfig = useMutation({
+    mutationFn: async (configToDelete: ChatConfig) => {
+      const response = await fetch(`/api/chat-configs/${configToDelete.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to delete configuration");
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
+      setDeletingConfig(null);
+      toast({
+        description: "Configuration deleted successfully!",
       });
     },
     onError: (error: Error) => {
@@ -223,6 +264,13 @@ export default function Home() {
                             <Copy className="h-4 w-4 mr-2" />
                             Duplicate
                           </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-red-600"
+                            onClick={() => setDeletingConfig(config)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                       <Dialog open={editingConfig?.id === config.id} onOpenChange={(open) => !open && setEditingConfig(null)}>
@@ -312,6 +360,29 @@ export default function Home() {
           </div>
         </ScrollArea>
       </div>
+      <AlertDialog 
+        open={deletingConfig !== null}
+        onOpenChange={(open) => !open && setDeletingConfig(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the configuration
+              "{deletingConfig?.title}" and all associated conversations.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => deletingConfig && deleteConfig.mutate(deletingConfig)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
