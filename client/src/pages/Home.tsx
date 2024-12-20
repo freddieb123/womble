@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Copy, ExternalLink, MoreVertical } from "lucide-react";
+import { Plus, Pencil, Copy, ExternalLink, MoreVertical, BarChart2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import AdminPanel from "@/components/AdminPanel";
@@ -139,6 +139,10 @@ export default function Home() {
     window.open(`${window.location.origin}/chat?configId=${configId}`, '_blank');
   };
 
+  const handleViewFeedback = (configId: number) => {
+    window.open(`${window.location.origin}/analysis?configId=${configId}`, '_blank');
+  };
+
   const handleDuplicate = (configToDuplicate: ChatConfig) => {
     setConfig({
       title: `${configToDuplicate.title} (Copy)`,
@@ -168,34 +172,29 @@ export default function Home() {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-blue-900">AI Chat Configurations</h1>
-          <div className="flex gap-4">
-            <Button variant="outline" onClick={() => window.location.href = '/analysis'}>
-              View Conversations
-            </Button>
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Configuration
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
-                <DialogHeader>
-                  <DialogTitle>Create New Configuration</DialogTitle>
-                </DialogHeader>
-                <ScrollArea className="flex-1 -mx-6 px-6">
-                  <div className="py-4">
-                    <AdminPanel config={config} onConfigChange={setConfig} />
-                  </div>
-                </ScrollArea>
-                <div className="pt-4 border-t flex justify-end">
-                  <Button onClick={() => saveConfig.mutate()} disabled={saveConfig.isPending}>
-                    Save Configuration
-                  </Button>
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                New Configuration
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Create New Configuration</DialogTitle>
+              </DialogHeader>
+              <ScrollArea className="flex-1 -mx-6 px-6">
+                <div className="py-4">
+                  <AdminPanel config={config} onConfigChange={setConfig} />
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
+              </ScrollArea>
+              <div className="pt-4 border-t flex justify-end">
+                <Button onClick={() => saveConfig.mutate()} disabled={saveConfig.isPending}>
+                  Save Configuration
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <ScrollArea className="h-[calc(100vh-12rem)]">
@@ -295,6 +294,15 @@ export default function Home() {
                         <Button size="sm" variant="outline" onClick={() => handleOpenChat(config.id)}>
                           <ExternalLink className="h-4 w-4 mr-2" />
                           Open Chat
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="secondary"
+                          onClick={() => handleViewFeedback(config.id)}
+                          disabled={!config.feedbackCriteria || config.conversationCount === 0}
+                        >
+                          <BarChart2 className="h-4 w-4 mr-2" />
+                          View Feedback
                         </Button>
                       </div>
                       <span className="text-sm text-muted-foreground">
