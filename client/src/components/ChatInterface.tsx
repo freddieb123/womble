@@ -337,7 +337,6 @@ export default function ChatInterface({ config }: Props) {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Chat Feedback</DialogTitle>
-            </DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
             <div className="space-y-3">
