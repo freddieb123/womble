@@ -1,6 +1,10 @@
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Wand2 } from "lucide-react";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 import type { AdminConfig } from "@/lib/types";
 
 interface Props {
@@ -9,10 +13,55 @@ interface Props {
 }
 
 export default function AdminPanel({ config, onConfigChange }: Props) {
+  const [isImproving, setIsImproving] = useState(false);
+  const [hasImproved, setHasImproved] = useState(false);
+  const { toast } = useToast();
+
+  const improveCriteria = async () => {
+    if (!config.feedbackCriteria) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please enter some initial feedback criteria first."
+      });
+      return;
+    }
+
+    try {
+      setIsImproving(true);
+      const response = await fetch("/api/improve-criteria", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feedbackCriteria: config.feedbackCriteria }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const { improvedCriteria } = await response.json();
+      onConfigChange({
+        ...config,
+        feedbackCriteria: improvedCriteria
+      });
+
+      setHasImproved(true);
+      toast({
+        description: "Feedback criteria improved successfully!"
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to improve criteria"
+      });
+    } finally {
+      setIsImproving(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      
-      
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="title">Title</Label>
@@ -69,7 +118,18 @@ export default function AdminPanel({ config, onConfigChange }: Props) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="feedback-criteria">Feedback Criteria</Label>
+          <div className="flex justify-between items-center">
+            <Label htmlFor="feedback-criteria">Feedback Criteria</Label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={improveCriteria}
+              disabled={isImproving || hasImproved || !config.feedbackCriteria}
+            >
+              <Wand2 className="h-4 w-4 mr-2" />
+              {isImproving ? "Improving..." : "Improve criteria"}
+            </Button>
+          </div>
           <Textarea
             id="feedback-criteria"
             value={config.feedbackCriteria}

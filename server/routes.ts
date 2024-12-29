@@ -441,14 +441,14 @@ export function registerRoutes(app: Express): Server {
       }
 
       const prompt = `Analyze the user's interactions in this conversation based on these criteria: ${feedbackCriteria}
-
+      
 Please provide your feedback in exactly this format:
-
+      
 • [2-4 bullet points focusing ONLY on the user's conversation so far and how well they met the criteria]
-
+      
 Score: [1-10]
 [Brief one-line summary of overall performance]
-
+      
 Chat transcript:
 ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}`;
 
@@ -521,14 +521,14 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
 
       // Construct the prompt for hint generation
       const prompt = `Based on the following conversation and context, provide a brief, encouraging suggestion directly to the user about their next message or action. You should think of this as a hint that will help them improve their feedback score.
-
+      
 Context:
 ${userInstructions ? `Instructions that the user received: ${userInstructions}` : ''}
 Feedback Criteria: ${feedbackCriteria}
-
+      
 Conversation so far:
 ${messages.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}
-
+      
 Provide a single, friendly sentence starting with "Try to" or "Consider" that directly tells the user what they could do next. Focus on practical communication advice that aligns with the feedback criteria.`;
 
       const completion = await openai.chat.completions.create({
@@ -575,6 +575,42 @@ Provide a single, friendly sentence starting with "Try to" or "Consider" that di
       res.json(conversationsWithMetadata);
     } catch (error: any) {
       console.error("Error fetching conversations:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/improve-criteria", async (req: Request, res: Response) => {
+    try {
+      const { feedbackCriteria } = req.body;
+
+      if (!feedbackCriteria) {
+        return res.status(400).json({ error: "Feedback criteria is required" });
+      }
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert at creating effective feedback criteria for evaluating communication skills and interactions. Your goal is to enhance existing feedback criteria to be more comprehensive, clear, and actionable while maintaining its core purpose."
+          },
+          {
+            role: "user",
+            content: `Please improve the following feedback criteria to be more comprehensive, specific, and effective at evaluating user interactions. Maintain the same general purpose but make it more detailed and actionable. Here's the current criteria:\n\n${feedbackCriteria}`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+      });
+
+      const improvedCriteria = response.choices[0]?.message?.content;
+      if (!improvedCriteria) {
+        throw new Error("Failed to get improved criteria from OpenAI");
+      }
+
+      res.json({ improvedCriteria });
+    } catch (error: any) {
+      console.error("Error improving criteria:", error);
       res.status(500).json({ error: error.message });
     }
   });
