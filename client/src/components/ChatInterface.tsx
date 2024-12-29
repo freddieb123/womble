@@ -333,19 +333,10 @@ export default function ChatInterface({ config }: Props) {
         </div>
       </div>
 
-      <Dialog open={feedbackOpen}>
-        <DialogContent className="max-w-md" hideClose>
+      <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex justify-between items-center">
-              <span>Chat Feedback</span>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-6 w-6 p-0 hover:bg-transparent" 
-                onClick={() => setFeedbackOpen(false)}
-              >
-                <X className="h-4 w-4 text-white" />
-              </Button>
+            <DialogTitle>Chat Feedback</DialogTitle>
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
