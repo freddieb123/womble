@@ -231,6 +231,7 @@ export default function ChatInterface({ config }: Props) {
             placeholder="Type your message..."
             className="flex-1"
             disabled={sendMessage.isPending}
+            autoFocus
           />
           <Button 
             type="submit" 
