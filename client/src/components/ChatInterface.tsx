@@ -23,6 +23,7 @@ interface Props {
 export default function ChatInterface({ config }: Props) {
   const [input, setInput] = useState("");
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [feedbackData, setFeedbackData] = useState<{ bullets: string[], score: number | null, summary: string | null }>({ bullets: [], score: null, summary: null });
   const [isGettingHint, setIsGettingHint] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -176,6 +177,7 @@ export default function ChatInterface({ config }: Props) {
     },
     onSuccess: () => {
       setInput("");
+      inputRef.current?.focus();
     },
     onError: (error) => {
       toast({
@@ -232,6 +234,7 @@ export default function ChatInterface({ config }: Props) {
             className="flex-1"
             disabled={sendMessage.isPending}
             autoFocus
+            ref={inputRef}
           />
           <Button 
             type="submit" 
