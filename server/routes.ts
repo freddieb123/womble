@@ -582,26 +582,3 @@ Provide a single, friendly sentence starting with "Try to" or "Consider" that di
   const httpServer = createServer(app);
   return httpServer;
 }
-app.post("/api/improve-criteria", async (req: Request, res: Response) => {
-  try {
-    const { currentCriteria } = req.body;
-
-    const prompt = `Improve the following feedback criteria for evaluating chat interactions. Make it more specific, measurable, and comprehensive while maintaining clarity:
-
-${currentCriteria}
-
-Provide only the improved criteria text without any explanations or additional formatting.`;
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
-    });
-
-    const improvedCriteria = completion.choices[0].message.content;
-    res.json({ improvedCriteria });
-  } catch (error) {
-    console.error("Error improving criteria:", error);
-    res.status(500).json({ error: "Failed to improve criteria" });
-  }
-});

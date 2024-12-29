@@ -69,36 +69,7 @@ export default function AdminPanel({ config, onConfigChange }: Props) {
         </div>
 
         <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <Label htmlFor="feedback-criteria">Feedback Criteria</Label>
-            <Button
-              variant="outline"
-              size="sm"
-              id="improve-criteria"
-              onClick={async () => {
-                const response = await fetch("/api/improve-criteria", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ currentCriteria: config.feedbackCriteria }),
-                });
-                
-                if (!response.ok) {
-                  throw new Error("Failed to improve criteria");
-                }
-                
-                const { improvedCriteria } = await response.json();
-                onConfigChange({
-                  ...config,
-                  feedbackCriteria: improvedCriteria
-                });
-                
-                const button = document.getElementById("improve-criteria") as HTMLButtonElement;
-                button.disabled = true;
-              }}
-            >
-              Improve criteria
-            </Button>
-          </div>
+          <Label htmlFor="feedback-criteria">Feedback Criteria</Label>
           <Textarea
             id="feedback-criteria"
             value={config.feedbackCriteria}
