@@ -118,18 +118,7 @@ export default function AdminPanel({ config, onConfigChange }: Props) {
         </div>
 
         <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <Label htmlFor="feedback-criteria">Feedback Criteria</Label>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={improveCriteria}
-              disabled={isImproving || hasImproved || !config.feedbackCriteria}
-            >
-              <Wand2 className="h-4 w-4 mr-2" />
-              {isImproving ? "Improving..." : "Improve criteria"}
-            </Button>
-          </div>
+          <Label htmlFor="feedback-criteria">Feedback Criteria</Label>
           <Textarea
             id="feedback-criteria"
             value={config.feedbackCriteria}
@@ -144,6 +133,16 @@ export default function AdminPanel({ config, onConfigChange }: Props) {
           <p className="text-sm text-muted-foreground">
             Specify criteria that will be used to assess and provide feedback on user interactions.
           </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={improveCriteria}
+            disabled={isImproving || hasImproved || !config.feedbackCriteria}
+            className="w-full"
+          >
+            <Wand2 className="h-4 w-4 mr-2" />
+            {isImproving ? "Improving..." : "Improve criteria"}
+          </Button>
         </div>
       </div>
     </div>
