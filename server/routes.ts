@@ -592,11 +592,11 @@ Provide a single, friendly sentence starting with "Try to" or "Consider" that di
         messages: [
           {
             role: "system",
-            content: "You are an expert at creating effective feedback criteria for evaluating communication skills and interactions. Your goal is to enhance existing feedback criteria to be more comprehensive, clear, and actionable while maintaining its core purpose."
+            content: "You are an expert at creating effective feedback criteria for evaluating soft skills and interactions. Your goal is to enhance existing feedback criteria to be more comprehensive, clear, and actionable while maintaining its core purpose."
           },
           {
             role: "user",
-            content: `Please improve the following feedback criteria to be more comprehensive, specific, and effective at evaluating user interactions. Maintain the same general purpose but make it more detailed and actionable. Here's the current criteria:\n\n${feedbackCriteria}`
+            content: `Please improve the following feedback criteria to be more comprehensive, specific, and effective at evaluating user interactions. Maintain the same general purpose but make it as actionable as possible. Don't make it longer than 5 points. Here's the current criteria:\n\n${feedbackCriteria}`
           }
         ],
         temperature: 0.7,
