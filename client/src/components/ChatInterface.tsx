@@ -199,6 +199,9 @@ export default function ChatInterface({ config }: Props) {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
   }, [chatState.messages]);
 
   return (
