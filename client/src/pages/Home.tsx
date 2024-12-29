@@ -290,8 +290,8 @@ export default function Home() {
         <ScrollArea className="h-[calc(100vh-12rem)]">
           <div className="space-y-4">
             {configs?.map((config) => (
-              <Card 
-                key={config.id} 
+              <Card
+                key={config.id}
                 className={`p-6 ${config.deleted ? 'opacity-60' : ''}`}
               >
                 <CardHeader className="pb-4">
@@ -325,7 +325,7 @@ export default function Home() {
                                 <Copy className="h-4 w-4 mr-2" />
                                 Duplicate
                               </DropdownMenuItem>
-                              <DropdownMenuItem 
+                              <DropdownMenuItem
                                 className="text-red-600"
                                 onClick={() => setDeletingConfig(config)}
                               >
@@ -334,7 +334,7 @@ export default function Home() {
                               </DropdownMenuItem>
                             </>
                           ) : (
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => restoreConfig.mutate(config)}
                             >
                               <ArrowUpCircle className="h-4 w-4 mr-2" />
@@ -370,6 +370,7 @@ export default function Home() {
                                         feedbackCriteria: updatedConfig.feedbackCriteria || null,
                                       });
                                     }}
+                                    isEditMode={true}
                                   />
                                 </div>
                               </ScrollArea>
@@ -430,7 +431,7 @@ export default function Home() {
           </div>
         </ScrollArea>
       </div>
-      <AlertDialog 
+      <AlertDialog
         open={deletingConfig !== null}
         onOpenChange={(open) => !open && setDeletingConfig(null)}
       >

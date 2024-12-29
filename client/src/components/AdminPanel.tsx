@@ -10,9 +10,10 @@ import type { AdminConfig } from "@/lib/types";
 interface Props {
   config: AdminConfig;
   onConfigChange: (config: AdminConfig) => void;
+  isEditMode?: boolean;
 }
 
-export default function AdminPanel({ config, onConfigChange }: Props) {
+export default function AdminPanel({ config, onConfigChange, isEditMode = false }: Props) {
   const [isImproving, setIsImproving] = useState(false);
   const [hasImproved, setHasImproved] = useState(false);
   const { toast } = useToast();
@@ -133,16 +134,18 @@ export default function AdminPanel({ config, onConfigChange }: Props) {
           <p className="text-sm text-muted-foreground">
             Specify criteria that will be used to assess and provide feedback on user interactions.
           </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={improveCriteria}
-            disabled={isImproving || hasImproved || !config.feedbackCriteria}
-            className="w-full"
-          >
-            <Wand2 className="h-4 w-4 mr-2" />
-            {isImproving ? "Improving..." : "Improve criteria"}
-          </Button>
+          {!isEditMode && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={improveCriteria}
+              disabled={isImproving || hasImproved || !config.feedbackCriteria}
+              className="w-full"
+            >
+              <Wand2 className="h-4 w-4 mr-2" />
+              {isImproving ? "Improving..." : "Improve criteria"}
+            </Button>
+          )}
         </div>
       </div>
     </div>
