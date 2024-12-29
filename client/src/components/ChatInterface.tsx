@@ -196,12 +196,24 @@ export default function ChatInterface({ config }: Props) {
   };
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    const scrollToBottom = () => {
+      if (scrollRef.current) {
+        const viewport = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+        if (viewport) {
+          viewport.scrollTop = viewport.scrollHeight;
+        }
+      }
+    };
+    
+    scrollToBottom();
+    // Also scroll when messages change
+    const timeout = setTimeout(scrollToBottom, 100); // Extra check after any DOM updates
+    
     if (inputRef.current) {
       inputRef.current.focus();
     }
+    
+    return () => clearTimeout(timeout);
   }, [chatState.messages]);
 
   return (
