@@ -223,6 +223,7 @@ export default function ChatInterface({ config }: Props) {
         onSubmit={(name) => {
           setUserName(name);
           setShowNameModal(false);
+          setTimeout(() => inputRef.current?.focus(), 0);
         }} 
       />
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
@@ -247,8 +248,7 @@ export default function ChatInterface({ config }: Props) {
             onChange={(e) => setInput(e.target.value)}
             placeholder="Type your message..."
             className="flex-1"
-            disabled={sendMessage.isPending}
-            autoFocus
+            disabled={sendMessage.isPending || showNameModal}
             ref={inputRef}
           />
           <Button 

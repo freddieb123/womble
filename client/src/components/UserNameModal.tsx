@@ -43,6 +43,7 @@ export default function UserNameModal({ open, onSubmit }: UserNameModalProps) {
             placeholder="Enter your name..."
             className="w-full"
             autoFocus
+            disabled={false}
           />
           <Button type="submit" className="w-full" disabled={!name.trim()}>
             Start Chat
