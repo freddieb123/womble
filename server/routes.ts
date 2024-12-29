@@ -444,7 +444,7 @@ export function registerRoutes(app: Express): Server {
 
 Please provide your feedback in exactly this format:
 
-• [2-4 bullet points focusing ONLY on the user's communication style and how well they met the criteria]
+• [2-4 bullet points focusing ONLY on the user's conversation so far and how well they met the criteria]
 
 Score: [1-10]
 [Brief one-line summary of overall performance]
@@ -457,7 +457,7 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
         messages: [
           { 
             role: "system", 
-            content: "You are an expert at evaluating user communication. Focus solely on the user's messages and interactions, ignoring the AI assistant's responses. Address the user directly using 'you' in your feedback. For example: 'You maintained clear communication' instead of 'The user maintained clear communication'. Keep feedback points brief, clear, and actionable. Always follow the exact format specified, with 2-4 bullet points followed by a score and one-line summary."
+            content: "You are an expert at evaluating user communication. Focus your feedback solely on the user's messages and interactions, taking into account how they respond to the AI assistant. Address the user directly using 'you' in your feedback. For example: 'You maintained clear communication' instead of 'The user maintained clear communication'. Keep feedback points brief, clear, and actionable. Always follow the exact format specified, with 2-4 bullet points followed by a score and one-line summary."
           },
           { role: "user", content: prompt }
         ],
@@ -520,10 +520,10 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
       }
 
       // Construct the prompt for hint generation
-      const prompt = `Based on the following conversation and context, provide a brief, encouraging suggestion directly to the user about their next message or action.
+      const prompt = `Based on the following conversation and context, provide a brief, encouraging suggestion directly to the user about their next message or action. You should think of this as a hint that will help them improve their feedback score.
 
 Context:
-${userInstructions ? `Instructions: ${userInstructions}` : ''}
+${userInstructions ? `Instructions that the user received: ${userInstructions}` : ''}
 Feedback Criteria: ${feedbackCriteria}
 
 Conversation so far:
@@ -536,7 +536,7 @@ Provide a single, friendly sentence starting with "Try to" or "Consider" that di
         messages: [
           { 
             role: "system", 
-            content: "You are a friendly communication coach speaking directly to the user. Always phrase your suggestions in second person ('you' form) and keep them actionable and encouraging. Start with 'Try to' or 'Consider' and focus on immediate next steps the user can take."
+            content: "You are a friendly but expert business coach speaking directly to the user. Always phrase your suggestions in second person ('you' form) and keep them actionable and encouraging. Start with 'Try to' or 'Consider' and focus on immediate next steps the user can take."
           },
           { role: "user", content: prompt }
         ],
