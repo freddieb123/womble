@@ -206,15 +206,17 @@ export default function ChatInterface({ config }: Props) {
     };
     
     scrollToBottom();
-    // Also scroll when messages change
-    const timeout = setTimeout(scrollToBottom, 100); // Extra check after any DOM updates
     
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
+    // Handle both scrolling and focus after messages change
+    const timeout = setTimeout(() => {
+      scrollToBottom();
+      if (!showNameModal && inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, 100);
     
     return () => clearTimeout(timeout);
-  }, [chatState.messages]);
+  }, [chatState.messages, showNameModal]);
 
   return (
     <div className="flex flex-col h-[600px]">
