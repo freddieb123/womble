@@ -223,6 +223,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly 
         <Alert className="mb-4">
           <Info className="h-4 w-4" />
           <AlertDescription>
+            <div className="font-semibold text-lg mb-2">{config.title}</div>
             {config.userInstructions}
           </AlertDescription>
         </Alert>
@@ -235,12 +236,12 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly 
         </div>
       )}
       {showNameModal && (
-        <UserNameModal 
-          open={showNameModal} 
+        <UserNameModal
+          open={showNameModal}
           onSubmit={(name) => {
             setShowNameModal(false);
             setTimeout(() => inputRef.current?.focus(), 0);
-          }} 
+          }}
         />
       )}
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
@@ -269,8 +270,8 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly 
                 disabled={sendMessage.isPending || showNameModal}
                 ref={inputRef}
               />
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={sendMessage.isPending || !input.trim()}
               >
                 <Send className="h-4 w-4" />
@@ -328,9 +329,9 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly 
                             const response = await fetch("/api/chat-feedback", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ 
+                              body: JSON.stringify({
                                 feedbackCriteria: config.feedbackCriteria,
-                                messages: chatState.messages 
+                                messages: chatState.messages
                               }),
                             });
 
@@ -359,8 +360,8 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly 
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>
-                      {hasEnoughMessages 
-                        ? "Get feedback on your conversation" 
+                      {hasEnoughMessages
+                        ? "Get feedback on your conversation"
                         : "Have a longer conversation (at least 5 messages) to get meaningful feedback"}
                     </p>
                   </TooltipContent>
