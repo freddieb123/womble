@@ -453,10 +453,10 @@ export function registerRoutes(app: Express): Server {
 
       Please provide your feedback in exactly this format:
 
-      • [2-4 bullet points focusing ONLY on the user's conversation so far and how well they met the criteria]
+      • [3 bullet points focusing ONLY on the user's conversation so far and how well they met the criteria]
 
       Score: [1-10]
-      [Brief one-line summary of overall performance]
+      [Brief one-line summary of overall performance. Make sure you don't give anything above a 5 if they haven't yet come to an agreement]
 
       Chat transcript:
       ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}`;
