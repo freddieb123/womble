@@ -110,7 +110,8 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
         id: crypto.randomUUID(),
         content,
         role: 'user',
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        sessionId
       };
 
       queryClient.setQueryData<ChatState>([`/api/messages?configId=${config.id}&sessionId=${sessionId}`], (old) => ({
@@ -123,7 +124,8 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
         id: '',
         content: '',
         role: 'assistant',
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        sessionId
       };
 
       const reader = response.body?.getReader();

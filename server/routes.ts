@@ -65,10 +65,10 @@ export function registerRoutes(app: Express): Server {
 
       // Initialize session if it doesn't exist
       if (!sessions[sessionId]) {
-        sessions[sessionId] = conversation ? 
-          (typeof conversation.messages === 'string' ? 
-            JSON.parse(conversation.messages) : 
-            conversation.messages) : 
+        sessions[sessionId] = conversation ?
+          (typeof conversation.messages === 'string' ?
+            JSON.parse(conversation.messages) :
+            conversation.messages) :
           [];
         console.log("Initialized session with messages count:", sessions[sessionId].length);
       }
@@ -265,7 +265,7 @@ export function registerRoutes(app: Express): Server {
           ),
         });
 
-        sessions[sessionId] = existingConversation ? 
+        sessions[sessionId] = existingConversation ?
           JSON.parse(existingConversation.messages as string) : [];
       }
 
@@ -325,8 +325,8 @@ export function registerRoutes(app: Express): Server {
       res.setHeader('Connection', 'keep-alive');
 
       // Prepare messages for OpenAI API
-      const enhancedSystemPrompt = userName 
-        ? `${parsedConfig.systemPrompt}\nThe user's name is ${userName}. Always address them by their name in your first response and periodically throughout the conversation to maintain a personal connection.`
+      const enhancedSystemPrompt = userName
+        ? `${parsedConfig.systemPrompt}\nThe user's name is ${userName}. You MUST address them as "${userName}" in your first response and periodically use their name naturally in the conversation. For example, if they say "hello", respond with "Hello ${userName}!" or similar personalized greeting.`
         : parsedConfig.systemPrompt;
 
       const apiMessages = [
@@ -384,7 +384,8 @@ export function registerRoutes(app: Express): Server {
         id: messageId,
         content: accumulatedMessage,
         role: 'assistant' as const,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        sessionId: sessionId // Add sessionId to message
       };
       sessions[sessionId].push(assistantMessage);
 
@@ -414,19 +415,19 @@ export function registerRoutes(app: Express): Server {
       const messagesToAnalyze = messages || (sessions[sessionId] || []);
 
       if (!Array.isArray(messagesToAnalyze) || messagesToAnalyze.length === 0) {
-        return res.status(400).json({ 
-          error: "No chat messages to analyze. Please have a conversation first before requesting feedback." 
+        return res.status(400).json({
+          error: "No chat messages to analyze. Please have a conversation first before requesting feedback."
         });
       }
 
       // Ensure there are at least two messages (one from user and one from assistant)
       const hasUserMessage = messagesToAnalyze.some(m => m.role === 'user');
       const hasAssistantMessage = messagesToAnalyze.some(m => m.role === 'assistant');
-      
+
 
       if (!hasUserMessage || !hasAssistantMessage) {
-        return res.status(400).json({ 
-          error: "Please have at least one complete exchange before requesting feedback." 
+        return res.status(400).json({
+          error: "Please have at least one complete exchange before requesting feedback."
         });
       }
 
@@ -441,22 +442,22 @@ export function registerRoutes(app: Express): Server {
       }
 
       const prompt = `Analyze the user's interactions in this conversation based on these criteria: ${feedbackCriteria}
-      
+
       Please provide your feedback in exactly this format:
-      
+
       • [2-4 bullet points focusing ONLY on the user's conversation so far and how well they met the criteria]
-      
+
       Score: [1-10]
       [Brief one-line summary of overall performance]
-      
+
       Chat transcript:
       ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: [
-          { 
-            role: "system", 
+          {
+            role: "system",
             content: "You are an expert at evaluating user communication. Focus your feedback solely on the user's messages and interactions, taking into account how they respond to the AI assistant. Address the user directly using 'you' in your feedback. For example: 'You maintained clear communication' instead of 'The user maintained clear communication'. Keep feedback points brief, clear, and actionable. Always follow the exact format specified, with 2-4 bullet points followed by a score and one-line summary."
           },
           { role: "user", content: prompt }
@@ -469,17 +470,17 @@ export function registerRoutes(app: Express): Server {
       if (!response) {
         throw new Error("Failed to get response from OpenAI");
       }
-      
+
 
       // Extract score and summary
       const scoreMatch = response.match(/Score:\s*(\d+)/i);
       const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
-      
+
 
       // Extract summary (the line after the score)
       const summaryMatch = response.match(/Score:\s*\d+\s*\n([^\n]+)/i);
       const summary = summaryMatch ? summaryMatch[1].trim() : null;
-      
+
 
       // Get bullet points (everything before "Score:")
       const bullets = response
@@ -524,21 +525,21 @@ export function registerRoutes(app: Express): Server {
 
       // Construct the prompt for hint generation
       const prompt = `Based on the following conversation and context, provide a brief, encouraging suggestion directly to the user about their next message or action. You should think of this as a hint that will help them improve their feedback score.
-      
+
       Context:
       ${userInstructions ? `Instructions that the user received: ${userInstructions}` : ''}
       Feedback Criteria: ${feedbackCriteria}
-      
+
       Conversation so far:
       ${messages.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}
-      
+
       Provide a single, friendly sentence starting with "Try to" or "Consider" that directly tells the user what they could do next. Focus on practical communication advice that aligns with the feedback criteria.`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: [
-          { 
-            role: "system", 
+          {
+            role: "system",
             content: "You are a friendly but expert business coach speaking directly to the user. Always phrase your suggestions in second person ('you' form) and keep them actionable and encouraging. Start with 'Try to' or 'Consider' and focus on immediate next steps the user can take."
           },
           { role: "user", content: prompt }
@@ -574,7 +575,7 @@ export function registerRoutes(app: Express): Server {
       const conversationsWithMetadata = savedConversations.map(conv => ({
         messages: typeof conv.messages === 'string' ? JSON.parse(conv.messages) : conv.messages,
         userName: conv.userName,
-        sessionId: conv.sessionId 
+        sessionId: conv.sessionId
       }));
       res.json(conversationsWithMetadata);
     } catch (error: any) {
