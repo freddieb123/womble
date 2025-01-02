@@ -357,7 +357,7 @@ export function registerRoutes(app: Express): Server {
 
       // Get OpenAI streaming response
       const stream = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4",
         messages: apiMessages.map(msg => ({
           role: msg.role as 'system' | 'user' | 'assistant',
           content: msg.content
