@@ -23,18 +23,7 @@ export default function UserNameModal({ open, onSubmit }: UserNameModalProps) {
     <Dialog open={open}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex justify-between items-center">
-            <span>Welcome!</span>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-6 w-6 p-0 hover:bg-transparent" 
-              onClick={() => onSubmit(name.trim())}
-              disabled={!name.trim()}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </DialogTitle>
+          <DialogTitle>Welcome!</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           <Input
