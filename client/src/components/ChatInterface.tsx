@@ -252,24 +252,6 @@ export default function ChatInterface({ config }: Props) {
         </div>
       </ScrollArea>
 
-      {!isViewOnly && <div className="p-4 border-t">
-        <form onSubmit={handleSubmit} className="flex gap-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Type your message..."
-            className="flex-1"
-            disabled={sendMessage.isPending || showNameModal}
-            ref={inputRef}
-          />
-          <Button 
-            type="submit" 
-            disabled={sendMessage.isPending || !input.trim()}
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </form>
-      </div>
       {!isViewOnly && (
         <>
           <div className="p-4 border-t">
