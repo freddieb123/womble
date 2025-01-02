@@ -34,8 +34,12 @@ export default function UserView() {
     if (!newParams.has('sessionId')) {
       newParams.set('sessionId', sessionId);
     }
+    if (!newParams.has('configId') && configId) {
+      newParams.set('configId', configId);
+    }
     const newUrl = `${window.location.pathname}?${newParams.toString()}`;
     window.history.replaceState({}, '', newUrl);
+    window.location.reload(); // Force reload to update the userName state
     return newUrl;
   };
 
