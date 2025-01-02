@@ -270,9 +270,27 @@ export default function ChatInterface({ config }: Props) {
           </Button>
         </form>
       </div>
-
-      </div>}
-      {!isViewOnly && <div className="px-4 pb-4 space-y-2">
+      {!isViewOnly && (
+        <>
+          <div className="p-4 border-t">
+            <form onSubmit={handleSubmit} className="flex gap-2">
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Type your message..."
+                className="flex-1"
+                disabled={sendMessage.isPending || showNameModal}
+                ref={inputRef}
+              />
+              <Button 
+                type="submit" 
+                disabled={sendMessage.isPending || !input.trim()}
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </form>
+          </div>
+          <div className="px-4 pb-4 space-y-2">
         <div className="flex gap-2">
           <Button
             onClick={getHint}
@@ -362,7 +380,8 @@ export default function ChatInterface({ config }: Props) {
             </Tooltip>
           </TooltipProvider>
         </div>
-      </div>
+        </>
+      )}
 
       <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
         <DialogContent className="max-w-md">
