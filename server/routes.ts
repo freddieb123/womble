@@ -256,6 +256,11 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Valid config ID is required" });
       }
 
+      if (!userName) {
+        console.error("Warning: userName is null");
+        return res.status(400).json({ error: "userName is required" });
+      }
+
       const parsedConfig = configSchema.parse(config);
 
       // Initialize session if it doesn't exist
