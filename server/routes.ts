@@ -442,15 +442,15 @@ export function registerRoutes(app: Express): Server {
 
       const prompt = `Analyze the user's interactions in this conversation based on these criteria: ${feedbackCriteria}
       
-Please provide your feedback in exactly this format:
+      Please provide your feedback in exactly this format:
       
-• [2-4 bullet points focusing ONLY on the user's conversation so far and how well they met the criteria]
+      • [2-4 bullet points focusing ONLY on the user's conversation so far and how well they met the criteria]
       
-Score: [1-10]
-[Brief one-line summary of overall performance]
+      Score: [1-10]
+      [Brief one-line summary of overall performance]
       
-Chat transcript:
-${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}`;
+      Chat transcript:
+      ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
@@ -522,14 +522,14 @@ ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${
       // Construct the prompt for hint generation
       const prompt = `Based on the following conversation and context, provide a brief, encouraging suggestion directly to the user about their next message or action. You should think of this as a hint that will help them improve their feedback score.
       
-Context:
-${userInstructions ? `Instructions that the user received: ${userInstructions}` : ''}
-Feedback Criteria: ${feedbackCriteria}
+      Context:
+      ${userInstructions ? `Instructions that the user received: ${userInstructions}` : ''}
+      Feedback Criteria: ${feedbackCriteria}
       
-Conversation so far:
-${messages.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}
+      Conversation so far:
+      ${messages.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}
       
-Provide a single, friendly sentence starting with "Try to" or "Consider" that directly tells the user what they could do next. Focus on practical communication advice that aligns with the feedback criteria.`;
+      Provide a single, friendly sentence starting with "Try to" or "Consider" that directly tells the user what they could do next. Focus on practical communication advice that aligns with the feedback criteria.`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
@@ -570,7 +570,8 @@ Provide a single, friendly sentence starting with "Try to" or "Consider" that di
 
       const conversationsWithMetadata = savedConversations.map(conv => ({
         messages: typeof conv.messages === 'string' ? JSON.parse(conv.messages) : conv.messages,
-        userName: conv.userName
+        userName: conv.userName,
+        sessionId: conv.sessionId // Add sessionId to the response
       }));
       res.json(conversationsWithMetadata);
     } catch (error: any) {
