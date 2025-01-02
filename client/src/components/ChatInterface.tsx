@@ -32,9 +32,12 @@ export default function ChatInterface({ config }: Props) {
 
   const searchParams = new URLSearchParams(window.location.search);
   const configId = searchParams.get('configId');
-  const [sessionId] = useState(() => crypto.randomUUID());
+  const urlSessionId = searchParams.get('sessionId');
   const isViewOnly = searchParams.get('viewOnly') === 'true';
   const urlUserName = searchParams.get('userName');
+
+  // Use the URL session ID if in view-only mode, otherwise generate a new one
+  const [sessionId] = useState(() => isViewOnly ? urlSessionId || crypto.randomUUID() : crypto.randomUUID());
   const [showNameModal, setShowNameModal] = useState(!isViewOnly && !urlUserName);
   const [userName, setUserName] = useState<string | null>(urlUserName);
 
