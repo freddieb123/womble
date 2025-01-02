@@ -416,7 +416,7 @@ export default function Home() {
                           View Current Feedback
                         </Button>
                       </div>
-                      <span className="text-sm text-muted-foreground">
+                      <span className="hidden md:inline text-sm text-muted-foreground">
                         {config.conversationCount} conversation{config.conversationCount !== 1 ? 's' : ''}
                       </span>
                     </div>
