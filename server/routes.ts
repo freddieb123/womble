@@ -326,7 +326,7 @@ export function registerRoutes(app: Express): Server {
 
       // Prepare messages for OpenAI API
       const enhancedSystemPrompt = userName
-        ? `${parsedConfig.systemPrompt}\nThe user's name is ${userName}. You MUST address them as "${userName}" in your first response and periodically use their name naturally in the conversation. For example, if they say "hello", respond with "Hello ${userName}!" or similar personalized greeting.`
+        ? `${parsedConfig.systemPrompt}\nThe user's name is ${userName}. You MUST address them by name in your responses. Your first response MUST include a personalized greeting using their name. Throughout the conversation, naturally weave in their name periodically to maintain a personal connection.`
         : parsedConfig.systemPrompt;
 
       const apiMessages = [
