@@ -245,6 +245,9 @@ export function registerRoutes(app: Express): Server {
       const sessionId = url.searchParams.get("sessionId") || crypto.randomUUID();
       const userName = url.searchParams.get('userName');
 
+      console.log("Debug - userName:", userName);
+      console.log("Debug - URL params:", Object.fromEntries(url.searchParams));
+
       if (!content || typeof content !== "string") {
         return res.status(400).send("Message content is required");
       }
