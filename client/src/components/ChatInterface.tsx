@@ -362,7 +362,7 @@ export default function ChatInterface({ config }: Props) {
             </Tooltip>
           </TooltipProvider>
         </div>
-        </>
+      </div>
       )}
 
       <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
