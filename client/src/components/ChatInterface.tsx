@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, X, Lightbulb } from "lucide-react";
+import { Send, Lightbulb } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -33,8 +33,10 @@ export default function ChatInterface({ config }: Props) {
   const searchParams = new URLSearchParams(window.location.search);
   const configId = searchParams.get('configId');
   const [sessionId] = useState(() => crypto.randomUUID());
-  const [showNameModal, setShowNameModal] = useState(true);
-  const [userName, setUserName] = useState<string | null>(null);
+  const isViewOnly = searchParams.get('viewOnly') === 'true';
+  const urlUserName = searchParams.get('userName');
+  const [showNameModal, setShowNameModal] = useState(!isViewOnly && !urlUserName);
+  const [userName, setUserName] = useState<string | null>(urlUserName);
 
   const { data: chatState = { messages: [], isLoading: false, error: null } } = useQuery<ChatState>({
     queryKey: [`/api/messages?configId=${configId}&sessionId=${sessionId}`],
@@ -204,10 +206,8 @@ export default function ChatInterface({ config }: Props) {
         }
       }
     };
-    
 
     scrollToBottom();
-    
 
     // Handle both scrolling and focus after messages change
     const timeout = setTimeout(() => {
@@ -216,12 +216,10 @@ export default function ChatInterface({ config }: Props) {
         inputRef.current.focus();
       }
     }, 100);
-    
 
     return () => clearTimeout(timeout);
   }, [chatState.messages, showNameModal]);
 
-  const isViewOnly = searchParams.get('viewOnly') === 'true';
 
   return (
     <div className="flex flex-col h-[600px]">
@@ -232,14 +230,16 @@ export default function ChatInterface({ config }: Props) {
           </h2>
         </div>
       )}
-      <UserNameModal 
-        open={showNameModal} 
-        onSubmit={(name) => {
-          setUserName(name);
-          setShowNameModal(false);
-          setTimeout(() => inputRef.current?.focus(), 0);
-        }} 
-      />
+      {showNameModal && (
+        <UserNameModal 
+          open={showNameModal} 
+          onSubmit={(name) => {
+            setUserName(name);
+            setShowNameModal(false);
+            setTimeout(() => inputRef.current?.focus(), 0);
+          }} 
+        />
+      )}
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         <div className="space-y-4">
           {chatState.messages.map((message: Message) => (
@@ -254,7 +254,6 @@ export default function ChatInterface({ config }: Props) {
           )}
         </div>
       </ScrollArea>
-
       {!isViewOnly && (
         <>
           <div className="p-4 border-t">
@@ -293,7 +292,6 @@ export default function ChatInterface({ config }: Props) {
                     <div className="flex-1">
                       <Button
                         onClick={async () => {
-                          // Existing feedback logic
                           if (!config.feedbackCriteria) {
                             toast({
                               variant: "destructive",
