@@ -215,8 +215,16 @@ export default function Home() {
     }
   };
 
-  const handleOpenChat = (configId: number) => {
-    window.open(`${window.location.origin}/chat?configId=${configId}`, '_blank');
+  const handleViewChat = (conversation: { messages: any[], userName: string | null, configId: number }) => {
+    const sessionId = conversation.messages[0]?.sessionId || crypto.randomUUID();
+    const url = new URL(`${window.location.origin}/chat`);
+    url.searchParams.set('configId', conversation.configId.toString());
+    url.searchParams.set('sessionId', sessionId);
+    url.searchParams.set('viewOnly', 'true');
+    if (conversation.userName) {
+      url.searchParams.set('userName', conversation.userName);
+    }
+    window.open(url.toString(), '_blank');
   };
 
   const handleViewFeedback = (configId: number) => {
@@ -418,6 +426,9 @@ export default function Home() {
                         >
                           <BarChart2 className="h-4 w-4 mr-2" />
                           View Current Feedback
+                        </Button>
+                        <Button size="sm" onClick={() => handleViewChat({messages: [], userName: null, configId: config.id})}>
+                          View Chat
                         </Button>
                       </div>
                       <span className="text-sm text-muted-foreground">

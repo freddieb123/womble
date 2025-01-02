@@ -16,7 +16,7 @@ interface ConversationFeedback {
 interface ConversationData {
   messages: Message[];
   userName: string | null;
-  sessionId: string; // Added sessionId
+  sessionId: string;
 }
 
 export default function ConversationAnalysis() {
@@ -30,7 +30,6 @@ export default function ConversationAnalysis() {
   const searchParams = new URLSearchParams(window.location.search);
   const configId = searchParams.get('configId');
 
-  // Fetch config data
   const { data: config } = useQuery({
     queryKey: [`/api/chat-configs/${configId}`],
     enabled: !!configId,
@@ -212,7 +211,16 @@ export default function ConversationAnalysis() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => window.open(`/chat?configId=${configId}&sessionId=${conversation.sessionId}&viewOnly=true`, '_blank')}
+                          onClick={() => {
+                            const url = new URL(`${window.location.origin}/chat`);
+                            url.searchParams.set('configId', configId || '');
+                            url.searchParams.set('sessionId', conversation.sessionId);
+                            url.searchParams.set('viewOnly', 'true');
+                            if (conversation.userName) {
+                              url.searchParams.set('userName', conversation.userName);
+                            }
+                            window.open(url.toString(), '_blank');
+                          }}
                         >
                           <span className="text-sm">View Chat</span>
                         </Button>
