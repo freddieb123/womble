@@ -218,8 +218,18 @@ export default function ChatInterface({ config }: Props) {
     return () => clearTimeout(timeout);
   }, [chatState.messages, showNameModal]);
 
+  const searchParams = new URLSearchParams(window.location.search);
+  const isViewOnly = searchParams.get('viewOnly') === 'true';
+
   return (
     <div className="flex flex-col h-[600px]">
+      {isViewOnly && userName && (
+        <div className="p-4 border-b bg-blue-50">
+          <h2 className="text-lg font-semibold text-blue-900">
+            {userName}'s Chat History
+          </h2>
+        </div>
+      )}
       <UserNameModal 
         open={showNameModal} 
         onSubmit={(name) => {
@@ -243,7 +253,7 @@ export default function ChatInterface({ config }: Props) {
         </div>
       </ScrollArea>
 
-      <div className="p-4 border-t">
+      {!isViewOnly && <div className="p-4 border-t">
         <form onSubmit={handleSubmit} className="flex gap-2">
           <Input
             value={input}
@@ -262,7 +272,8 @@ export default function ChatInterface({ config }: Props) {
         </form>
       </div>
 
-      <div className="px-4 pb-4 space-y-2">
+      </div>}
+      {!isViewOnly && <div className="px-4 pb-4 space-y-2">
         <div className="flex gap-2">
           <Button
             onClick={getHint}

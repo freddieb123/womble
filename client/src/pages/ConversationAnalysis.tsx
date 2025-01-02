@@ -16,6 +16,7 @@ interface ConversationFeedback {
 interface ConversationData {
   messages: Message[];
   userName: string | null;
+  sessionId: string; // Added sessionId
 }
 
 export default function ConversationAnalysis() {
@@ -202,9 +203,20 @@ export default function ConversationAnalysis() {
                 <Card key={index}>
                   <CardHeader>
                     <h2 className="text-lg font-semibold">
-                      {conversation.userName 
-                        ? `${conversation.userName}'s Conversation` 
-                        : `Conversation ${index + 1}`}
+                      <div className="flex justify-between items-center">
+                        <span>
+                          {conversation.userName 
+                            ? `${conversation.userName}'s Conversation` 
+                            : `Conversation ${index + 1}`}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(`/chat?configId=${configId}&sessionId=${conversation.sessionId}&viewOnly=true`, '_blank')}
+                        >
+                          <span className="text-sm">View Chat</span>
+                        </Button>
+                      </div>
                     </h2>
                   </CardHeader>
                   <CardContent>
