@@ -413,7 +413,8 @@ export default function Home() {
                           disabled={!config.feedbackCriteria || config.conversationCount === 0}
                         >
                           <BarChart2 className="h-4 w-4 mr-2" />
-                          View Current Feedback
+                          <span className="md:hidden">View Feedback</span>
+                          <span className="hidden md:inline">View Current Feedback</span>
                         </Button>
                       </div>
                       <span className="hidden md:inline text-sm text-muted-foreground">
