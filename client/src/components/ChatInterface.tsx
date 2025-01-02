@@ -22,9 +22,10 @@ interface Props {
   sessionId: string;
   userName: string | null;
   isViewOnly: boolean;
+  onUserNameSubmit: (name: string) => string; // Added onUserNameSubmit prop
 }
 
-export default function ChatInterface({ config, sessionId, userName, isViewOnly }: Props) {
+export default function ChatInterface({ config, sessionId, userName, isViewOnly, onUserNameSubmit }: Props) {
   const [input, setInput] = useState("");
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -239,6 +240,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly 
         <UserNameModal
           open={showNameModal}
           onSubmit={(name) => {
+            const newUrl = onUserNameSubmit(name); // Use the onUserNameSubmit prop
             setShowNameModal(false);
             setTimeout(() => inputRef.current?.focus(), 0);
           }}

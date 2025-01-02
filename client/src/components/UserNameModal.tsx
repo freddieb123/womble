@@ -20,7 +20,7 @@ export default function UserNameModal({ open, onSubmit }: UserNameModalProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={() => onSubmit(name.trim())}>
+    <Dialog open={open}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex justify-between items-center">

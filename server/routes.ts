@@ -243,7 +243,8 @@ export function registerRoutes(app: Express): Server {
       const url = new URL(req.url, `http://${req.headers.host}`);
       const configId = parseInt(url.searchParams.get("configId") || "");
       const sessionId = url.searchParams.get("sessionId") || crypto.randomUUID();
-      
+      const userName = url.searchParams.get('userName');
+
       if (!content || typeof content !== "string") {
         return res.status(400).send("Message content is required");
       }
@@ -297,7 +298,6 @@ export function registerRoutes(app: Express): Server {
               eq(conversations.sessionId, sessionId)
             ));
         } else {
-          const userName = url.searchParams.get('userName');
           await db
             .insert(conversations)
             .values({
@@ -325,7 +325,6 @@ export function registerRoutes(app: Express): Server {
       res.setHeader('Connection', 'keep-alive');
 
       // Prepare messages for OpenAI API
-      const userName = url.searchParams.get('userName');
       const enhancedSystemPrompt = userName 
         ? `${parsedConfig.systemPrompt}\nThe user's name is ${userName}. Address them by their name naturally in your responses when appropriate.`
         : parsedConfig.systemPrompt;
@@ -424,6 +423,7 @@ export function registerRoutes(app: Express): Server {
       const hasUserMessage = messagesToAnalyze.some(m => m.role === 'user');
       const hasAssistantMessage = messagesToAnalyze.some(m => m.role === 'assistant');
       
+
       if (!hasUserMessage || !hasAssistantMessage) {
         return res.status(400).json({ 
           error: "Please have at least one complete exchange before requesting feedback." 
@@ -470,14 +470,17 @@ export function registerRoutes(app: Express): Server {
         throw new Error("Failed to get response from OpenAI");
       }
       
+
       // Extract score and summary
       const scoreMatch = response.match(/Score:\s*(\d+)/i);
       const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
       
+
       // Extract summary (the line after the score)
       const summaryMatch = response.match(/Score:\s*\d+\s*\n([^\n]+)/i);
       const summary = summaryMatch ? summaryMatch[1].trim() : null;
       
+
       // Get bullet points (everything before "Score:")
       const bullets = response
         .split(/Score:/i)[0]
@@ -571,7 +574,7 @@ export function registerRoutes(app: Express): Server {
       const conversationsWithMetadata = savedConversations.map(conv => ({
         messages: typeof conv.messages === 'string' ? JSON.parse(conv.messages) : conv.messages,
         userName: conv.userName,
-        sessionId: conv.sessionId // Add sessionId to the response
+        sessionId: conv.sessionId 
       }));
       res.json(conversationsWithMetadata);
     } catch (error: any) {

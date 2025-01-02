@@ -7,10 +7,10 @@ import { AlertCircle } from "lucide-react";
 import { SelectChatConfig } from "@db/schema";
 
 export default function UserView() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const searchParams = new URLSearchParams(window.location.search);
   const configId = searchParams.get('configId');
-  const sessionId = searchParams.get('sessionId') || crypto.randomUUID(); // Generate sessionId if not provided
+  const sessionId = searchParams.get('sessionId') || crypto.randomUUID();
   const userName = searchParams.get('userName');
   const isViewOnly = searchParams.get('viewOnly') === 'true';
 
@@ -27,6 +27,17 @@ export default function UserView() {
     retry: 1,
     staleTime: Infinity,
   });
+
+  const updateUrlWithUserName = (name: string) => {
+    const newParams = new URLSearchParams(window.location.search);
+    newParams.set('userName', name);
+    if (!newParams.has('sessionId')) {
+      newParams.set('sessionId', sessionId);
+    }
+    const newUrl = `${window.location.pathname}?${newParams.toString()}`;
+    window.history.replaceState({}, '', newUrl);
+    return newUrl;
+  };
 
   if (!configId) {
     return (
@@ -88,7 +99,13 @@ export default function UserView() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         <Card className="p-6">
-          <ChatInterface config={config} sessionId={sessionId} userName={userName} isViewOnly={isViewOnly} />
+          <ChatInterface 
+            config={config} 
+            sessionId={sessionId} 
+            userName={userName} 
+            isViewOnly={isViewOnly}
+            onUserNameSubmit={updateUrlWithUserName} 
+          />
         </Card>
       </div>
     </div>
