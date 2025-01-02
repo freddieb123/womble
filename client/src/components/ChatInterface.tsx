@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Lightbulb } from "lucide-react";
+import { Send, Lightbulb, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -12,6 +12,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import MessageBubble from "./MessageBubble";
 import UserNameModal from "./UserNameModal";
 import type { Message, ChatState, AdminConfig } from "@/lib/types";
@@ -218,6 +219,14 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly 
 
   return (
     <div className="flex flex-col h-[600px]">
+      {config.userInstructions && !isViewOnly && (
+        <Alert className="mb-4">
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            {config.userInstructions}
+          </AlertDescription>
+        </Alert>
+      )}
       {isViewOnly && userName && (
         <div className="p-4 border-b bg-blue-50">
           <h2 className="text-lg font-semibold text-blue-900">
