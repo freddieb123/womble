@@ -38,30 +38,20 @@ export default function ConversationAnalysis() {
   const handleViewChat = (conversation: ConversationData) => {
     try {
       // Log the conversation data for debugging
-      console.log('Conversation data:', conversation);
-      console.log('First message:', conversation.messages[0]);
+      console.log('Opening conversation:', conversation);
 
-      // Try to get sessionId from conversation or first message
-      let sessionId = conversation.sessionId;
-      if (!sessionId && conversation.messages.length > 0) {
-        const firstMessage = conversation.messages[0];
-        // Log the first message structure
-        console.log('First message structure:', JSON.stringify(firstMessage, null, 2));
-        sessionId = firstMessage?.sessionId;
-      }
-
-      if (!sessionId) {
+      if (!configId) {
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Could not find session ID for this conversation",
+          description: "No config ID provided",
         });
         return;
       }
 
       const url = new URL(`${window.location.origin}/chat`);
-      url.searchParams.set('configId', configId || '');
-      url.searchParams.set('sessionId', sessionId);
+      url.searchParams.set('configId', configId);
+      url.searchParams.set('sessionId', conversation.sessionId);
       url.searchParams.set('viewOnly', 'true');
       if (conversation.userName) {
         url.searchParams.set('userName', conversation.userName);
