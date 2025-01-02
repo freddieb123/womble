@@ -204,17 +204,29 @@ export default function ConversationAnalysis() {
                     <h2 className="text-lg font-semibold">
                       <div className="flex justify-between items-center">
                         <span>
-                          {conversation.userName 
-                            ? `${conversation.userName}'s Conversation` 
+                          {conversation.userName
+                            ? `${conversation.userName}'s Conversation`
                             : `Conversation ${index + 1}`}
                         </span>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => {
+                            // Find the first message's sessionId, as all messages in a conversation share the same sessionId
+                            const sessionId = conversation.messages.length > 0 ? conversation.messages[0].sessionId : conversation.sessionId;
+
+                            if (!sessionId) {
+                              toast({
+                                variant: "destructive",
+                                title: "Error",
+                                description: "Could not find session ID for this conversation",
+                              });
+                              return;
+                            }
+
                             const url = new URL(`${window.location.origin}/chat`);
                             url.searchParams.set('configId', configId || '');
-                            url.searchParams.set('sessionId', conversation.sessionId);
+                            url.searchParams.set('sessionId', sessionId);
                             url.searchParams.set('viewOnly', 'true');
                             if (conversation.userName) {
                               url.searchParams.set('userName', conversation.userName);
