@@ -12,6 +12,7 @@ export interface ChatState {
 }
 
 export interface AdminConfig {
+  id?: number;
   title: string;
   systemPrompt: string;
   userInstructions: string;

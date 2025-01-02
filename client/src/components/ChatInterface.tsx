@@ -18,9 +18,12 @@ import type { Message, ChatState, AdminConfig } from "@/lib/types";
 
 interface Props {
   config: AdminConfig;
+  sessionId: string;
+  userName: string | null;
+  isViewOnly: boolean;
 }
 
-export default function ChatInterface({ config }: Props) {
+export default function ChatInterface({ config, sessionId, userName, isViewOnly }: Props) {
   const [input, setInput] = useState("");
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -30,20 +33,11 @@ export default function ChatInterface({ config }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const searchParams = new URLSearchParams(window.location.search);
-  const configId = searchParams.get('configId');
-  const urlSessionId = searchParams.get('sessionId');
-  const isViewOnly = searchParams.get('viewOnly') === 'true';
-  const urlUserName = searchParams.get('userName');
-
-  // Use the URL session ID if in view-only mode, otherwise generate a new one
-  const [sessionId] = useState(() => isViewOnly ? urlSessionId || crypto.randomUUID() : crypto.randomUUID());
-  const [showNameModal, setShowNameModal] = useState(!isViewOnly && !urlUserName);
-  const [userName, setUserName] = useState<string | null>(urlUserName);
+  const [showNameModal, setShowNameModal] = useState(!isViewOnly && !userName);
 
   const { data: chatState = { messages: [], isLoading: false, error: null } } = useQuery<ChatState>({
-    queryKey: [`/api/messages?configId=${configId}&sessionId=${sessionId}`],
-    enabled: !!configId,
+    queryKey: [`/api/messages?configId=${config.id}&sessionId=${sessionId}`],
+    enabled: !!config.id && !!sessionId,
   });
 
   const hasEnoughMessages = chatState.messages.length >= 5;
@@ -93,9 +87,7 @@ export default function ChatInterface({ config }: Props) {
   const sendMessage = useMutation({
     mutationFn: async (content: string) => {
       const url = new URL("/api/messages", window.location.origin);
-      const searchParams = new URLSearchParams(window.location.search);
-      const configId = searchParams.get('configId');
-      url.searchParams.set('configId', configId || '');
+      url.searchParams.set('configId', config.id?.toString() || '');
       url.searchParams.set('sessionId', sessionId);
       if (userName) {
         url.searchParams.set('userName', userName);
@@ -119,7 +111,7 @@ export default function ChatInterface({ config }: Props) {
         timestamp: Date.now()
       };
 
-      queryClient.setQueryData<ChatState>([`/api/messages?configId=${configId}&sessionId=${sessionId}`], (old) => ({
+      queryClient.setQueryData<ChatState>([`/api/messages?configId=${config.id}&sessionId=${sessionId}`], (old) => ({
         messages: [...(old?.messages || []), userMessage],
         isLoading: false,
         error: null
@@ -162,7 +154,7 @@ export default function ChatInterface({ config }: Props) {
               assistantMessage.content += parsed.content;
 
               // Update UI immediately
-              queryClient.setQueryData<ChatState>([`/api/messages?configId=${configId}&sessionId=${sessionId}`], (old) => {
+              queryClient.setQueryData<ChatState>([`/api/messages?configId=${config.id}&sessionId=${sessionId}`], (old) => {
                 const existingMessages = old?.messages || [];
                 const updatedMessages = existingMessages.filter(m => m.id !== assistantMessage.id);
                 return {
@@ -237,7 +229,6 @@ export default function ChatInterface({ config }: Props) {
         <UserNameModal 
           open={showNameModal} 
           onSubmit={(name) => {
-            setUserName(name);
             setShowNameModal(false);
             setTimeout(() => inputRef.current?.focus(), 0);
           }} 
