@@ -10,7 +10,7 @@ export default function UserView() {
   const [location] = useLocation();
   const searchParams = new URLSearchParams(window.location.search);
   const configId = searchParams.get('configId');
-  const sessionId = searchParams.get('sessionId');
+  const sessionId = searchParams.get('sessionId') || crypto.randomUUID(); // Generate sessionId if not provided
   const userName = searchParams.get('userName');
   const isViewOnly = searchParams.get('viewOnly') === 'true';
 
@@ -28,14 +28,14 @@ export default function UserView() {
     staleTime: Infinity,
   });
 
-  if (!configId || !sessionId) {
+  if (!configId) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
         <div className="max-w-4xl mx-auto">
           <Card className="p-6">
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-red-500" />
-              <p className="text-sm text-red-700">Missing required parameters</p>
+              <p className="text-sm text-red-700">Config ID is required</p>
             </div>
           </Card>
         </div>
