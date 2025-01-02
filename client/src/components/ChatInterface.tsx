@@ -227,7 +227,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
           <Info className="h-4 w-4" />
           <AlertDescription>
             <div className="font-semibold text-lg mb-2">{config.title}</div>
-            {config.userInstructions}
+            <pre className="font-sans whitespace-pre-wrap">{config.userInstructions}</pre>
           </AlertDescription>
         </Alert>
       )}
