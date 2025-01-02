@@ -218,7 +218,6 @@ export default function ChatInterface({ config }: Props) {
     return () => clearTimeout(timeout);
   }, [chatState.messages, showNameModal]);
 
-  const searchParams = new URLSearchParams(window.location.search);
   const isViewOnly = searchParams.get('viewOnly') === 'true';
 
   return (
