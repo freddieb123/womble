@@ -35,6 +35,51 @@ export default function ConversationAnalysis() {
     enabled: !!configId,
   });
 
+  const handleViewChat = (conversation: ConversationData) => {
+    try {
+      // Log the conversation data for debugging
+      console.log('Conversation data:', conversation);
+      console.log('First message:', conversation.messages[0]);
+
+      // Try to get sessionId from conversation or first message
+      let sessionId = conversation.sessionId;
+      if (!sessionId && conversation.messages.length > 0) {
+        const firstMessage = conversation.messages[0];
+        // Log the first message structure
+        console.log('First message structure:', JSON.stringify(firstMessage, null, 2));
+        sessionId = firstMessage?.sessionId;
+      }
+
+      if (!sessionId) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Could not find session ID for this conversation",
+        });
+        return;
+      }
+
+      const url = new URL(`${window.location.origin}/chat`);
+      url.searchParams.set('configId', configId || '');
+      url.searchParams.set('sessionId', sessionId);
+      url.searchParams.set('viewOnly', 'true');
+      if (conversation.userName) {
+        url.searchParams.set('userName', conversation.userName);
+      }
+
+      // Log the final URL for debugging
+      console.log('Opening chat URL:', url.toString());
+      window.open(url.toString(), '_blank');
+    } catch (error) {
+      console.error('Error in handleViewChat:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to open chat view",
+      });
+    }
+  };
+
   const regenerateAllFeedback = async () => {
     if (!config?.feedbackCriteria || conversations.length === 0) return;
 
@@ -100,6 +145,9 @@ export default function ConversationAnalysis() {
           throw new Error(`Failed to fetch conversations: ${await conversationsResponse.text()}`);
         }
         const conversationsData = await conversationsResponse.json();
+
+        // Log the fetched conversations data
+        console.log('Fetched conversations:', conversationsData);
 
         if (!Array.isArray(conversationsData) || conversationsData.length === 0) {
           throw new Error("No conversations found for this chat GPT");
@@ -211,28 +259,7 @@ export default function ConversationAnalysis() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            // Find the first message's sessionId, as all messages in a conversation share the same sessionId
-                            const sessionId = conversation.messages.length > 0 ? conversation.messages[0].sessionId : conversation.sessionId;
-
-                            if (!sessionId) {
-                              toast({
-                                variant: "destructive",
-                                title: "Error",
-                                description: "Could not find session ID for this conversation",
-                              });
-                              return;
-                            }
-
-                            const url = new URL(`${window.location.origin}/chat`);
-                            url.searchParams.set('configId', configId || '');
-                            url.searchParams.set('sessionId', sessionId);
-                            url.searchParams.set('viewOnly', 'true');
-                            if (conversation.userName) {
-                              url.searchParams.set('userName', conversation.userName);
-                            }
-                            window.open(url.toString(), '_blank');
-                          }}
+                          onClick={() => handleViewChat(conversation)}
                         >
                           <span className="text-sm">View Chat</span>
                         </Button>
