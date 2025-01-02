@@ -3,6 +3,7 @@ export interface Message {
   content: string;
   role: 'user' | 'assistant';
   timestamp: number;
+  sessionId: string;  // Added sessionId to the Message interface
 }
 
 export interface ChatState {
