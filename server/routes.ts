@@ -342,9 +342,16 @@ export function registerRoutes(app: Express): Server {
       res.setHeader('Connection', 'keep-alive');
 
       // Prepare messages for OpenAI API
-      const enhancedSystemPrompt = userName
-        ? `${parsedConfig.systemPrompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${userName}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${userName}!" or "Hi ${userName}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much!`
-        : parsedConfig.systemPrompt;
+      const enhancedSystemPrompt = (() => {
+        let prompt = parsedConfig.systemPrompt;
+        if (config.systemPromptFile) {
+          const fileContent = Buffer.from(config.systemPromptFile.content, 'base64').toString('utf-8');
+          prompt += `\n\nAttached file content (${config.systemPromptFile.name}):\n${fileContent}`;
+        }
+        return userName
+          ? `${prompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${userName}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${userName}!" or "Hi ${userName}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much!`
+          : prompt;
+      })();
 
       const apiMessages = [
         { role: "system", content: enhancedSystemPrompt },
