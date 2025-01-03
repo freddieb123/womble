@@ -12,12 +12,6 @@ export interface ChatState {
   error: string | null;
 }
 
-interface SystemPromptFile {
-  name: string;
-  content: string;
-  type: string;
-}
-
 export interface AdminConfig {
   id?: number;
   title: string;
@@ -26,5 +20,4 @@ export interface AdminConfig {
   feedbackCriteria: string;
   temperature: number;
   maxTokens: number;
-  systemPromptFile?: SystemPromptFile | null;
 }

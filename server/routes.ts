@@ -7,18 +7,11 @@ import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
 
-const systemPromptFileSchema = z.object({
-  name: z.string(),
-  content: z.string(),
-  type: z.string()
-}).nullable().optional();
-
 const chatConfigSchema = z.object({
   title: z.string().min(1, "Title is required"),
   systemPrompt: z.string().min(1, "System prompt is required"),
   userInstructions: z.string().nullable(),
   feedbackCriteria: z.string().nullable(),
-  systemPromptFile: systemPromptFileSchema
 });
 
 if (!process.env.OPENAI_API_KEY) {
@@ -106,7 +99,6 @@ export function registerRoutes(app: Express): Server {
         systemPrompt: parsedConfig.systemPrompt,
         userInstructions: parsedConfig.userInstructions,
         feedbackCriteria: parsedConfig.feedbackCriteria,
-        systemPromptFile: parsedConfig.systemPromptFile ? JSON.stringify(parsedConfig.systemPromptFile) : null,
       }).returning();
 
       console.log("Saved chat config:", result[0]);
@@ -178,7 +170,6 @@ export function registerRoutes(app: Express): Server {
           systemPrompt: parsedConfig.systemPrompt,
           userInstructions: parsedConfig.userInstructions,
           feedbackCriteria: parsedConfig.feedbackCriteria,
-          systemPromptFile: parsedConfig.systemPromptFile ? JSON.stringify(parsedConfig.systemPromptFile) : null,
         })
         .where(eq(chatConfigs.id, id))
         .returning();
@@ -342,16 +333,9 @@ export function registerRoutes(app: Express): Server {
       res.setHeader('Connection', 'keep-alive');
 
       // Prepare messages for OpenAI API
-      const enhancedSystemPrompt = (() => {
-        let prompt = parsedConfig.systemPrompt;
-        if (config.systemPromptFile) {
-          const fileContent = Buffer.from(config.systemPromptFile.content, 'base64').toString('utf-8');
-          prompt += `\n\nAttached file content (${config.systemPromptFile.name}):\n${fileContent}`;
-        }
-        return userName
-          ? `${prompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${userName}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${userName}!" or "Hi ${userName}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much!`
-          : prompt;
-      })();
+      const enhancedSystemPrompt = userName
+        ? `${parsedConfig.systemPrompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${userName}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${userName}!" or "Hi ${userName}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much!`
+        : parsedConfig.systemPrompt;
 
       const apiMessages = [
         { role: "system", content: enhancedSystemPrompt },

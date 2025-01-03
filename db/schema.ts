@@ -17,7 +17,6 @@ export const chatConfigs = pgTable("chat_configs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   deleted: boolean("deleted").default(false).notNull(),
   deletedAt: timestamp("deleted_at"),
-  systemPromptFile: jsonb("system_prompt_file").default(null),
 });
 
 export const conversations = pgTable("conversations", {
