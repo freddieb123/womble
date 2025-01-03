@@ -6,10 +6,16 @@ import { Send, Lightbulb, Info, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AdminConfig } from "@/lib/types";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import MessageBubble from "./MessageBubble";
 import UserNameModal from "./UserNameModal";
-import type { Message, ChatState } from "@/lib/types";
+import type { Message, ChatState, AdminConfig } from "@/lib/types";
 
 interface Props {
   config: AdminConfig;
@@ -298,9 +304,9 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
           {pastedImage && (
             <div className="px-4 pb-2">
               <div className="relative inline-block">
-                <img 
-                  src={pastedImage} 
-                  alt="Pasted screenshot" 
+                <img
+                  src={pastedImage}
+                  alt="Pasted screenshot"
                   className="max-h-32 rounded-lg border border-gray-200"
                 />
                 <button

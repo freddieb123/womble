@@ -1,9 +1,14 @@
+export interface MessageContent {
+  text: string;
+  image: string | null;
+}
+
 export interface Message {
   id: string;
-  content: string;
+  content: string | MessageContent;
   role: 'user' | 'assistant';
   timestamp: number;
-  sessionId: string;  // Added sessionId to the Message interface
+  sessionId: string;
 }
 
 export interface ChatState {
