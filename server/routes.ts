@@ -411,60 +411,60 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/chat-feedback", async (req: Request, res: Response) => {
     try {
       const { feedbackCriteria, messages } = req.body;
-      const sessionId = getSessionId(req);
-      const configId = parseInt(new URL(req.url, `http://${req.headers.host}`).searchParams.get("configId") || "0");
-
-      console.log('Received feedback request:', { feedbackCriteria, messageCount: messages?.length, configId, sessionId });
 
       if (!feedbackCriteria) {
         return res.status(400).json({ error: "Feedback criteria is required" });
       }
 
-      const messagesToAnalyze = messages || (sessions[sessionId] || []);
-
-      if (!Array.isArray(messagesToAnalyze) || messagesToAnalyze.length === 0) {
+      if (!Array.isArray(messages) || messages.length === 0) {
         return res.status(400).json({
           error: "No chat messages to analyze. Please have a conversation first before requesting feedback."
         });
       }
 
-      const hasUserMessage = messagesToAnalyze.some(m => m.role === 'user');
-      const hasAssistantMessage = messagesToAnalyze.some(m => m.role === 'assistant');
-
+      const hasUserMessage = messages.some(m => m.role === 'user');
+      const hasAssistantMessage = messages.some(m => m.role === 'assistant');
 
       if (!hasUserMessage || !hasAssistantMessage) {
         return res.status(400).json({
-          error: "Please have at least one complete exchange before requesting feedback."
+          error: "Please complete at least one exchange before requesting feedback."
         });
       }
 
-      if (configId) {
-        const conversation = await db.query.conversations.findFirst({
-          where: and(
-            eq(conversations.configId, configId),
-            eq(conversations.sessionId, sessionId)
-          )
-        });
-      }
+      // Format messages to include both text and image content
+      const formattedMessages = messages.map(m => {
+        if (typeof m.content === 'string') {
+          return `${m.role}: ${m.content}`;
+        }
+
+        let content = m.content.text || '';
+        if (m.content.image) {
+          content += ' [Image shared]';
+        }
+        return `${m.role}: ${content}`;
+      }).join('\n');
 
       const prompt = `Analyze the user's interactions in this conversation based on these criteria: ${feedbackCriteria}
+
+      Consider both text messages and any shared images when providing feedback.
 
       Please provide your feedback in exactly this format:
 
       • [3 bullet points focusing ONLY on the user's conversation so far and how well they met the criteria]
 
       Score: [1-10]
-      [Brief one-line summary of overall performance. Make sure you don't give anything above a 5 if they haven't yet come to an agreement]
+      [Brief one-line summary of overall performance]
 
       Chat transcript:
-      ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}`;
+      ${formattedMessages}`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+        model: "gpt-4o",
         messages: [
           {
             role: "system",
-            content: "You are an expert at evaluating user communication. Focus your feedback solely on the user's messages and interactions, taking into account how they respond to the AI assistant. Address the user directly using 'you' in your feedback. For example: 'You maintained clear communication' instead of 'The user maintained clear communication'. Keep feedback points brief, clear, and actionable. Always follow the exact format specified, with 2-4 bullet points followed by a score and one-line summary."
+            content: "You are an expert at evaluating user communication. Focus your feedback solely on the user's messages and interactions, taking into account both text messages and shared images. Address the user directly using 'you' in your feedback. For example: 'You maintained clear communication' instead of 'The user maintained clear communication'. Keep feedback points brief, clear, and actionable. Always follow the exact format specified, with 3 bullet points followed by a score and one-line summary."
           },
           { role: "user", content: prompt }
         ],
@@ -476,7 +476,6 @@ export function registerRoutes(app: Express): Server {
       if (!response) {
         throw new Error("Failed to get response from OpenAI");
       }
-
 
       const scoreMatch = response.match(/Score:\s*(\d+)/i);
       const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
@@ -490,25 +489,11 @@ export function registerRoutes(app: Express): Server {
         .filter(bullet => bullet.trim())
         .map(bullet => bullet.trim());
 
-      const feedbackData = {
+      res.json({
         bullets,
         score,
-        summary,
-        rawFeedback: response
-      };
-
-      if (configId) {
-        await db.update(conversations)
-          .set({ feedback: JSON.stringify(feedbackData) })
-          .where(
-            and(
-              eq(conversations.configId, configId),
-              eq(conversations.sessionId, sessionId)
-            )
-          );
-      }
-
-      res.json(feedbackData);
+        summary
+      });
     } catch (error: any) {
       console.error("Error getting feedback:", error);
       res.status(500).json({ error: error.message });
