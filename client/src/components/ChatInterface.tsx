@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Lightbulb, Info } from "lucide-react";
+import { Send, Lightbulb, Info, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -22,11 +22,12 @@ interface Props {
   sessionId: string;
   userName: string | null;
   isViewOnly: boolean;
-  onUserNameSubmit: (name: string) => string; // Added onUserNameSubmit prop
+  onUserNameSubmit: (name: string) => string;
 }
 
 export default function ChatInterface({ config, sessionId, userName, isViewOnly, onUserNameSubmit }: Props) {
   const [input, setInput] = useState("");
+  const [pastedImage, setPastedImage] = useState<string | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [feedbackData, setFeedbackData] = useState<{ bullets: string[], score: number | null, summary: string | null }>({ bullets: [], score: null, summary: null });
@@ -44,47 +45,33 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
 
   const hasEnoughMessages = chatState.messages.length >= 5;
 
-  const getHint = async () => {
-    if (!config.feedbackCriteria) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No feedback criteria specified for this chat."
-      });
-      return;
-    }
+  // Handle paste event
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      if (!e.clipboardData) return;
 
-    try {
-      setIsGettingHint(true);
-      const response = await fetch("/api/chat-hint", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          feedbackCriteria: config.feedbackCriteria,
-          userInstructions: config.userInstructions,
-          messages: chatState.messages
-        }),
-      });
+      // Check for images in clipboard
+      const items = e.clipboardData.items;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const blob = items[i].getAsFile();
+          if (!blob) continue;
 
-      if (!response.ok) {
-        throw new Error(await response.text());
+          // Convert blob to base64
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const base64String = event.target?.result as string;
+            setPastedImage(base64String);
+          };
+          reader.readAsDataURL(blob);
+          break;
+        }
       }
+    };
 
-      const hint = await response.json();
-      toast({
-        title: "Hint",
-        description: hint.message,
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to get hint",
-      });
-    } finally {
-      setIsGettingHint(false);
-    }
-  };
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, []);
 
   const sendMessage = useMutation({
     mutationFn: async (content: string) => {
@@ -95,10 +82,16 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
         url.searchParams.set('userName', userName);
       }
 
+      // Create message content with image if present
+      const messageContent = {
+        text: content,
+        image: pastedImage
+      };
+
       const response = await fetch(url.toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, config }),
+        body: JSON.stringify({ content: messageContent, config }),
       });
 
       if (!response.ok) {
@@ -108,7 +101,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
       // Add the user message immediately
       const userMessage: Message = {
         id: crypto.randomUUID(),
-        content,
+        content: messageContent,
         role: 'user',
         timestamp: Date.now(),
         sessionId
@@ -178,6 +171,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
     },
     onSuccess: () => {
       setInput("");
+      setPastedImage(null);
       inputRef.current?.focus();
     },
     onError: (error) => {
@@ -191,7 +185,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (input.trim()) {
+    if (input.trim() || pastedImage) {
       sendMessage.mutate(input.trim());
     }
   };
@@ -242,7 +236,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
         <UserNameModal
           open={showNameModal}
           onSubmit={(name) => {
-            const newUrl = onUserNameSubmit(name); // Use the onUserNameSubmit prop
+            const newUrl = onUserNameSubmit(name);
             setShowNameModal(false);
             setTimeout(() => inputRef.current?.focus(), 0);
           }}
@@ -264,19 +258,36 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
       </ScrollArea>
       {!isViewOnly && (
         <>
+          {pastedImage && (
+            <div className="px-4 pb-2">
+              <div className="relative inline-block">
+                <img 
+                  src={pastedImage} 
+                  alt="Pasted screenshot" 
+                  className="max-h-32 rounded-lg border border-gray-200"
+                />
+                <button
+                  onClick={() => setPastedImage(null)}
+                  className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-sm border border-gray-200"
+                >
+                  <X className="h-4 w-4 text-gray-500" />
+                </button>
+              </div>
+            </div>
+          )}
           <div className="p-4 border-t">
             <form onSubmit={handleSubmit} className="flex gap-2">
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Type your message..."
+                placeholder={pastedImage ? "Add a message (optional) and press send..." : "Type your message or paste an image..."}
                 className="flex-1"
                 disabled={sendMessage.isPending || showNameModal}
                 ref={inputRef}
               />
               <Button
                 type="submit"
-                disabled={sendMessage.isPending || !input.trim()}
+                disabled={sendMessage.isPending || (!input.trim() && !pastedImage)}
               >
                 <Send className="h-4 w-4" />
               </Button>
