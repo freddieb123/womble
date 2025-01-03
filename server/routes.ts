@@ -7,6 +7,12 @@ import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
 
+// Update schema to support both text and image content
+const messageContentSchema = z.object({
+  text: z.string(),
+  image: z.string().nullable()
+});
+
 const chatConfigSchema = z.object({
   title: z.string().min(1, "Title is required"),
   systemPrompt: z.string().min(1, "System prompt is required"),
@@ -23,7 +29,6 @@ const openai = new OpenAI({
   dangerouslyAllowBrowser: false
 });
 
-// Store conversations by session ID
 const sessions: Record<string, any[]> = {};
 
 function getSessionId(req: Request): string {
@@ -37,7 +42,6 @@ const configSchema = z.object({
   temperature: z.number().min(0).max(2),
   maxTokens: z.number().min(100).max(4000)
 });
-
 
 export function registerRoutes(app: Express): Server {
   app.get("/api/messages", async (req: Request, res: Response) => {
@@ -247,9 +251,18 @@ export function registerRoutes(app: Express): Server {
 
       console.log("Debug - userName:", userName);
       console.log("Debug - URL params:", Object.fromEntries(url.searchParams));
+      console.log("Debug - Message content:", content);
 
-      if (!content || typeof content !== "string") {
-        return res.status(400).send("Message content is required");
+      // Validate content based on the new schema
+      try {
+        messageContentSchema.parse(content);
+      } catch (e) {
+        console.error("Message content validation failed:", e);
+        return res.status(400).json({ error: "Invalid message content format. Expected {text: string, image: string | null}" });
+      }
+
+      if (!content.text && !content.image) {
+        return res.status(400).json({ error: "Message must contain either text or an image" });
       }
 
       if (isNaN(configId) || configId <= 0) {
@@ -263,9 +276,7 @@ export function registerRoutes(app: Express): Server {
 
       const parsedConfig = configSchema.parse(config);
 
-      // Initialize session if it doesn't exist
       if (!sessions[sessionId]) {
-        // Try to get existing conversation from database
         const existingConversation = await db.query.conversations.findFirst({
           where: and(
             eq(conversations.configId, configId),
@@ -277,12 +288,13 @@ export function registerRoutes(app: Express): Server {
           JSON.parse(existingConversation.messages as string) : [];
       }
 
-      // Add user message
+      // Create user message with the new content format
       const userMessage = {
         id: crypto.randomUUID(),
         content,
         role: 'user' as const,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        sessionId
       };
       sessions[sessionId].push(userMessage);
 
@@ -316,7 +328,6 @@ export function registerRoutes(app: Express): Server {
             });
         }
 
-        // Log success for debugging
         console.log("Successfully saved conversation:", {
           configId,
           sessionId,
@@ -324,82 +335,76 @@ export function registerRoutes(app: Express): Server {
         });
       } catch (error) {
         console.error("Error saving conversation:", error);
-        // Continue with the chat even if saving fails
       }
 
-      // Set up SSE headers
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
-      // Prepare messages for OpenAI API
+      // Prepare content for OpenAI API
       const enhancedSystemPrompt = userName
         ? `${parsedConfig.systemPrompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${userName}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${userName}!" or "Hi ${userName}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much!`
         : parsedConfig.systemPrompt;
 
+      // Convert message content to string format for OpenAI
       const apiMessages = [
         { role: "system", content: enhancedSystemPrompt },
         ...sessions[sessionId].map(m => ({
           role: m.role,
-          content: m.content
+          content: typeof m.content === 'string' ? m.content :
+            `${m.content.text || ''}${m.content.image ? '\n[Attached Image]' : ''}`
         }))
       ];
 
       let accumulatedMessage = '';
       const messageId = crypto.randomUUID();
 
-      // Set up SSE
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
       });
 
-      // Get OpenAI streaming response
-      const stream = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages: apiMessages.map(msg => ({
-          role: msg.role as 'system' | 'user' | 'assistant',
-          content: msg.content
-        })),
-        temperature: parsedConfig.temperature,
-        max_tokens: parsedConfig.maxTokens,
-        stream: true,
-        presence_penalty: 0.6,
-        frequency_penalty: 0.5,
-        response_format: { type: "text" }
-      });
-
-      // Handle the stream with immediate sending
+      // Stream response from OpenAI
       try {
+        const stream = await openai.chat.completions.create({
+          model: "gpt-4",
+          messages: apiMessages.map(msg => ({
+            role: msg.role as 'system' | 'user' | 'assistant',
+            content: msg.content
+          })),
+          temperature: parsedConfig.temperature,
+          max_tokens: parsedConfig.maxTokens,
+          stream: true,
+          presence_penalty: 0.6,
+          frequency_penalty: 0.5,
+          response_format: { type: "text" }
+        });
+
         for await (const chunk of stream) {
           const content = chunk.choices[0]?.delta?.content || '';
           if (content) {
             accumulatedMessage += content;
-            // Send the chunk immediately
             res.write(`data: ${JSON.stringify({ content, messageId })}\n\n`);
           }
         }
+
+        const assistantMessage = {
+          id: messageId,
+          content: accumulatedMessage,
+          role: 'assistant' as const,
+          timestamp: Date.now(),
+          sessionId
+        };
+        sessions[sessionId].push(assistantMessage);
+
+        res.write('data: [DONE]\n\n');
+        res.end();
       } catch (streamError) {
         console.error("Stream error:", streamError);
         res.write(`data: ${JSON.stringify({ error: "Stream interrupted" })}\n\n`);
         res.end();
-        return;
       }
-
-      // Add the complete AI response to the session
-      const assistantMessage = {
-        id: messageId,
-        content: accumulatedMessage,
-        role: 'assistant' as const,
-        timestamp: Date.now(),
-        sessionId: sessionId // Add sessionId to message
-      };
-      sessions[sessionId].push(assistantMessage);
-
-      // End the stream
-      res.write('data: [DONE]\n\n');
-      res.end();
     } catch (error: any) {
       console.error("Error processing message:", error);
       res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
@@ -484,11 +489,9 @@ export function registerRoutes(app: Express): Server {
       const scoreMatch = response.match(/Score:\s*(\d+)/i);
       const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
 
-
       // Extract summary (the line after the score)
       const summaryMatch = response.match(/Score:\s*\d+\s*\n([^\n]+)/i);
       const summary = summaryMatch ? summaryMatch[1].trim() : null;
-
 
       // Get bullet points (everything before "Score:")
       const bullets = response
