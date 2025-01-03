@@ -352,7 +352,9 @@ export function registerRoutes(app: Express): Server {
               },
               {
                 type: "image_url",
-                image_url: m.content.image
+                image_url: {
+                  url: m.content.image
+                }
               }
             ]
           });
@@ -362,15 +364,10 @@ export function registerRoutes(app: Express): Server {
       let accumulatedMessage = '';
       const messageId = crypto.randomUUID();
 
-      res.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      });
-
       try {
         const stream = await openai.chat.completions.create({
-          model: content.image ? "gpt-4v" : "gpt-4",
+          // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+          model: "gpt-4o",
           messages: apiMessages,
           temperature: parsedConfig.temperature,
           max_tokens: parsedConfig.maxTokens,
@@ -408,6 +405,7 @@ export function registerRoutes(app: Express): Server {
       res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
       res.end();
     }
+
   });
 
   app.post("/api/chat-feedback", async (req: Request, res: Response) => {
