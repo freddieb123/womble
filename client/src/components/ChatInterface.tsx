@@ -6,16 +6,10 @@ import { Send, Lightbulb, Info, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AdminConfig } from "@/lib/types";
 import MessageBubble from "./MessageBubble";
 import UserNameModal from "./UserNameModal";
-import type { Message, ChatState, AdminConfig } from "@/lib/types";
+import type { Message, ChatState } from "@/lib/types";
 
 interface Props {
   config: AdminConfig;
@@ -44,6 +38,49 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
   });
 
   const hasEnoughMessages = chatState.messages.length >= 5;
+
+  // Restore getHint function
+  const getHint = async () => {
+    if (!config.feedbackCriteria) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No feedback criteria specified for this chat."
+      });
+      return;
+    }
+
+    try {
+      setIsGettingHint(true);
+      const response = await fetch("/api/chat-hint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          feedbackCriteria: config.feedbackCriteria,
+          userInstructions: config.userInstructions,
+          messages: chatState.messages
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const hint = await response.json();
+      toast({
+        title: "Hint",
+        description: hint.message,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to get hint",
+      });
+    } finally {
+      setIsGettingHint(false);
+    }
+  };
 
   // Handle paste event
   useEffect(() => {
