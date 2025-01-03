@@ -7,11 +7,18 @@ import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
 
+const systemPromptFileSchema = z.object({
+  name: z.string(),
+  content: z.string(),
+  type: z.string()
+}).nullable().optional();
+
 const chatConfigSchema = z.object({
   title: z.string().min(1, "Title is required"),
   systemPrompt: z.string().min(1, "System prompt is required"),
   userInstructions: z.string().nullable(),
   feedbackCriteria: z.string().nullable(),
+  systemPromptFile: systemPromptFileSchema
 });
 
 if (!process.env.OPENAI_API_KEY) {
@@ -99,6 +106,7 @@ export function registerRoutes(app: Express): Server {
         systemPrompt: parsedConfig.systemPrompt,
         userInstructions: parsedConfig.userInstructions,
         feedbackCriteria: parsedConfig.feedbackCriteria,
+        systemPromptFile: parsedConfig.systemPromptFile ? JSON.stringify(parsedConfig.systemPromptFile) : null,
       }).returning();
 
       console.log("Saved chat config:", result[0]);
@@ -170,6 +178,7 @@ export function registerRoutes(app: Express): Server {
           systemPrompt: parsedConfig.systemPrompt,
           userInstructions: parsedConfig.userInstructions,
           feedbackCriteria: parsedConfig.feedbackCriteria,
+          systemPromptFile: parsedConfig.systemPromptFile ? JSON.stringify(parsedConfig.systemPromptFile) : null,
         })
         .where(eq(chatConfigs.id, id))
         .returning();

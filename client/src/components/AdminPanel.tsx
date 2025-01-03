@@ -2,8 +2,8 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Wand2 } from "lucide-react";
-import { useState } from "react";
+import { Wand2, Paperclip } from "lucide-react";
+import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { AdminConfig } from "@/lib/types";
 
@@ -16,6 +16,7 @@ interface Props {
 export default function AdminPanel({ config, onConfigChange, isEditMode = false }: Props) {
   const [isImproving, setIsImproving] = useState(false);
   const [hasImproved, setHasImproved] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const improveCriteria = async () => {
@@ -61,6 +62,48 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
     }
   };
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "File size should be less than 5MB"
+      });
+      return;
+    }
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64String = e.target?.result as string;
+        const base64Content = base64String.split(',')[1];
+
+        onConfigChange({
+          ...config,
+          systemPromptFile: {
+            name: file.name,
+            content: base64Content,
+            type: file.type
+          }
+        });
+
+        toast({
+          description: `File "${file.name}" attached successfully!`
+        });
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to process the file"
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="space-y-4">
@@ -84,17 +127,45 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
 
         <div className="space-y-2">
           <Label htmlFor="system-prompt">System Prompt</Label>
-          <Textarea
-            id="system-prompt"
-            value={config.systemPrompt}
-            onChange={(e) => onConfigChange({
-              ...config,
-              systemPrompt: e.target.value
-            })}
-            placeholder="Enter system prompt..."
-            className="resize-none"
-            rows={6}
-          />
+          <div className="relative">
+            <Textarea
+              id="system-prompt"
+              value={config.systemPrompt}
+              onChange={(e) => onConfigChange({
+                ...config,
+                systemPrompt: e.target.value
+              })}
+              placeholder="Enter system prompt..."
+              className="resize-none pr-10"
+              rows={6}
+            />
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              className="hidden"
+              accept=".txt,.pdf,.doc,.docx,.csv"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute bottom-2 right-2 p-2 text-gray-500 hover:text-gray-700 transition-colors"
+              type="button"
+              title="Attach file"
+            >
+              <Paperclip className="h-4 w-4" />
+            </button>
+            {config.systemPromptFile && (
+              <div className="mt-2 text-sm text-blue-600">
+                Attached: {config.systemPromptFile.name}
+                <button
+                  onClick={() => onConfigChange({ ...config, systemPromptFile: null })}
+                  className="ml-2 text-red-500 hover:text-red-700"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">
             Customize how the AI assistant behaves by providing specific instructions.
           </p>
