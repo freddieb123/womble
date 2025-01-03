@@ -15,7 +15,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import MessageBubble from "./MessageBubble";
 import UserNameModal from "./UserNameModal";
-import type { Message, ChatState, AdminConfig } from "@/lib/types";
+import type { Message, ChatState, AdminConfig, MessageContent } from "@/lib/types";
 
 interface Props {
   config: AdminConfig;
@@ -45,7 +45,6 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
 
   const hasEnoughMessages = chatState.messages.length >= 5;
 
-  // Restore getHint function
   const getHint = async () => {
     if (!config.feedbackCriteria) {
       toast({
@@ -88,19 +87,16 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
     }
   };
 
-  // Handle paste event
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
       if (!e.clipboardData) return;
 
-      // Check for images in clipboard
       const items = e.clipboardData.items;
       for (let i = 0; i < items.length; i++) {
         if (items[i].type.indexOf('image') !== -1) {
           const blob = items[i].getAsFile();
           if (!blob) continue;
 
-          // Convert blob to base64
           const reader = new FileReader();
           reader.onload = (event) => {
             const base64String = event.target?.result as string;
@@ -125,8 +121,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
         url.searchParams.set('userName', userName);
       }
 
-      // Create message content with image if present
-      const messageContent = {
+      const messageContent: MessageContent = {
         text: content,
         image: pastedImage
       };
@@ -141,7 +136,6 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
         throw new Error(await response.text());
       }
 
-      // Add the user message immediately
       const userMessage: Message = {
         id: crypto.randomUUID(),
         content: messageContent,
@@ -193,7 +187,6 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
 
               assistantMessage.content += parsed.content;
 
-              // Update UI immediately
               queryClient.setQueryData<ChatState>([`/api/messages?configId=${config.id}&sessionId=${sessionId}`], (old) => {
                 const existingMessages = old?.messages || [];
                 const updatedMessages = existingMessages.filter(m => m.id !== assistantMessage.id);
@@ -230,6 +223,12 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
     e.preventDefault();
     if (input.trim() || pastedImage) {
       sendMessage.mutate(input.trim());
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please provide either a message or an image",
+      });
     }
   };
 
@@ -245,7 +244,6 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
 
     scrollToBottom();
 
-    // Handle both scrolling and focus after messages change
     const timeout = setTimeout(() => {
       scrollToBottom();
       if (!showNameModal && inputRef.current) {
@@ -255,7 +253,6 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
 
     return () => clearTimeout(timeout);
   }, [chatState.messages, showNameModal]);
-
 
   return (
     <div className="flex flex-col h-[600px]">
@@ -330,7 +327,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
               />
               <Button
                 type="submit"
-                disabled={sendMessage.isPending || (!input.trim() && !pastedImage)}
+                disabled={sendMessage.isPending || !input.trim() && !pastedImage}
               >
                 <Send className="h-4 w-4" />
               </Button>
