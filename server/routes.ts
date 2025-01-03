@@ -6,6 +6,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
+import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 
 // Update schema to support both text and image content
 const messageContentSchema = z.object({
@@ -50,14 +51,10 @@ export function registerRoutes(app: Express): Server {
       const configId = parseInt(url.searchParams.get("configId") || "");
       const sessionId = url.searchParams.get("sessionId") || crypto.randomUUID();
 
-      console.log("Fetching messages for:", { configId, sessionId });
-
       if (isNaN(configId) || configId <= 0) {
-        console.log("Invalid configId:", configId);
         return res.status(400).json({ error: "Valid config ID is required" });
       }
 
-      // Try to get messages from database first
       const conversation = await db.query.conversations.findFirst({
         where: and(
           eq(conversations.configId, configId),
@@ -65,16 +62,12 @@ export function registerRoutes(app: Express): Server {
         ),
       });
 
-      console.log("Found conversation:", conversation ? "yes" : "no");
-
-      // Initialize session if it doesn't exist
       if (!sessions[sessionId]) {
         sessions[sessionId] = conversation ?
           (typeof conversation.messages === 'string' ?
             JSON.parse(conversation.messages) :
             conversation.messages) :
           [];
-        console.log("Initialized session with messages count:", sessions[sessionId].length);
       }
 
       const response = {
@@ -83,7 +76,6 @@ export function registerRoutes(app: Express): Server {
         error: null
       };
 
-      console.log("Returning messages count:", response.messages.length);
       res.json(response);
     } catch (error) {
       console.error("Error fetching messages:", error);
@@ -241,7 +233,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/messages", async (req, res) => {
+  app.post("/api/messages", async (req: Request, res: Response) => {
     try {
       const { content, config } = req.body;
       const url = new URL(req.url, `http://${req.headers.host}`);
@@ -249,16 +241,11 @@ export function registerRoutes(app: Express): Server {
       const sessionId = url.searchParams.get("sessionId") || crypto.randomUUID();
       const userName = url.searchParams.get('userName');
 
-      console.log("Debug - userName:", userName);
-      console.log("Debug - URL params:", Object.fromEntries(url.searchParams));
-      console.log("Debug - Message content:", content);
-
-      // Validate content based on the new schema
       try {
         messageContentSchema.parse(content);
       } catch (e) {
         console.error("Message content validation failed:", e);
-        return res.status(400).json({ error: "Invalid message content format. Expected {text: string, image: string | null}" });
+        return res.status(400).json({ error: "Invalid message content format" });
       }
 
       if (!content.text && !content.image) {
@@ -270,7 +257,6 @@ export function registerRoutes(app: Express): Server {
       }
 
       if (!userName) {
-        console.error("Warning: userName is null");
         return res.status(400).json({ error: "userName is required" });
       }
 
@@ -288,17 +274,18 @@ export function registerRoutes(app: Express): Server {
           JSON.parse(existingConversation.messages as string) : [];
       }
 
-      // Create user message with the new content format
       const userMessage = {
         id: crypto.randomUUID(),
-        content,
+        content: {
+          text: content.text,
+          image: content.image
+        },
         role: 'user' as const,
         timestamp: Date.now(),
         sessionId
       };
       sessions[sessionId].push(userMessage);
 
-      // Save conversation in database
       try {
         const existingConversation = await db.query.conversations.findFirst({
           where: and(
@@ -327,12 +314,6 @@ export function registerRoutes(app: Express): Server {
               messages: JSON.stringify(sessions[sessionId])
             });
         }
-
-        console.log("Successfully saved conversation:", {
-          configId,
-          sessionId,
-          messageCount: sessions[sessionId].length
-        });
       } catch (error) {
         console.error("Error saving conversation:", error);
       }
@@ -341,20 +322,42 @@ export function registerRoutes(app: Express): Server {
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
-      // Prepare content for OpenAI API
       const enhancedSystemPrompt = userName
         ? `${parsedConfig.systemPrompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${userName}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${userName}!" or "Hi ${userName}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much!`
         : parsedConfig.systemPrompt;
 
-      // Convert message content to string format for OpenAI
-      const apiMessages = [
-        { role: "system", content: enhancedSystemPrompt },
-        ...sessions[sessionId].map(m => ({
-          role: m.role,
-          content: typeof m.content === 'string' ? m.content :
-            `${m.content.text || ''}${m.content.image ? '\n[Attached Image]' : ''}`
-        }))
+      let apiMessages: ChatCompletionMessageParam[] = [
+        { role: "system", content: enhancedSystemPrompt }
       ];
+
+      // Add messages with proper format for Vision API
+      for (const m of sessions[sessionId]) {
+        if (typeof m.content === 'string') {
+          apiMessages.push({
+            role: m.role,
+            content: m.content
+          });
+        } else if (!m.content.image) {
+          apiMessages.push({
+            role: m.role,
+            content: m.content.text
+          });
+        } else {
+          apiMessages.push({
+            role: m.role,
+            content: [
+              {
+                type: "text",
+                text: m.content.text || "Please analyze this image."
+              },
+              {
+                type: "image_url",
+                image_url: m.content.image
+              }
+            ]
+          });
+        }
+      }
 
       let accumulatedMessage = '';
       const messageId = crypto.randomUUID();
@@ -365,20 +368,15 @@ export function registerRoutes(app: Express): Server {
         'Connection': 'keep-alive',
       });
 
-      // Stream response from OpenAI
       try {
         const stream = await openai.chat.completions.create({
-          model: "gpt-4",
-          messages: apiMessages.map(msg => ({
-            role: msg.role as 'system' | 'user' | 'assistant',
-            content: msg.content
-          })),
+          model: content.image ? "gpt-4v" : "gpt-4",
+          messages: apiMessages,
           temperature: parsedConfig.temperature,
           max_tokens: parsedConfig.maxTokens,
           stream: true,
           presence_penalty: 0.6,
-          frequency_penalty: 0.5,
-          response_format: { type: "text" }
+          frequency_penalty: 0.5
         });
 
         for await (const chunk of stream) {
@@ -402,7 +400,7 @@ export function registerRoutes(app: Express): Server {
         res.end();
       } catch (streamError) {
         console.error("Stream error:", streamError);
-        res.write(`data: ${JSON.stringify({ error: "Stream interrupted" })}\n\n`);
+        res.write(`data: ${JSON.stringify({ error: "Error processing image or generating response" })}\n\n`);
         res.end();
       }
     } catch (error: any) {
@@ -424,7 +422,6 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Feedback criteria is required" });
       }
 
-      // Use provided messages if available, otherwise fall back to session messages
       const messagesToAnalyze = messages || (sessions[sessionId] || []);
 
       if (!Array.isArray(messagesToAnalyze) || messagesToAnalyze.length === 0) {
@@ -433,7 +430,6 @@ export function registerRoutes(app: Express): Server {
         });
       }
 
-      // Ensure there are at least two messages (one from user and one from assistant)
       const hasUserMessage = messagesToAnalyze.some(m => m.role === 'user');
       const hasAssistantMessage = messagesToAnalyze.some(m => m.role === 'assistant');
 
@@ -445,7 +441,6 @@ export function registerRoutes(app: Express): Server {
       }
 
       if (configId) {
-        // Find the conversation in the database
         const conversation = await db.query.conversations.findFirst({
           where: and(
             eq(conversations.configId, configId),
@@ -485,15 +480,12 @@ export function registerRoutes(app: Express): Server {
       }
 
 
-      // Extract score and summary
       const scoreMatch = response.match(/Score:\s*(\d+)/i);
       const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
 
-      // Extract summary (the line after the score)
       const summaryMatch = response.match(/Score:\s*\d+\s*\n([^\n]+)/i);
       const summary = summaryMatch ? summaryMatch[1].trim() : null;
 
-      // Get bullet points (everything before "Score:")
       const bullets = response
         .split(/Score:/i)[0]
         .split(/[•\-\*]\s+/)
@@ -508,7 +500,6 @@ export function registerRoutes(app: Express): Server {
       };
 
       if (configId) {
-        // Update feedback in database
         await db.update(conversations)
           .set({ feedback: JSON.stringify(feedbackData) })
           .where(
@@ -534,7 +525,6 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Feedback criteria is required" });
       }
 
-      // Construct the prompt for hint generation
       const prompt = `Based on the following conversation and context, provide a brief, encouraging suggestion directly to the user about their next message or action. You should think of this as a hint that will help them improve their feedback score.
 
       Context:
