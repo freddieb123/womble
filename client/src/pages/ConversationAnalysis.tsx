@@ -257,7 +257,7 @@ export default function ConversationAnalysis() {
                     </h2>
                   </CardHeader>
                   <CardContent>
-                    {conversation.feedback && (
+                    {conversation.feedback?.bullets && (
                       <div className="space-y-4">
                         <div className="space-y-2">
                           {conversation.feedback.bullets.map((bullet, bulletIndex) => (
