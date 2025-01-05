@@ -29,7 +29,6 @@ if (!process.env.OPENAI_API_KEY) {
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  dangerouslyAllowBrowser: false
 });
 
 const sessions: Record<string, any[]> = {};
@@ -137,33 +136,18 @@ export function registerRoutes(app: Express): Server {
       sessions[sessionId].push(userMessage);
 
       try {
-        const existingConversation = await db.query.conversations.findFirst({
-          where: and(
-            eq(conversations.configId, configId),
-            eq(conversations.sessionId, sessionId)
-          ),
-        });
-
-        if (existingConversation) {
-          await db
-            .update(conversations)
-            .set({
-              messages: JSON.stringify(sessions[sessionId])
-            })
-            .where(and(
-              eq(conversations.configId, configId),
-              eq(conversations.sessionId, sessionId)
-            ));
-        } else {
-          await db
-            .insert(conversations)
-            .values({
-              configId,
-              sessionId,
-              userName,
-              messages: JSON.stringify(sessions[sessionId])
-            });
-        }
+        await db
+          .insert(conversations)
+          .values({
+            configId,
+            sessionId,
+            userName,
+            messages: JSON.stringify(sessions[sessionId])
+          })
+          .onConflictDoUpdate({
+            target: [conversations.configId, conversations.sessionId],
+            set: { messages: JSON.stringify(sessions[sessionId]) }
+          });
       } catch (error) {
         console.error("Error saving conversation:", error);
       }
@@ -180,7 +164,7 @@ export function registerRoutes(app: Express): Server {
         { role: "system", content: enhancedSystemPrompt }
       ];
 
-      // Add messages with proper format for Vision API
+      // Format messages for the API, handling both text and image content
       for (const m of sessions[sessionId]) {
         if (typeof m.content === 'string') {
           apiMessages.push({
@@ -245,9 +229,10 @@ export function registerRoutes(app: Express): Server {
 
         res.write('data: [DONE]\n\n');
         res.end();
-      } catch (streamError) {
-        console.error("Stream error:", streamError);
-        res.write(`data: ${JSON.stringify({ error: "Error processing image or generating response" })}\n\n`);
+      } catch (error: any) {
+        console.error("Stream error:", error);
+        const errorMessage = error.message || "Error processing request";
+        res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
         res.end();
       }
     } catch (error: any) {
