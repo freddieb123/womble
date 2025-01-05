@@ -257,10 +257,10 @@ export default function ConversationAnalysis() {
                     </h2>
                   </CardHeader>
                   <CardContent>
-                    {conversation.feedback && (
+                    {feedbacks[index] && (
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          {conversation.feedback.bullets?.map((bullet, bulletIndex) => (
+                          {feedbacks[index].bullets.map((bullet, bulletIndex) => (
                             <div key={bulletIndex} className="flex items-start gap-2 text-sm">
                               <span>•</span>
                               <span>{bullet}</span>
@@ -270,11 +270,11 @@ export default function ConversationAnalysis() {
                         <div className="border-t pt-4">
                           <div className="flex flex-col gap-2 bg-blue-50 p-4 rounded-lg">
                             <span className="text-2xl font-bold text-blue-900">
-                              {conversation.feedback?.score}/10
+                              {feedbacks[index].score}/10
                             </span>
-                            {conversation.feedback?.summary && (
+                            {feedbacks[index].summary && (
                               <p className="text-sm text-blue-700">
-                                {conversation.feedback.summary}
+                                {feedbacks[index].summary}
                               </p>
                             )}
                           </div>
