@@ -574,7 +574,8 @@ export function registerRoutes(app: Express): Server {
       const conversationsWithMetadata = savedConversations.map(conv => ({
         messages: typeof conv.messages === 'string' ? JSON.parse(conv.messages) : conv.messages,
         userName: conv.userName,
-        sessionId: conv.sessionId
+        sessionId: conv.sessionId,
+        feedback: typeof conv.feedback === 'string' ? JSON.parse(conv.feedback) : conv.feedback
       }));
       res.json(conversationsWithMetadata);
     } catch (error: any) {
