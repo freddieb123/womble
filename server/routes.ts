@@ -8,7 +8,7 @@ import crypto from 'crypto';
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 
-// Update schema to support both text and image content
+// Define schemas
 const messageContentSchema = z.object({
   text: z.string(),
   image: z.string().nullable()
@@ -19,6 +19,8 @@ const chatConfigSchema = z.object({
   systemPrompt: z.string().min(1, "System prompt is required"),
   userInstructions: z.string().nullable(),
   feedbackCriteria: z.string().nullable(),
+  temperature: z.number().optional().default(0.7),
+  maxTokens: z.number().optional().default(1000),
 });
 
 if (!process.env.OPENAI_API_KEY) {
@@ -37,12 +39,6 @@ function getSessionId(req: Request): string {
   const sessionId = url.searchParams.get("sessionId");
   return sessionId || crypto.randomUUID();
 }
-
-const configSchema = z.object({
-  systemPrompt: z.string(),
-  temperature: z.number().min(0).max(2),
-  maxTokens: z.number().min(100).max(4000)
-});
 
 export function registerRoutes(app: Express): Server {
   app.get("/api/messages", async (req: Request, res: Response) => {
@@ -87,152 +83,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/chat-configs", async (req, res) => {
-    try {
-      const parsedConfig = chatConfigSchema.parse(req.body);
-      const result = await db.insert(chatConfigs).values({
-        title: parsedConfig.title,
-        systemPrompt: parsedConfig.systemPrompt,
-        userInstructions: parsedConfig.userInstructions,
-        feedbackCriteria: parsedConfig.feedbackCriteria,
-      }).returning();
-
-      console.log("Saved chat config:", result[0]);
-      res.json(result[0]);
-    } catch (error: any) {
-      console.error("Error saving chat config:", error);
-      res.status(400).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/chat-configs/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ error: "Invalid ID" });
-      }
-
-      const config = await db.query.chatConfigs.findFirst({
-        where: eq(chatConfigs.id, id),
-      });
-
-      if (!config) {
-        return res.status(404).json({ error: "Configuration not found" });
-      }
-
-      res.json(config);
-    } catch (error: any) {
-      console.error("Error fetching chat config:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-  app.get("/api/chat-configs", async (req, res) => {
-    try {
-      const showDeleted = req.query.showDeleted === 'true';
-      const query = db.query.chatConfigs.findMany({
-        where: showDeleted ? undefined : eq(chatConfigs.deleted, false),
-        orderBy: (chatConfigs, { desc }) => [desc(chatConfigs.createdAt)],
-        with: {
-          conversations: true,
-        }
-      });
-
-      const configs = await query;
-
-      const configsWithCount = configs.map(config => ({
-        ...config,
-        conversationCount: config.conversations.length,
-        conversations: undefined
-      }));
-
-      res.json(configsWithCount);
-    } catch (error: any) {
-      console.error("Error fetching chat configs:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.put("/api/chat-configs/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ error: "Invalid ID" });
-      }
-
-      const parsedConfig = chatConfigSchema.parse(req.body);
-      const result = await db.update(chatConfigs)
-        .set({
-          title: parsedConfig.title,
-          systemPrompt: parsedConfig.systemPrompt,
-          userInstructions: parsedConfig.userInstructions,
-          feedbackCriteria: parsedConfig.feedbackCriteria,
-        })
-        .where(eq(chatConfigs.id, id))
-        .returning();
-
-      if (!result.length) {
-        return res.status(404).json({ error: "Configuration not found" });
-      }
-
-      res.json(result[0]);
-    } catch (error: any) {
-      console.error("Error updating chat config:", error);
-      res.status(400).json({ error: error.message });
-    }
-  });
-
-  app.delete("/api/chat-configs/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ error: "Invalid ID" });
-      }
-
-      const result = await db.update(chatConfigs)
-        .set({
-          deleted: true,
-          deletedAt: new Date()
-        })
-        .where(eq(chatConfigs.id, id))
-        .returning();
-
-      if (!result.length) {
-        return res.status(404).json({ error: "Configuration not found" });
-      }
-
-      res.json(result[0]);
-    } catch (error: any) {
-      console.error("Error soft deleting chat config:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post("/api/chat-configs/:id/restore", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ error: "Invalid ID" });
-      }
-
-      const result = await db.update(chatConfigs)
-        .set({
-          deleted: false,
-          deletedAt: null
-        })
-        .where(eq(chatConfigs.id, id))
-        .returning();
-
-      if (!result.length) {
-        return res.status(404).json({ error: "Configuration not found" });
-      }
-
-      res.json(result[0]);
-    } catch (error: any) {
-      console.error("Error restoring chat config:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
   app.post("/api/messages", async (req: Request, res: Response) => {
     try {
       const { content, config } = req.body;
@@ -260,7 +110,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "userName is required" });
       }
 
-      const parsedConfig = configSchema.parse(config);
+      const parsedConfig = chatConfigSchema.parse(config);
 
       if (!sessions[sessionId]) {
         const existingConversation = await db.query.conversations.findFirst({
@@ -365,8 +215,8 @@ export function registerRoutes(app: Express): Server {
       const messageId = crypto.randomUUID();
 
       try {
+        // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
         const stream = await openai.chat.completions.create({
-          // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
           model: "gpt-4o",
           messages: apiMessages,
           temperature: parsedConfig.temperature,
@@ -405,7 +255,6 @@ export function registerRoutes(app: Express): Server {
       res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
       res.end();
     }
-
   });
 
   app.post("/api/chat-feedback", async (req: Request, res: Response) => {
@@ -458,8 +307,8 @@ export function registerRoutes(app: Express): Server {
       Chat transcript:
       ${formattedMessages}`;
 
+      // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       const completion = await openai.chat.completions.create({
-        // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
         model: "gpt-4o",
         messages: [
           {
@@ -496,110 +345,6 @@ export function registerRoutes(app: Express): Server {
       });
     } catch (error: any) {
       console.error("Error getting feedback:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post("/api/chat-hint", async (req: Request, res: Response) => {
-    try {
-      const { feedbackCriteria, userInstructions, messages } = req.body;
-
-      if (!feedbackCriteria) {
-        return res.status(400).json({ error: "Feedback criteria is required" });
-      }
-
-      const prompt = `Based on the following conversation and context, provide a brief, encouraging suggestion directly to the user about their next message or action. You should think of this as a hint that will help them improve their feedback score.
-
-      Context:
-      ${userInstructions ? `Instructions that the user received: ${userInstructions}` : ''}
-      Feedback Criteria: ${feedbackCriteria}
-
-      Conversation so far:
-      ${messages.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}
-
-      Provide a single, friendly sentence starting with "Try to" or "Consider" that directly tells the user what they could do next. Focus on practical communication advice that aligns with the feedback criteria.`;
-
-      const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content: "You are a friendly but expert business coach speaking directly to the user. Always phrase your suggestions in second person ('you' form) and keep them actionable and encouraging. Start with 'Try to' or 'Consider' and focus on immediate next steps the user can take."
-          },
-          { role: "user", content: prompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 100,
-      });
-
-      const hint = completion.choices[0]?.message?.content?.trim();
-      if (!hint) {
-        throw new Error("Failed to generate hint");
-      }
-
-      res.json({ message: hint });
-    } catch (error: any) {
-      console.error("Error getting hint:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
-    try {
-      const configId = parseInt(req.params.configId);
-      if (isNaN(configId)) {
-        return res.status(400).json({ error: "Invalid config ID" });
-      }
-
-      const savedConversations = await db.query.conversations.findMany({
-        where: eq(conversations.configId, configId),
-        orderBy: [desc(conversations.createdAt)]
-      });
-
-      const conversationsWithMetadata = savedConversations.map(conv => ({
-        messages: typeof conv.messages === 'string' ? JSON.parse(conv.messages) : conv.messages,
-        userName: conv.userName,
-        sessionId: conv.sessionId
-      }));
-      res.json(conversationsWithMetadata);
-    } catch (error: any) {
-      console.error("Error fetching conversations:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post("/api/improve-criteria", async (req: Request, res: Response) => {
-    try {
-      const { feedbackCriteria } = req.body;
-
-      if (!feedbackCriteria) {
-        return res.status(400).json({ error: "Feedback criteria is required" });
-      }
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert at creating effective feedback criteria for evaluating soft skills and interactions. Your goal is to enhance existing feedback criteria to be more comprehensive, clear, and actionable while maintaining its core purpose."
-          },
-          {
-            role: "user",
-            content: `Please improve the following feedback criteria to be more comprehensive, specific, and effective at evaluating user interactions. Maintain the same general purpose but make it as actionable as possible. Don't make it longer than 5 points. Here's the current criteria:\n\n${feedbackCriteria}`
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000,
-      });
-
-      const improvedCriteria = response.choices[0]?.message?.content;
-      if (!improvedCriteria) {
-        throw new Error("Failed to get improved criteria from OpenAI");
-      }
-
-      res.json({ improvedCriteria });
-    } catch (error: any) {
-      console.error("Error improving criteria:", error);
       res.status(500).json({ error: error.message });
     }
   });
