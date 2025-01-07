@@ -460,11 +460,11 @@ export function registerRoutes(app: Express): Server {
       ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o",
         messages: [
           {
             role: "system",
-            content: "You are an expert at evaluating user communication. Focus your feedback solely on the user's messages and interactions, taking into account how they respond to the AI assistant. Address the user directly using 'you' in your feedback. For example: 'You maintained clear communication' instead of 'The user maintained clear communication'. Keep feedback points brief, clear, and actionable. Always follow the exact format specified, with 2-4 bullet points followed by a score and one-line summary."
+            content: "You are an expert at evaluating user communication. Focus your feedback solely on the user's messages and interactions, taking into account how they respond to the AI assistant. Address the user directly using 'you' in your feedback. For example: 'You maintained clear communication' instead of 'The user maintained clear communication'. Keep feedback points brief, clear, and actionable."
           },
           { role: "user", content: prompt }
         ],
@@ -535,7 +535,7 @@ export function registerRoutes(app: Express): Server {
       Provide a single, friendly sentence starting with "Try to" or "Consider" that directly tells the user what they could do next. Focus on practical communication advice that aligns with the feedback criteria.`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o,
         messages: [
           {
             role: "system",
@@ -593,7 +593,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o",
         messages: [
           {
             role: "system",
