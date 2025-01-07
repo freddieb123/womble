@@ -535,7 +535,7 @@ export function registerRoutes(app: Express): Server {
       Provide a single, friendly sentence starting with "Try to" or "Consider" that directly tells the user what they could do next. Focus on practical communication advice that aligns with the feedback criteria.`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o,
+        model: "gpt-4o",
         messages: [
           {
             role: "system",
