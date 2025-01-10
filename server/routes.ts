@@ -8,41 +8,12 @@ import crypto from 'crypto';
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 
-// Update schema to support both text and image content
-const messageContentSchema = z.object({
-  text: z.string(),
-  image: z.string().nullable()
-});
-
-const chatConfigSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  type: z.enum(['chat', 'upload']).default('chat'),
-  systemPrompt: z.string().min(1, "System prompt is required"),
-  userInstructions: z.string().nullable(),
-  feedbackCriteria: z.string().nullable(),
-});
-
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error("OPENAI_API_KEY is required");
-}
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  dangerouslyAllowBrowser: false
-});
-
-const sessions: Record<string, any[]> = {};
-
-function getSessionId(req: Request): string {
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  const sessionId = url.searchParams.get("sessionId");
-  return sessionId || crypto.randomUUID();
-}
-
-const configSchema = z.object({
-  systemPrompt: z.string(),
-  temperature: z.number().min(0).max(2),
-  maxTokens: z.number().min(100).max(4000)
+// Add file handling schema
+const uploadFeedbackSchema = z.object({
+  configId: z.number(),
+  sessionId: z.string(),
+  fileContent: z.string(),
+  fileName: z.string(),
 });
 
 export function registerRoutes(app: Express): Server {
@@ -623,6 +594,140 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add new upload feedback route
+  app.post("/api/upload-feedback", async (req: Request, res: Response) => {
+    try {
+      const { configId, sessionId, fileContent, fileName } = uploadFeedbackSchema.parse(req.body);
+
+      const config = await db.query.chatConfigs.findFirst({
+        where: eq(chatConfigs.id, configId),
+      });
+
+      if (!config) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+
+      if (!config.feedbackCriteria) {
+        return res.status(400).json({ error: "Feedback criteria not set for this configuration" });
+      }
+
+      const prompt = `Analyze the following uploaded file based on these criteria: ${config.feedbackCriteria}
+
+Please provide your feedback in exactly this format:
+
+• [3 bullet points focusing on how well the file content meets the criteria]
+
+Score: [1-10]
+[Brief one-line summary of overall quality]
+
+File content:
+${fileContent}`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert at evaluating uploaded content. Focus your feedback solely on the content, taking into account the provided criteria. Keep feedback points brief, clear, and actionable."
+          },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+      });
+
+      const response = completion.choices[0]?.message?.content;
+      if (!response) {
+        throw new Error("Failed to get response from OpenAI");
+      }
+
+      const scoreMatch = response.match(/Score:\s*(\d+)/i);
+      const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
+
+      const summaryMatch = response.match(/Score:\s*\d+\s*\n([^\n]+)/i);
+      const summary = summaryMatch ? summaryMatch[1].trim() : null;
+
+      const bullets = response
+        .split(/Score:/i)[0]
+        .split(/[•\-\*]\s+/)
+        .filter(bullet => bullet.trim())
+        .map(bullet => bullet.trim());
+
+      const feedbackData = {
+        bullets,
+        score,
+        summary
+      };
+
+      // Save feedback to conversation
+      await db.insert(conversations)
+        .values({
+          configId,
+          sessionId,
+          messages: JSON.stringify([{
+            role: 'user',
+            content: `Uploaded file: ${fileName}`,
+            timestamp: Date.now(),
+            id: crypto.randomUUID()
+          }]),
+          feedback: JSON.stringify(feedbackData)
+        })
+        .onConflictDoUpdate({
+          target: [conversations.configId, conversations.sessionId],
+          set: {
+            messages: JSON.stringify([{
+              role: 'user',
+              content: `Uploaded file: ${fileName}`,
+              timestamp: Date.now(),
+              id: crypto.randomUUID()
+            }]),
+            feedback: JSON.stringify(feedbackData)
+          }
+        });
+
+      res.json(feedbackData);
+    } catch (error: any) {
+      console.error("Error processing upload feedback:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
+
+const messageContentSchema = z.object({
+  text: z.string(),
+  image: z.string().nullable()
+});
+
+const chatConfigSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  type: z.enum(['chat', 'upload']).default('chat'),
+  systemPrompt: z.string().min(1, "System prompt is required"),
+  userInstructions: z.string().nullable(),
+  feedbackCriteria: z.string().nullable(),
+});
+
+if (!process.env.OPENAI_API_KEY) {
+  throw new Error("OPENAI_API_KEY is required");
+}
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  dangerouslyAllowBrowser: false
+});
+
+const sessions: Record<string, any[]> = {};
+
+function getSessionId(req: Request): string {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const sessionId = url.searchParams.get("sessionId");
+  return sessionId || crypto.randomUUID();
+}
+
+const configSchema = z.object({
+  systemPrompt: z.string(),
+  temperature: z.number().min(0).max(2),
+  maxTokens: z.number().min(100).max(4000)
+});
