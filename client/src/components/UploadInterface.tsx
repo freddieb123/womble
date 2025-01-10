@@ -100,11 +100,12 @@ export default function UploadInterface({ config, sessionId }: Props) {
 
   return (
     <div className="flex flex-col h-[600px]">
+      <h2 className="text-2xl font-bold mb-4">{config.title}</h2>
+
       {config.userInstructions && (
         <Alert className="mb-4">
           <Info className="h-4 w-4" />
           <AlertDescription>
-            <div className="font-semibold text-lg mb-2">{config.title}</div>
             <pre className="font-sans whitespace-pre-wrap">{config.userInstructions}</pre>
           </AlertDescription>
         </Alert>
