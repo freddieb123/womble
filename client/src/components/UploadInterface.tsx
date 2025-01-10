@@ -1,6 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { UploadCloud, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -15,48 +15,47 @@ interface Props {
 export default function UploadInterface({ config, sessionId }: Props) {
   const [uploadState, setUploadState] = useState<UploadState>({
     file: null,
-    fileName: '',
     isLoading: false,
     error: null,
     feedback: undefined
   });
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    await handleFile(file);
-  };
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      if (!e.clipboardData) return;
 
-  const handleFile = async (file: File) => {
-    if (!file.type.startsWith('text/')) {
-      toast({
-        variant: "destructive",
-        title: "Invalid file",
-        description: "Please upload a text file"
-      });
-      return;
-    }
+      const items = e.clipboardData.items;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const blob = items[i].getAsFile();
+          if (!blob) continue;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setUploadState(prev => ({
-        ...prev,
-        file: e.target?.result as string,
-        fileName: file.name
-      }));
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const base64String = event.target?.result as string;
+            setUploadState(prev => ({
+              ...prev,
+              file: base64String
+            }));
+          };
+          reader.readAsDataURL(blob);
+          break;
+        }
+      }
     };
-    reader.readAsText(file);
-  };
+
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, []);
 
   const getFeedback = async () => {
     if (!uploadState.file) {
       toast({
         variant: "destructive",
-        title: "No file",
-        description: "Please upload a file first"
+        title: "No screenshot",
+        description: "Please paste a screenshot first"
       });
       return;
     }
@@ -70,7 +69,7 @@ export default function UploadInterface({ config, sessionId }: Props) {
           configId: config.id,
           sessionId,
           fileContent: uploadState.file,
-          fileName: uploadState.fileName
+          fileName: "pasted_screenshot.png"
         }),
       });
 
@@ -112,41 +111,27 @@ export default function UploadInterface({ config, sessionId }: Props) {
       )}
 
       <div 
-        className="flex-1 border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-6 relative cursor-pointer hover:bg-gray-50"
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
+        className="flex-1 border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-6 relative"
       >
         {uploadState.file ? (
           <div className="relative inline-block">
-            <pre className="max-h-96 overflow-auto p-4 bg-gray-50 rounded-lg border border-gray-200">
-              {uploadState.file}
-            </pre>
+            <img
+              src={uploadState.file}
+              alt="Pasted screenshot"
+              className="max-h-96 rounded-lg border border-gray-200"
+            />
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setUploadState(prev => ({ ...prev, file: null, fileName: '' }));
-              }}
+              onClick={() => setUploadState(prev => ({ ...prev, file: null }))}
               className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-sm border border-gray-200"
             >
               <X className="h-4 w-4 text-gray-500" />
             </button>
           </div>
         ) : (
-          <>
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept="text/*"
-              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-            />
-            <UploadCloud className="h-12 w-12 text-gray-400 mb-4" />
-            <div className="text-center">
-              <p className="text-lg font-semibold mb-2">Click or drag and drop</p>
-              <p className="text-sm text-gray-600">Upload your text file to get feedback</p>
-            </div>
-          </>
+          <div className="text-center">
+            <p className="text-lg font-semibold mb-2">Press Ctrl+V (Cmd+V on Mac)</p>
+            <p className="text-sm text-gray-600">Paste your screenshot here to get feedback</p>
+          </div>
         )}
       </div>
 
