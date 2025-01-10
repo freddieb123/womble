@@ -86,12 +86,13 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
         <div className="space-y-2">
           <Label htmlFor="type">Type</Label>
           <Select
-            value={config.type || 'chat'}
+            value={config.type || "chat"}
             onValueChange={(value) => {
-              console.log('Type changed to:', value); 
+              const newType = value as 'chat' | 'upload';
+              console.log('Type changed to:', newType);
               onConfigChange({
                 ...config,
-                type: value as 'chat' | 'upload'
+                type: newType
               });
             }}
             disabled={isEditMode}

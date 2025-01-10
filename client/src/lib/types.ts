@@ -20,7 +20,7 @@ export interface ChatState {
 export interface AdminConfig {
   id?: number;
   title: string;
-  type?: 'chat' | 'upload';
+  type: 'chat' | 'upload';  // Make type required and explicitly typed
   systemPrompt: string;
   userInstructions: string;
   feedbackCriteria: string;

@@ -30,7 +30,7 @@ import { Switch } from "@/components/ui/switch";
 type ChatConfig = {
   id: number;
   title: string;
-  type?: string; // Added type field
+  type: 'chat' | 'upload';  // Make type required and properly typed
   systemPrompt: string;
   userInstructions: string | null;
   feedbackCriteria: string | null;
@@ -47,6 +47,7 @@ export default function Home() {
   const [showDeleted, setShowDeleted] = useState(false);
   const [config, setConfig] = useState<AdminConfig>({
     title: "",
+    type: "chat",
     systemPrompt: "You are a helpful AI assistant.",
     userInstructions: "",
     feedbackCriteria: "",
@@ -75,7 +76,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: config.title,
-          type: config.type || 'chat', // Ensure type is included
+          type: config.type,
           systemPrompt: config.systemPrompt,
           userInstructions: config.userInstructions,
           feedbackCriteria: config.feedbackCriteria,
@@ -94,6 +95,7 @@ export default function Home() {
       setIsCreateOpen(false);
       setConfig({
         title: "",
+        type: "chat",
         systemPrompt: "You are a helpful AI assistant.",
         userInstructions: "",
         feedbackCriteria: "",
@@ -120,7 +122,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...configToUpdate,
-          type: configToUpdate.type || 'chat', // Ensure type is included
+          type: configToUpdate.type,
         }),
       });
 
@@ -227,6 +229,7 @@ export default function Home() {
   const handleDuplicate = (configToDuplicate: ChatConfig) => {
     setConfig({
       title: `${configToDuplicate.title} (Copy)`,
+      type: configToDuplicate.type,
       systemPrompt: configToDuplicate.systemPrompt,
       userInstructions: configToDuplicate.userInstructions || "",
       feedbackCriteria: configToDuplicate.feedbackCriteria || "",
@@ -356,6 +359,7 @@ export default function Home() {
                                   <AdminPanel
                                     config={{
                                       title: editingConfig.title,
+                                      type: editingConfig.type,
                                       systemPrompt: editingConfig.systemPrompt,
                                       userInstructions: editingConfig.userInstructions || "",
                                       feedbackCriteria: editingConfig.feedbackCriteria || "",
@@ -366,6 +370,7 @@ export default function Home() {
                                       setEditingConfig({
                                         ...editingConfig,
                                         title: updatedConfig.title,
+                                        type: updatedConfig.type,
                                         systemPrompt: updatedConfig.systemPrompt,
                                         userInstructions: updatedConfig.userInstructions || null,
                                         feedbackCriteria: updatedConfig.feedbackCriteria || null,
