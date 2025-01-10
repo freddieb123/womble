@@ -397,8 +397,22 @@ export function registerRoutes(app: Express): Server {
       const messagesToAnalyze = messages || (sessions[sessionId] || []);
 
       if (type === 'upload') {
-        // For upload type, we just need at least one message with a file
-        if (!messagesToAnalyze.some(m => m.content.includes('Uploaded file:'))) {
+        // For upload type, we need at least one message and it should be an upload
+        if (!Array.isArray(messagesToAnalyze) || messagesToAnalyze.length === 0) {
+          return res.status(400).json({
+            error: "No uploads found to analyze."
+          });
+        }
+
+        // Verify if there's at least one upload message
+        const hasUploadMessage = messagesToAnalyze.some(message => {
+          const content = typeof message.content === 'string'
+            ? message.content
+            : message.content.text;
+          return content.includes('Uploaded file:');
+        });
+
+        if (!hasUploadMessage) {
           return res.status(400).json({
             error: "No uploads found to analyze."
           });
