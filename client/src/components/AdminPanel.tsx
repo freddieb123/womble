@@ -110,23 +110,25 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
           </p>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="system-prompt">System Prompt</Label>
-          <Textarea
-            id="system-prompt"
-            value={config.systemPrompt}
-            onChange={(e) => onConfigChange({
-              ...config,
-              systemPrompt: e.target.value
-            })}
-            placeholder="Enter system prompt..."
-            className="resize-none"
-            rows={6}
-          />
-          <p className="text-sm text-muted-foreground">
-            Customize how the AI assistant behaves by providing specific instructions.
-          </p>
-        </div>
+        {(config.type === 'chat' || !config.type) && (
+          <div className="space-y-2">
+            <Label htmlFor="system-prompt">System Prompt</Label>
+            <Textarea
+              id="system-prompt"
+              value={config.systemPrompt}
+              onChange={(e) => onConfigChange({
+                ...config,
+                systemPrompt: e.target.value
+              })}
+              placeholder="Enter system prompt..."
+              className="resize-none"
+              rows={6}
+            />
+            <p className="text-sm text-muted-foreground">
+              Customize how the AI assistant behaves by providing specific instructions.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="user-instructions">User Instructions</Label>
