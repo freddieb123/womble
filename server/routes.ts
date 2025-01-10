@@ -384,11 +384,11 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/chat-feedback", async (req: Request, res: Response) => {
     try {
-      const { feedbackCriteria, messages } = req.body;
+      const { feedbackCriteria, messages, type } = req.body;
       const sessionId = getSessionId(req);
       const configId = parseInt(new URL(req.url, `http://${req.headers.host}`).searchParams.get("configId") || "0");
 
-      console.log('Received feedback request:', { feedbackCriteria, messageCount: messages?.length, configId, sessionId });
+      console.log('Received feedback request:', { feedbackCriteria, messageCount: messages?.length, configId, sessionId, type });
 
       if (!feedbackCriteria) {
         return res.status(400).json({ error: "Feedback criteria is required" });
@@ -396,20 +396,29 @@ export function registerRoutes(app: Express): Server {
 
       const messagesToAnalyze = messages || (sessions[sessionId] || []);
 
-      if (!Array.isArray(messagesToAnalyze) || messagesToAnalyze.length === 0) {
-        return res.status(400).json({
-          error: "No chat messages to analyze. Please have a conversation first before requesting feedback."
-        });
-      }
+      if (type === 'upload') {
+        // For upload type, we just need at least one message with a file
+        if (!messagesToAnalyze.some(m => m.content.includes('Uploaded file:'))) {
+          return res.status(400).json({
+            error: "No uploads found to analyze."
+          });
+        }
+      } else {
+        // For chat type, we need the regular message validation
+        if (!Array.isArray(messagesToAnalyze) || messagesToAnalyze.length === 0) {
+          return res.status(400).json({
+            error: "No chat messages to analyze. Please have a conversation first before requesting feedback."
+          });
+        }
 
-      const hasUserMessage = messagesToAnalyze.some(m => m.role === 'user');
-      const hasAssistantMessage = messagesToAnalyze.some(m => m.role === 'assistant');
+        const hasUserMessage = messagesToAnalyze.some(m => m.role === 'user');
+        const hasAssistantMessage = messagesToAnalyze.some(m => m.role === 'assistant');
 
-
-      if (!hasUserMessage || !hasAssistantMessage) {
-        return res.status(400).json({
-          error: "Please have at least one complete exchange before requesting feedback."
-        });
+        if (!hasUserMessage || !hasAssistantMessage) {
+          return res.status(400).json({
+            error: "Please have at least one complete exchange before requesting feedback."
+          });
+        }
       }
 
       if (configId) {
