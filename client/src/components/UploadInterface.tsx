@@ -150,7 +150,7 @@ export default function UploadInterface({ config, sessionId }: Props) {
       <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Analysis Feedback</DialogTitle>
+            <DialogTitle>Feedback</DialogTitle>
           </DialogHeader>
           {uploadState.feedback && (
             <div className="space-y-6">
