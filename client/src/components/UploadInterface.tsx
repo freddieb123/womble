@@ -15,6 +15,7 @@ interface Props {
 export default function UploadInterface({ config, sessionId }: Props) {
   const [uploadState, setUploadState] = useState<UploadState>({
     file: null,
+    fileName: '',
     isLoading: false,
     error: null,
     feedback: undefined
@@ -30,11 +31,11 @@ export default function UploadInterface({ config, sessionId }: Props) {
   };
 
   const handleFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith('text/')) {
       toast({
         variant: "destructive",
         title: "Invalid file",
-        description: "Please upload an image file"
+        description: "Please upload a text file"
       });
       return;
     }
@@ -43,10 +44,11 @@ export default function UploadInterface({ config, sessionId }: Props) {
     reader.onload = (e) => {
       setUploadState(prev => ({
         ...prev,
-        file: e.target?.result as string
+        file: e.target?.result as string,
+        fileName: file.name
       }));
     };
-    reader.readAsDataURL(file);
+    reader.readAsText(file);
   };
 
   const getFeedback = async () => {
@@ -61,12 +63,14 @@ export default function UploadInterface({ config, sessionId }: Props) {
 
     try {
       setUploadState(prev => ({ ...prev, isLoading: true, error: null }));
-      const response = await fetch(`/api/upload-feedback?configId=${config.id}&sessionId=${sessionId}`, {
+      const response = await fetch("/api/upload-feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          image: uploadState.file,
-          feedbackCriteria: config.feedbackCriteria
+          configId: config.id,
+          sessionId,
+          fileContent: uploadState.file,
+          fileName: uploadState.fileName
         }),
       });
 
@@ -115,15 +119,13 @@ export default function UploadInterface({ config, sessionId }: Props) {
       >
         {uploadState.file ? (
           <div className="relative inline-block">
-            <img
-              src={uploadState.file}
-              alt="Uploaded screenshot"
-              className="max-h-96 rounded-lg border border-gray-200"
-            />
+            <pre className="max-h-96 overflow-auto p-4 bg-gray-50 rounded-lg border border-gray-200">
+              {uploadState.file}
+            </pre>
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                setUploadState(prev => ({ ...prev, file: null }));
+                setUploadState(prev => ({ ...prev, file: null, fileName: '' }));
               }}
               className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-sm border border-gray-200"
             >
@@ -136,13 +138,13 @@ export default function UploadInterface({ config, sessionId }: Props) {
               type="file"
               ref={fileInputRef}
               className="hidden"
-              accept="image/*"
+              accept="text/*"
               onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
             />
             <UploadCloud className="h-12 w-12 text-gray-400 mb-4" />
             <div className="text-center">
               <p className="text-lg font-semibold mb-2">Click or drag and drop</p>
-              <p className="text-sm text-gray-600">Upload your screenshot to get feedback</p>
+              <p className="text-sm text-gray-600">Upload your text file to get feedback</p>
             </div>
           </>
         )}
