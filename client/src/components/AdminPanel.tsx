@@ -87,10 +87,13 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
           <Label htmlFor="type">Type</Label>
           <Select
             value={config.type || 'chat'}
-            onValueChange={(value) => onConfigChange({
-              ...config,
-              type: value as 'chat' | 'upload'
-            })}
+            onValueChange={(value) => {
+              console.log('Type changed to:', value); 
+              onConfigChange({
+                ...config,
+                type: value as 'chat' | 'upload'
+              });
+            }}
             disabled={isEditMode}
           >
             <SelectTrigger>
