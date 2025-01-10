@@ -594,7 +594,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add new upload feedback route
+  // Add new upload feedback route (This section is replaced by the edited snippet)
   app.post("/api/upload-feedback", async (req: Request, res: Response) => {
     try {
       const { configId, sessionId, fileContent, fileName } = uploadFeedbackSchema.parse(req.body);
@@ -659,7 +659,7 @@ ${fileContent}`;
         summary
       };
 
-      // Save feedback to conversation
+      // Insert or update the conversation with feedback
       await db.insert(conversations)
         .values({
           configId,

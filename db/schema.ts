@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 
@@ -21,18 +21,15 @@ export const chatConfigs = pgTable("chat_configs", {
 });
 
 export const conversations = pgTable("conversations", {
-  id: serial("id").primaryKey(),
   configId: integer("config_id").notNull().references(() => chatConfigs.id),
   sessionId: text("session_id").notNull(),
   userName: text("user_name"),
   messages: jsonb("messages").notNull().default('[]'),
   feedback: jsonb("feedback").default('{}'),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => {
-  return {
-    configSessionIdx: unique("config_session_idx").on(table.configId, table.sessionId),
-  };
-});
+}, (table) => ({
+  pk: primaryKey({ columns: [table.configId, table.sessionId] })
+}));
 
 // Relations
 export const chatConfigsRelations = relations(chatConfigs, ({ many }) => ({
