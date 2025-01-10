@@ -16,6 +16,7 @@ const messageContentSchema = z.object({
 
 const chatConfigSchema = z.object({
   title: z.string().min(1, "Title is required"),
+  type: z.enum(['chat', 'upload']).default('chat'),
   systemPrompt: z.string().min(1, "System prompt is required"),
   userInstructions: z.string().nullable(),
   feedbackCriteria: z.string().nullable(),
@@ -92,6 +93,7 @@ export function registerRoutes(app: Express): Server {
       const parsedConfig = chatConfigSchema.parse(req.body);
       const result = await db.insert(chatConfigs).values({
         title: parsedConfig.title,
+        type: parsedConfig.type || 'chat',
         systemPrompt: parsedConfig.systemPrompt,
         userInstructions: parsedConfig.userInstructions,
         feedbackCriteria: parsedConfig.feedbackCriteria,
@@ -163,6 +165,7 @@ export function registerRoutes(app: Express): Server {
       const result = await db.update(chatConfigs)
         .set({
           title: parsedConfig.title,
+          type: parsedConfig.type || 'chat',
           systemPrompt: parsedConfig.systemPrompt,
           userInstructions: parsedConfig.userInstructions,
           feedbackCriteria: parsedConfig.feedbackCriteria,
