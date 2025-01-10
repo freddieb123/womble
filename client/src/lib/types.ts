@@ -20,9 +20,21 @@ export interface ChatState {
 export interface AdminConfig {
   id?: number;
   title: string;
+  type?: 'chat' | 'upload';
   systemPrompt: string;
   userInstructions: string;
   feedbackCriteria: string;
   temperature: number;
   maxTokens: number;
+}
+
+export interface UploadState {
+  file: string | null;
+  isLoading: boolean;
+  error: string | null;
+  feedback?: {
+    bullets: string[];
+    score: number;
+    summary: string;
+  };
 }

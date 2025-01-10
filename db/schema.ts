@@ -10,6 +10,7 @@ export const users = pgTable("users", {
 
 export const chatConfigs = pgTable("chat_configs", {
   id: serial("id").primaryKey(),
+  type: text("type", { enum: ['chat', 'upload'] }).default('chat').notNull(),
   title: text("title").notNull(),
   systemPrompt: text("system_prompt").notNull(),
   userInstructions: text("user_instructions"),

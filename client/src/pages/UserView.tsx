@@ -1,6 +1,7 @@
 import { useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import ChatInterface from "@/components/ChatInterface";
+import UploadInterface from "@/components/UploadInterface";
 import { AdminConfig } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle } from "lucide-react";
@@ -13,13 +14,6 @@ export default function UserView() {
   const sessionId = searchParams.get('sessionId') || crypto.randomUUID();
   const userName = searchParams.get('userName');
   const isViewOnly = searchParams.get('viewOnly') === 'true';
-
-  console.log("Current location:", location);
-  console.log("Search params:", window.location.search);
-  console.log("Loading config with ID:", configId);
-  console.log("Session ID:", sessionId);
-  console.log("User Name:", userName);
-  console.log("View Only:", isViewOnly);
 
   const { data: savedConfig, isLoading, error } = useQuery<SelectChatConfig>({
     queryKey: [`/api/chat-configs/${configId}`],
@@ -39,7 +33,7 @@ export default function UserView() {
     }
     const newUrl = `${window.location.pathname}?${newParams.toString()}`;
     window.history.replaceState({}, '', newUrl);
-    window.location.reload(); // Force reload to update the userName state
+    window.location.reload();
     return newUrl;
   };
 
@@ -64,7 +58,7 @@ export default function UserView() {
         <div className="max-w-4xl mx-auto">
           <Card className="p-6">
             <div className="flex items-center justify-center h-[600px]">
-              <div className="animate-pulse text-blue-900">Loading chat history...</div>
+              <div className="animate-pulse text-blue-900">Loading configuration...</div>
             </div>
           </Card>
         </div>
@@ -80,7 +74,7 @@ export default function UserView() {
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-red-500" />
               <p className="text-sm text-red-700">
-                Failed to load chat: {error instanceof Error ? error.message : 'Unknown error'}
+                Failed to load configuration: {error instanceof Error ? error.message : 'Unknown error'}
               </p>
             </div>
           </Card>
@@ -91,6 +85,7 @@ export default function UserView() {
 
   const config: AdminConfig = {
     id: savedConfig.id,
+    type: savedConfig.type,
     title: savedConfig.title,
     systemPrompt: savedConfig.systemPrompt,
     temperature: 0.7,
@@ -103,13 +98,20 @@ export default function UserView() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         <Card className="p-6">
-          <ChatInterface 
-            config={config} 
-            sessionId={sessionId} 
-            userName={userName} 
-            isViewOnly={isViewOnly}
-            onUserNameSubmit={updateUrlWithUserName} 
-          />
+          {config.type === 'upload' ? (
+            <UploadInterface
+              config={config}
+              sessionId={sessionId}
+            />
+          ) : (
+            <ChatInterface 
+              config={config} 
+              sessionId={sessionId} 
+              userName={userName} 
+              isViewOnly={isViewOnly}
+              onUserNameSubmit={updateUrlWithUserName} 
+            />
+          )}
         </Card>
       </div>
     </div>

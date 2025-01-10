@@ -6,6 +6,7 @@ import { Wand2 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { AdminConfig } from "@/lib/types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Props {
   config: AdminConfig;
@@ -83,6 +84,29 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
         </div>
 
         <div className="space-y-2">
+          <Label htmlFor="type">Type</Label>
+          <Select
+            value={config.type || 'chat'}
+            onValueChange={(value) => onConfigChange({
+              ...config,
+              type: value as 'chat' | 'upload'
+            })}
+            disabled={isEditMode}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="chat">Chat</SelectItem>
+              <SelectItem value="upload">Upload</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-sm text-muted-foreground">
+            Choose between a chat-based or upload-based interface.
+          </p>
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="system-prompt">System Prompt</Label>
           <Textarea
             id="system-prompt"
@@ -114,7 +138,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
             rows={4}
           />
           <p className="text-sm text-muted-foreground">
-            Add helpful instructions or context that will be shown to users of this chat.
+            Add helpful instructions or context that will be shown to users of this {config.type || 'chat'}.
           </p>
         </div>
 
@@ -132,7 +156,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
             rows={4}
           />
           <p className="text-sm text-muted-foreground">
-            Specify criteria that will be used to assess and provide feedback on user interactions.
+            Specify criteria that will be used to assess and provide feedback on {config.type === 'upload' ? 'uploads' : 'user interactions'}.
           </p>
           {!isEditMode && (
             <Button
