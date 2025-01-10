@@ -147,12 +147,21 @@ export default function ConversationAnalysis() {
 
         // Get feedback for each conversation
         const feedbackPromises = conversationsData.map(async (conversation: ConversationData) => {
-          const hasUserMessage = conversation.messages.some(m => m.role === 'user');
-          const hasAssistantMessage = conversation.messages.some(m => m.role === 'assistant');
-
-          if (!hasUserMessage || !hasAssistantMessage) {
-            console.warn('Skipping conversation without complete exchange');
-            return null;
+          // For upload type, we only need to check if there's a message containing an upload
+          if (config.type === 'upload') {
+            if (!conversation.messages.some(m => m.content.includes('Uploaded file:'))) {
+              console.warn('Skipping conversation without upload');
+              return null;
+            }
+          } else {
+            // For chat type, check for user-assistant exchange
+            const hasUserMessage = conversation.messages.some(m => m.role === 'user');
+            const hasAssistantMessage = conversation.messages.some(m => m.role === 'assistant');
+            
+            if (!hasUserMessage || !hasAssistantMessage) {
+              console.warn('Skipping conversation without complete exchange');
+              return null;
+            }
           }
 
           const feedbackResponse = await fetch("/api/chat-feedback", {
