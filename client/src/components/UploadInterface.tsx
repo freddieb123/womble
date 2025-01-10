@@ -108,9 +108,10 @@ export default function UploadInterface({ config, sessionId }: Props) {
       )}
 
       <div 
-        className="flex-1 border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-6 relative"
+        className="flex-1 border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-6 relative cursor-pointer hover:bg-gray-50"
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
       >
         {uploadState.file ? (
           <div className="relative inline-block">
@@ -120,7 +121,10 @@ export default function UploadInterface({ config, sessionId }: Props) {
               className="max-h-96 rounded-lg border border-gray-200"
             />
             <button
-              onClick={() => setUploadState(prev => ({ ...prev, file: null }))}
+              onClick={(e) => {
+                e.stopPropagation();
+                setUploadState(prev => ({ ...prev, file: null }));
+              }}
               className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-sm border border-gray-200"
             >
               <X className="h-4 w-4 text-gray-500" />
@@ -137,15 +141,8 @@ export default function UploadInterface({ config, sessionId }: Props) {
             />
             <UploadCloud className="h-12 w-12 text-gray-400 mb-4" />
             <div className="text-center">
-              <Button
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                Choose file
-              </Button>
-              <p className="mt-2 text-sm text-gray-600">
-                or drag and drop
-              </p>
+              <p className="text-lg font-semibold mb-2">Click or drag and drop</p>
+              <p className="text-sm text-gray-600">Upload your screenshot to get feedback</p>
             </div>
           </>
         )}
@@ -154,10 +151,11 @@ export default function UploadInterface({ config, sessionId }: Props) {
       <div className="mt-4">
         <Button 
           className="w-full" 
+          size="lg"
           disabled={!uploadState.file || uploadState.isLoading}
           onClick={getFeedback}
         >
-          {uploadState.isLoading ? "Getting feedback..." : "Get Feedback"}
+          {uploadState.isLoading ? "Analyzing..." : "Get Feedback"}
         </Button>
       </div>
 
