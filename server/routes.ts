@@ -396,24 +396,16 @@ export function registerRoutes(app: Express): Server {
 
       const messagesToAnalyze = messages || (sessions[sessionId] || []);
 
-      if (!Array.isArray(messagesToAnalyze) || messagesToAnalyze.length === 0) {
-        return res.status(400).json({
-          error: "No messages found to analyze"
-        });
-      }
-
       if (type === 'upload') {
         // For upload type, we just need at least one message with a file
-        const hasUpload = messagesToAnalyze.some(m => 
-          typeof m.content === 'string' && m.content.includes('Uploaded file:')
-        );
-        if (!hasUpload) {
+        if (!messagesToAnalyze.some(m => m.content.includes('Uploaded file:'))) {
           return res.status(400).json({
-            error: "No uploads found to analyze"
+            error: "No uploads found to analyze."
           });
         }
       } else {
         // For chat type, we need the regular message validation
+        if (!Array.isArray(messagesToAnalyze) || messagesToAnalyze.length === 0) {
           return res.status(400).json({
             error: "No chat messages to analyze. Please have a conversation first before requesting feedback."
           });
