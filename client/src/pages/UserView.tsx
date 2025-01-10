@@ -85,7 +85,7 @@ export default function UserView() {
 
   const config: AdminConfig = {
     id: savedConfig.id,
-    type: savedConfig.type,
+    type: savedConfig.type || 'chat', 
     title: savedConfig.title,
     systemPrompt: savedConfig.systemPrompt,
     temperature: 0.7,

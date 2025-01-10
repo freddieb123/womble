@@ -30,6 +30,7 @@ import { Switch } from "@/components/ui/switch";
 type ChatConfig = {
   id: number;
   title: string;
+  type?: string; // Added type field
   systemPrompt: string;
   userInstructions: string | null;
   feedbackCriteria: string | null;
@@ -74,6 +75,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: config.title,
+          type: config.type || 'chat', // Ensure type is included
           systemPrompt: config.systemPrompt,
           userInstructions: config.userInstructions,
           feedbackCriteria: config.feedbackCriteria,
@@ -116,7 +118,10 @@ export default function Home() {
       const response = await fetch(`/api/chat-configs/${configToUpdate.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(configToUpdate),
+        body: JSON.stringify({
+          ...configToUpdate,
+          type: configToUpdate.type || 'chat', // Ensure type is included
+        }),
       });
 
       if (!response.ok) {
