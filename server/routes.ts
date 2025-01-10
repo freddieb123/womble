@@ -594,7 +594,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add new upload feedback route (This section is replaced by the edited snippet)
+  // Add new upload feedback route
   app.post("/api/upload-feedback", async (req: Request, res: Response) => {
     try {
       const { configId, sessionId, fileContent, fileName } = uploadFeedbackSchema.parse(req.body);
@@ -611,26 +611,26 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Feedback criteria not set for this configuration" });
       }
 
-      const prompt = `Analyze the following uploaded file based on these criteria: ${config.feedbackCriteria}
-
-Please provide your feedback in exactly this format:
-
-• [3 bullet points focusing on how well the file content meets the criteria]
-
-Score: [1-10]
-[Brief one-line summary of overall quality]
-
-File content:
-${fileContent}`;
+      const prompt = `Analyze the uploaded screenshot based on these criteria:\n${config.feedbackCriteria}\n\nPlease provide your analysis in exactly this format:\n\n• [3 bullet points focusing on how well the screenshot meets the criteria]\n\nScore: [1-10]\n[Brief one-line summary of overall quality]`;
 
       const completion = await openai.chat.completions.create({
+        // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
         model: "gpt-4o",
         messages: [
           {
             role: "system",
-            content: "You are an expert at evaluating uploaded content. Focus your feedback solely on the content, taking into account the provided criteria. Keep feedback points brief, clear, and actionable."
+            content: "You are an expert at analyzing screenshots and providing constructive feedback. Focus on visual elements, clarity, and how well the content meets the specified criteria."
           },
-          { role: "user", content: prompt }
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              {
+                type: "image_url",
+                image_url: { url: fileContent }
+              }
+            ]
+          }
         ],
         temperature: 0.7,
         max_tokens: 1000,
