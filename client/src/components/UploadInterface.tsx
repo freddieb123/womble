@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import type { AdminConfig, UploadState } from "@/lib/types";
 
 interface Props {
@@ -21,6 +22,27 @@ export default function UploadInterface({ config, sessionId }: Props) {
   });
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const { toast } = useToast();
+
+  // Fetch existing feedback if available
+  const { data: conversations } = useQuery({
+    queryKey: [`/api/conversations/${config.id}`],
+    enabled: !!config.id,
+  });
+
+  // Get the latest feedback if available
+  useEffect(() => {
+    if (conversations && conversations.length > 0) {
+      const latestConversation = conversations.find(conv => conv.sessionId === sessionId);
+      if (latestConversation?.feedback) {
+        setUploadState(prev => ({
+          ...prev,
+          feedback: typeof latestConversation.feedback === 'string' 
+            ? JSON.parse(latestConversation.feedback)
+            : latestConversation.feedback
+        }));
+      }
+    }
+  }, [conversations, sessionId]);
 
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
@@ -98,6 +120,18 @@ export default function UploadInterface({ config, sessionId }: Props) {
     }
   };
 
+  const viewFeedback = () => {
+    if (uploadState.feedback) {
+      setFeedbackOpen(true);
+    } else {
+      toast({
+        variant: "destructive",
+        title: "No feedback",
+        description: "No feedback available for this upload yet"
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col h-[600px]">
       <h2 className="text-2xl font-bold mb-4">{config.title}</h2>
@@ -136,7 +170,7 @@ export default function UploadInterface({ config, sessionId }: Props) {
         )}
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 space-y-2">
         <Button 
           className="w-full" 
           size="lg"
@@ -144,6 +178,15 @@ export default function UploadInterface({ config, sessionId }: Props) {
           onClick={getFeedback}
         >
           {uploadState.isLoading ? "Analyzing..." : "Get Feedback"}
+        </Button>
+
+        <Button
+          variant="outline"
+          className="w-full"
+          size="lg"
+          onClick={viewFeedback}
+        >
+          View Current Feedback
         </Button>
       </div>
 
