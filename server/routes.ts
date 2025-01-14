@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
-import { chatConfigs, conversations, uploads } from "@db/schema";
+import { chatConfigs, messages, type Message, type FeedbackData } from "@db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import crypto from 'crypto';
@@ -21,29 +21,24 @@ interface MessageContent {
   image?: string | null;
 }
 
-interface Message {
-  role: 'user' | 'assistant';
-  content: string | MessageContent;
-  timestamp: number;
-  id: string;
-  sessionId: string;
-}
-
 interface ConversationData {
   messages: Message[];
   userName: string | null;
   sessionId: string;
+  feedback: ConversationFeedback | null;
+}
+
+interface ConversationFeedback {
+  bullets: string[];
+  score: number;
+  summary: string | null;
 }
 
 interface UploadData {
   fileName: string;
   userName: string | null;
   sessionId: string;
-  feedback: {
-    bullets: string[];
-    score: number;
-    summary: string | null;
-  } | null;
+  feedback: FeedbackData | null;
 }
 
 export function registerRoutes(app: Express): Server {
@@ -58,19 +53,16 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Valid config ID is required" });
       }
 
-      const conversation = await db.query.conversations.findFirst({
+      const conversation = await db.query.messages.findFirst({
         where: and(
-          eq(conversations.configId, configId),
-          eq(conversations.sessionId, sessionId)
+          eq(messages.configId, configId),
+          eq(messages.sessionId, sessionId),
+          eq(messages.type, 'conversation')
         ),
       });
 
       if (!sessions[sessionId]) {
-        sessions[sessionId] = conversation ?
-          (typeof conversation.messages === 'string' ?
-            JSON.parse(conversation.messages) :
-            conversation.messages) :
-          [];
+        sessions[sessionId] = conversation?.messages || [];
       }
 
       const response = {
@@ -109,15 +101,15 @@ export function registerRoutes(app: Express): Server {
       const parsedConfig = configSchema.parse(config);
 
       if (!sessions[sessionId]) {
-        const existingConversation = await db.query.conversations.findFirst({
+        const existingConversation = await db.query.messages.findFirst({
           where: and(
-            eq(conversations.configId, configId),
-            eq(conversations.sessionId, sessionId)
+            eq(messages.configId, configId),
+            eq(messages.sessionId, sessionId),
+            eq(messages.type, 'conversation')
           ),
         });
 
-        sessions[sessionId] = existingConversation ?
-          JSON.parse(existingConversation.messages as string) : [];
+        sessions[sessionId] = existingConversation?.messages || [];
       }
 
       const userMessage: Message = {
@@ -134,18 +126,18 @@ export function registerRoutes(app: Express): Server {
 
       try {
         await db
-          .insert(conversations)
+          .insert(messages)
           .values({
             configId,
             sessionId,
+            type: 'conversation',
             userName,
-            messages: JSON.stringify(sessions[sessionId])
+            messages: sessions[sessionId],
           })
           .onConflictDoUpdate({
-            target: [conversations.configId, conversations.sessionId],
+            target: [messages.configId, messages.sessionId],
             set: {
-              userName,
-              messages: JSON.stringify(sessions[sessionId])
+              messages: sessions[sessionId]
             }
           });
       } catch (error) {
@@ -228,13 +220,14 @@ export function registerRoutes(app: Express): Server {
         sessions[sessionId].push(assistantMessage);
 
         await db
-          .update(conversations)
+          .update(messages)
           .set({
-            messages: JSON.stringify(sessions[sessionId])
+            messages: sessions[sessionId]
           })
           .where(and(
-            eq(conversations.configId, configId),
-            eq(conversations.sessionId, sessionId)
+            eq(messages.configId, configId),
+            eq(messages.sessionId, sessionId),
+            eq(messages.type, 'conversation')
           ));
 
         res.write('data: [DONE]\n\n');
@@ -248,51 +241,6 @@ export function registerRoutes(app: Express): Server {
       console.error("Error processing message:", error);
       res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
       res.end();
-    }
-  });
-
-  // Restore chat-configs endpoints
-  app.post("/api/chat-configs", async (req, res) => {
-    try {
-      const parsedConfig = chatConfigSchema.parse(req.body);
-      const result = await db.insert(chatConfigs).values({
-        title: parsedConfig.title,
-        type: parsedConfig.type || 'chat',
-        systemPrompt: parsedConfig.systemPrompt,
-        userInstructions: parsedConfig.userInstructions,
-        feedbackCriteria: parsedConfig.feedbackCriteria,
-      }).returning();
-
-      res.json(result[0]);
-    } catch (error: any) {
-      console.error("Error saving chat config:", error);
-      res.status(400).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/chat-configs", async (req, res) => {
-    try {
-      const showDeleted = req.query.showDeleted === 'true';
-      const configs = await db.query.chatConfigs.findMany({
-        where: showDeleted ? undefined : eq(chatConfigs.deleted, false),
-        orderBy: [desc(chatConfigs.createdAt)],
-        with: {
-          conversations: true,
-          uploads: true,
-        }
-      });
-
-      const configsWithCount = configs.map(config => ({
-        ...config,
-        conversationCount: config.type === 'upload' ? config.uploads.length : config.conversations.length,
-        conversations: undefined,
-        uploads: undefined
-      }));
-
-      res.json(configsWithCount);
-    } catch (error: any) {
-      console.error("Error fetching chat configs:", error);
-      res.status(500).json({ error: error.message });
     }
   });
 
@@ -343,7 +291,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       const scoreMatch = response.match(/Score:\s*(\d+)/i);
-      const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
+      const score = scoreMatch ? parseInt(scoreMatch[1]) : 0; // Default to 0 if no score found
 
       const summaryMatch = response.match(/Score:\s*\d+\s*\n([^\n]+)/i);
       const summary = summaryMatch ? summaryMatch[1].trim() : null;
@@ -354,27 +302,28 @@ export function registerRoutes(app: Express): Server {
         .filter(bullet => bullet.trim())
         .map(bullet => bullet.trim());
 
-      const feedbackData = {
+      const feedbackData: FeedbackData = {
         bullets,
         score,
         summary
       };
 
-      // Save to uploads table
-      await db.insert(uploads)
+      await db
+        .insert(messages)
         .values({
           configId,
           sessionId,
+          type: 'upload',
           userName,
           fileName,
-          feedback: JSON.stringify(feedbackData)
+          feedback: feedbackData
         })
         .onConflictDoUpdate({
-          target: [uploads.configId, uploads.sessionId],
+          target: [messages.configId, messages.sessionId],
           set: {
             userName,
             fileName,
-            feedback: JSON.stringify(feedbackData)
+            feedback: feedbackData
           }
         });
 
@@ -402,33 +351,36 @@ export function registerRoutes(app: Express): Server {
       }
 
       if (config.type === 'upload') {
-        // Fetch uploads
-        const savedUploads = await db.query.uploads.findMany({
-          where: eq(uploads.configId, configId),
-          orderBy: [desc(uploads.createdAt)]
+        const uploadData = await db.query.messages.findMany({
+          where: and(
+            eq(messages.configId, configId),
+            eq(messages.type, 'upload')
+          ),
+          orderBy: [desc(messages.createdAt)]
         });
 
-        const uploadsWithMetadata: UploadData[] = savedUploads.map(upload => ({
+        const uploadsWithMetadata: UploadData[] = uploadData.map(upload => ({
           sessionId: upload.sessionId,
-          userName: upload.userName,
-          fileName: upload.fileName,
-          feedback: upload.feedback ? JSON.parse(upload.feedback as string) : null
+          userName: upload.userName || null,
+          fileName: upload.fileName!,
+          feedback: upload.feedback
         }));
 
         res.json(uploadsWithMetadata);
       } else {
-        // Fetch conversations
-        const savedConversations = await db.query.conversations.findMany({
-          where: eq(conversations.configId, configId),
-          orderBy: [desc(conversations.createdAt)]
+        const conversationData = await db.query.messages.findMany({
+          where: and(
+            eq(messages.configId, configId),
+            eq(messages.type, 'conversation')
+          ),
+          orderBy: [desc(messages.createdAt)]
         });
 
-        const conversationsWithMetadata: ConversationData[] = savedConversations.map(conv => ({
+        const conversationsWithMetadata: ConversationData[] = conversationData.map(conv => ({
           sessionId: conv.sessionId,
-          userName: conv.userName,
-          messages: typeof conv.messages === 'string' ?
-            JSON.parse(conv.messages) :
-            conv.messages as Message[]
+          userName: conv.userName || null,
+          messages: conv.messages || [],
+          feedback: null
         }));
 
         res.json(conversationsWithMetadata);
@@ -449,15 +401,14 @@ export function registerRoutes(app: Express): Server {
       }
 
       const prompt = `Based on the following conversation and context, provide a brief, encouraging suggestion directly to the user about their next message or action. You should think of this as a hint that will help them improve their feedback score.
+Context:
+${userInstructions ? `Instructions that the user received: ${userInstructions}` : ''}
+Feedback Criteria: ${feedbackCriteria}
 
-      Context:
-      ${userInstructions ? `Instructions that the user received: ${userInstructions}` : ''}
-      Feedback Criteria: ${feedbackCriteria}
+Conversation so far:
+${messages.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}
 
-      Conversation so far:
-      ${messages.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}
-
-      Provide a single, friendly sentence starting with "Try to" or "Consider" that directly tells the user what they could do next. Focus on practical communication advice that aligns with the feedback criteria.`;
+Provide a single, friendly sentence starting with "Try to" or "Consider" that directly tells the user what they could do next. Focus on practical communication advice that aligns with the feedback criteria.`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o",
@@ -488,32 +439,15 @@ export function registerRoutes(app: Express): Server {
   return httpServer;
 }
 
-const messageContentSchema = z.object({
-  text: z.string(),
-  image: z.string().nullable()
-});
-
-const chatConfigSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  type: z.enum(['chat', 'upload']).default('chat'),
-  systemPrompt: z.string().min(1, "System prompt is required"),
-  userInstructions: z.string().nullable(),
-  feedbackCriteria: z.string().nullable(),
-});
-
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error("OPENAI_API_KEY is required");
-}
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  dangerouslyAllowBrowser: false
-});
-
-const sessions: Record<string, Message[]> = {};
-
 const configSchema = z.object({
   systemPrompt: z.string(),
   temperature: z.number().min(0).max(2),
   maxTokens: z.number().min(100).max(4000)
+});
+
+const sessions: Record<string, Message[]> = {};
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  dangerouslyAllowBrowser: false
 });
