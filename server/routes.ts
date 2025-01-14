@@ -16,6 +16,30 @@ const uploadFeedbackSchema = z.object({
   fileName: z.string(),
 });
 
+interface Message {
+  role: 'user' | 'assistant';
+  content: string | {
+    text: string;
+    image?: string | null;
+  };
+  timestamp: number;
+  id: string;
+  sessionId: string;
+}
+
+interface FeedbackData {
+  bullets: string[];
+  score: number;
+  summary: string | null;
+}
+
+interface Conversation {
+  sessionId: string;
+  feedback?: FeedbackData | null;
+  messages: Message[];
+  userName?: string;
+}
+
 export function registerRoutes(app: Express): Server {
   app.get("/api/messages", async (req: Request, res: Response) => {
     try {
@@ -248,13 +272,13 @@ export function registerRoutes(app: Express): Server {
           JSON.parse(existingConversation.messages as string) : [];
       }
 
-      const userMessage = {
+      const userMessage: Message = {
         id: crypto.randomUUID(),
         content: {
           text: content.text,
           image: content.image
         },
-        role: 'user' as const,
+        role: 'user',
         timestamp: Date.now(),
         sessionId
       };
@@ -300,7 +324,8 @@ export function registerRoutes(app: Express): Server {
         ? `${parsedConfig.systemPrompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${userName}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${userName}!" or "Hi ${userName}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much!`
         : parsedConfig.systemPrompt;
 
-      let apiMessages: ChatCompletionMessageParam[] = [
+      // Fix the chat API messages array construction type error
+      const apiMessages: ChatCompletionMessageParam[] = [
         { role: "system", content: enhancedSystemPrompt }
       ];
 
@@ -358,10 +383,10 @@ export function registerRoutes(app: Express): Server {
           }
         }
 
-        const assistantMessage = {
+        const assistantMessage: Message = {
           id: messageId,
           content: accumulatedMessage,
-          role: 'assistant' as const,
+          role: 'assistant',
           timestamp: Date.now(),
           sessionId
         };
@@ -556,6 +581,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add better type checking and error handling for conversations endpoint
   app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.configId);
@@ -563,17 +589,88 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Invalid config ID" });
       }
 
+      // First get the config to determine its type
+      const config = await db.query.chatConfigs.findFirst({
+        where: eq(chatConfigs.id, configId),
+      });
+
+      if (!config) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+
       const savedConversations = await db.query.conversations.findMany({
         where: eq(conversations.configId, configId),
         orderBy: [desc(conversations.createdAt)]
       });
 
-      const conversationsWithMetadata = savedConversations.map(conv => ({
-        messages: typeof conv.messages === 'string' ? JSON.parse(conv.messages) : conv.messages,
-        userName: conv.userName,
-        sessionId: conv.sessionId,
-        feedback: typeof conv.feedback === 'string' ? JSON.parse(conv.feedback) : conv.feedback
-      }));
+      const parseMessages = (messagesData: any): Message[] => {
+        try {
+          if (typeof messagesData === 'string') {
+            return JSON.parse(messagesData);
+          }
+          return Array.isArray(messagesData) ? messagesData : [];
+        } catch (e) {
+          console.error('Error parsing messages:', e);
+          return [];
+        }
+      };
+
+      const parseFeedback = (feedbackData: any): FeedbackData | null => {
+        try {
+          if (!feedbackData) return null;
+          const parsed = typeof feedbackData === 'string' ? JSON.parse(feedbackData) : feedbackData;
+          if (parsed && typeof parsed === 'object' && 'bullets' in parsed) {
+            return parsed as FeedbackData;
+          }
+          return null;
+        } catch (e) {
+          console.error('Error parsing feedback:', e);
+          return null;
+        }
+      };
+
+      let conversationsWithMetadata: Conversation[] = [];
+
+      if (config.type === 'upload') {
+        // For upload type, we only need the latest feedback per session
+        conversationsWithMetadata = savedConversations
+          .map(conv => {
+            const feedback = parseFeedback(conv.feedback);
+            const messages = parseMessages(conv.messages);
+
+            // Only include conversations with valid feedback for upload type
+            if (!feedback) return null;
+
+            return {
+              sessionId: conv.sessionId,
+              feedback,
+              messages: messages.length > 0 ? messages : [{
+                role: 'user',
+                content: 'Upload content not available',
+                timestamp: Date.now(),
+                id: crypto.randomUUID(),
+                sessionId: conv.sessionId
+              }]
+            };
+          })
+          .filter((conv): conv is Conversation => conv !== null);
+      } else {
+        // For chat type, include all messages and feedback
+        conversationsWithMetadata = savedConversations
+          .map(conv => {
+            const messages = parseMessages(conv.messages);
+            if (messages.length === 0) return null;
+
+            return {
+              sessionId: conv.sessionId,
+              messages,
+              userName: conv.userName || undefined,
+              feedback: parseFeedback(conv.feedback)
+            };
+          })
+          .filter((conv): conv is Conversation => conv !== null);
+      }
+
       res.json(conversationsWithMetadata);
     } catch (error: any) {
       console.error("Error fetching conversations:", error);
@@ -637,7 +734,6 @@ export function registerRoutes(app: Express): Server {
       const prompt = `Analyze the uploaded screenshot based on these criteria:\n${config.feedbackCriteria}\n\nPlease provide your analysis in exactly this format:\n\n• [3 bullet points focusing on how well the screenshot meets the criteria]\n\nScore: [1-10]\n[Brief one-line summary of overall quality]`;
 
       const completion = await openai.chat.completions.create({
-        // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
         model: "gpt-4o",
         messages: [
           {
@@ -741,7 +837,7 @@ const openai = new OpenAI({
   dangerouslyAllowBrowser: false
 });
 
-const sessions: Record<string, any[]> = {};
+const sessions: Record<string, Message[]> = {};
 
 function getSessionId(req: Request): string {
   const url = new URL(req.url, `http://${req.headers.host}`);

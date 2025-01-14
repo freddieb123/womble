@@ -8,6 +8,22 @@ import { Info } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { AdminConfig, UploadState } from "@/lib/types";
 
+interface Conversation {
+  sessionId: string;
+  feedback?: {
+    bullets: string[];
+    score: number;
+    summary: string | null;
+  } | null;
+  messages: Array<{
+    role: string;
+    content: string;
+    timestamp: number;
+    id: string;
+    sessionId: string;
+  }>;
+}
+
 interface Props {
   config: AdminConfig;
   sessionId: string;
@@ -18,27 +34,27 @@ export default function UploadInterface({ config, sessionId }: Props) {
     file: null,
     isLoading: false,
     error: null,
-    feedback: undefined
+    feedback: null
   });
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const { toast } = useToast();
 
   // Fetch existing feedback if available
-  const { data: conversations } = useQuery({
+  const { data: conversations } = useQuery<Conversation[]>({
     queryKey: [`/api/conversations/${config.id}`],
     enabled: !!config.id,
   });
 
   // Get the latest feedback if available
   useEffect(() => {
-    if (conversations && conversations.length > 0) {
-      const latestConversation = conversations.find(conv => conv.sessionId === sessionId);
-      if (latestConversation?.feedback) {
+    if (conversations && Array.isArray(conversations) && conversations.length > 0) {
+      // Find the conversation for current session
+      const currentConversation = conversations.find(conv => conv.sessionId === sessionId);
+
+      if (currentConversation?.feedback) {
         setUploadState(prev => ({
           ...prev,
-          feedback: typeof latestConversation.feedback === 'string' 
-            ? JSON.parse(latestConversation.feedback)
-            : latestConversation.feedback
+          feedback: currentConversation.feedback
         }));
       }
     }
@@ -121,15 +137,16 @@ export default function UploadInterface({ config, sessionId }: Props) {
   };
 
   const viewFeedback = () => {
-    if (uploadState.feedback) {
-      setFeedbackOpen(true);
-    } else {
+    if (!uploadState.feedback) {
       toast({
         variant: "destructive",
         title: "No feedback",
-        description: "No feedback available for this upload yet"
+        description: "No feedback available for this upload yet. Please upload an image and get feedback first."
       });
+      return;
     }
+
+    setFeedbackOpen(true);
   };
 
   return (

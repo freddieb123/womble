@@ -20,7 +20,7 @@ export interface ChatState {
 export interface AdminConfig {
   id?: number;
   title: string;
-  type: 'chat' | 'upload';  // Make type required and explicitly typed
+  type: 'chat' | 'upload';
   systemPrompt: string;
   userInstructions: string;
   feedbackCriteria: string;
@@ -35,6 +35,6 @@ export interface UploadState {
   feedback?: {
     bullets: string[];
     score: number;
-    summary: string;
-  };
+    summary: string | null;
+  } | null;  // Make feedback entirely optional and nullable
 }
