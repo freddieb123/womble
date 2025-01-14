@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
-import type { Message } from "@/lib/types";
+import type { Message, AdminConfig } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 
 interface ConversationFeedback {
@@ -17,6 +17,7 @@ interface ConversationData {
   messages: Message[];
   userName: string | null;
   sessionId: string;
+  feedback: ConversationFeedback | null;
 }
 
 export default function ConversationAnalysis() {
@@ -30,22 +31,14 @@ export default function ConversationAnalysis() {
   const searchParams = new URLSearchParams(window.location.search);
   const configId = searchParams.get('configId');
 
-  const { data: config } = useQuery({
+  const { data: config } = useQuery<AdminConfig>({
     queryKey: [`/api/chat-configs/${configId}`],
     enabled: !!configId,
   });
 
   const handleViewChat = (conversation: ConversationData) => {
     try {
-      // Log the conversation data for debugging
-      console.log('Opening conversation:', conversation);
-
-      if (!configId) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "No config ID provided",
-        });
+      if (!configId || !config || config.type === 'upload') {
         return;
       }
 
@@ -57,8 +50,6 @@ export default function ConversationAnalysis() {
         url.searchParams.set('userName', conversation.userName);
       }
 
-      // Log the final URL for debugging
-      console.log('Opening chat URL:', url.toString());
       window.open(url.toString(), '_blank');
     } catch (error) {
       console.error('Error in handleViewChat:', error);
@@ -78,12 +69,23 @@ export default function ConversationAnalysis() {
 
       const newFeedbacks = await Promise.all(
         conversations.map(async (conversation) => {
-          const hasUserMessage = conversation.messages.some(m => m.role === 'user');
-          const hasAssistantMessage = conversation.messages.some(m => m.role === 'assistant');
+          if (config.type === 'upload') {
+            // For upload type, check if there's a file upload message
+            if (!conversation.messages.some(m => 
+              typeof m.content === 'object' && m.content.image !== null
+            )) {
+              console.warn('Skipping conversation without upload');
+              return null;
+            }
+          } else {
+            // For chat type, check for user-assistant exchange
+            const hasUserMessage = conversation.messages.some(m => m.role === 'user');
+            const hasAssistantMessage = conversation.messages.some(m => m.role === 'assistant');
 
-          if (!hasUserMessage || !hasAssistantMessage) {
-            console.warn('Skipping conversation without complete exchange');
-            return null;
+            if (!hasUserMessage || !hasAssistantMessage) {
+              console.warn('Skipping conversation without complete exchange');
+              return null;
+            }
           }
 
           const feedbackResponse = await fetch("/api/chat-feedback", {
@@ -91,7 +93,8 @@ export default function ConversationAnalysis() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               feedbackCriteria: config.feedbackCriteria,
-              messages: conversation.messages
+              messages: conversation.messages,
+              type: config.type
             }),
           });
 
@@ -129,27 +132,25 @@ export default function ConversationAnalysis() {
       try {
         setIsLoading(true);
 
-        // Fetch conversations
         const conversationsResponse = await fetch(`/api/conversations/${configId}`);
         if (!conversationsResponse.ok) {
           throw new Error(`Failed to fetch conversations: ${await conversationsResponse.text()}`);
         }
         const conversationsData = await conversationsResponse.json();
 
-        // Log the fetched conversations data
-        console.log('Fetched conversations:', conversationsData);
-
         if (!Array.isArray(conversationsData) || conversationsData.length === 0) {
-          throw new Error("No conversations found for this chat GPT");
+          throw new Error("No conversations found");
         }
 
         setConversations(conversationsData);
 
         // Get feedback for each conversation
         const feedbackPromises = conversationsData.map(async (conversation: ConversationData) => {
-          // For upload type, we only need to check if there's a message containing an upload
           if (config.type === 'upload') {
-            if (!conversation.messages.some(m => m.content.includes('Uploaded file:'))) {
+            // For upload type, we only need to check if there's a message containing an upload
+            if (!conversation.messages.some(m => 
+              typeof m.content === 'object' && m.content.image !== null
+            )) {
               console.warn('Skipping conversation without upload');
               return null;
             }
@@ -157,7 +158,7 @@ export default function ConversationAnalysis() {
             // For chat type, check for user-assistant exchange
             const hasUserMessage = conversation.messages.some(m => m.role === 'user');
             const hasAssistantMessage = conversation.messages.some(m => m.role === 'assistant');
-            
+
             if (!hasUserMessage || !hasAssistantMessage) {
               console.warn('Skipping conversation without complete exchange');
               return null;
@@ -169,7 +170,8 @@ export default function ConversationAnalysis() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               feedbackCriteria: config.feedbackCriteria,
-              messages: conversation.messages
+              messages: conversation.messages,
+              type: config.type
             }),
           });
 
@@ -189,7 +191,7 @@ export default function ConversationAnalysis() {
         const validFeedback = allFeedback.filter(feedback => feedback !== null);
 
         if (validFeedback.length === 0) {
-          throw new Error("No valid conversations found to analyze. Each conversation must have at least one user message and one assistant response.");
+          throw new Error("No valid conversations found to analyze");
         }
 
         setFeedbacks(validFeedback);
@@ -252,16 +254,18 @@ export default function ConversationAnalysis() {
                       <div className="flex justify-between items-center">
                         <span>
                           {conversation.userName
-                            ? `${conversation.userName}'s Conversation`
-                            : `Conversation ${index + 1}`}
+                            ? `${conversation.userName}'s ${config?.type === 'upload' ? 'Upload' : 'Conversation'}`
+                            : `${config?.type === 'upload' ? 'Upload' : 'Conversation'} ${index + 1}`}
                         </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewChat(conversation)}
-                        >
-                          <span className="text-sm">View Chat</span>
-                        </Button>
+                        {config?.type !== 'upload' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewChat(conversation)}
+                          >
+                            <span className="text-sm">View Chat</span>
+                          </Button>
+                        )}
                       </div>
                     </h2>
                   </CardHeader>

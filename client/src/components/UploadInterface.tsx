@@ -44,40 +44,18 @@ export default function UploadInterface({ config, sessionId }: Props) {
     }
   }, [fetchError, toast]);
 
-  // Debug logging for conversations data
-  useEffect(() => {
-    if (conversations) {
-      console.log('Conversations data:', {
-        configId: config.id,
-        configType: config.type,
-        conversationsCount: conversations.length,
-        conversations: conversations.map(c => ({
-          sessionId: c.sessionId,
-          hasFeedback: !!c.feedback,
-          feedback: c.feedback
-        }))
-      });
-    }
-  }, [conversations, config]);
-
   // Get the latest feedback if available
   useEffect(() => {
     if (conversations && conversations.length > 0) {
-      console.log('Looking for feedback for session:', sessionId);
       const currentConversation = conversations.find(conv => conv.sessionId === sessionId);
 
-      console.log('Found conversation:', {
-        found: !!currentConversation,
-        hasFeedback: !!currentConversation?.feedback,
-        feedback: currentConversation?.feedback
-      });
-
       if (currentConversation?.feedback) {
-        console.log('Setting feedback:', currentConversation.feedback);
         setUploadState(prev => ({
           ...prev,
           feedback: currentConversation.feedback
         }));
+        // Automatically show feedback if available
+        setFeedbackOpen(true);
       }
     }
   }, [conversations, sessionId]);
@@ -137,10 +115,10 @@ export default function UploadInterface({ config, sessionId }: Props) {
         throw new Error(await response.text());
       }
 
-      const { bullets, score, summary } = await response.json();
+      const feedbackData = await response.json();
       setUploadState(prev => ({
         ...prev,
-        feedback: { bullets, score, summary }
+        feedback: feedbackData
       }));
       setFeedbackOpen(true);
     } catch (error) {
@@ -156,24 +134,6 @@ export default function UploadInterface({ config, sessionId }: Props) {
     } finally {
       setUploadState(prev => ({ ...prev, isLoading: false }));
     }
-  };
-
-  const viewFeedback = () => {
-    console.log('View feedback clicked:', {
-      hasFeedback: !!uploadState.feedback,
-      feedbackData: uploadState.feedback
-    });
-
-    if (!uploadState.feedback) {
-      toast({
-        variant: "destructive",
-        title: "No feedback",
-        description: "No feedback available for this upload yet. Please upload an image and get feedback first."
-      });
-      return;
-    }
-
-    setFeedbackOpen(true);
   };
 
   return (
@@ -200,7 +160,7 @@ export default function UploadInterface({ config, sessionId }: Props) {
               className="max-h-96 rounded-lg border border-gray-200"
             />
             <button
-              onClick={() => setUploadState(prev => ({ ...prev, file: null }))}
+              onClick={() => setUploadState(prev => ({ ...prev, file: null, feedback: null }))}
               className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-sm border border-gray-200"
             >
               <X className="h-4 w-4 text-gray-500" />
@@ -214,7 +174,7 @@ export default function UploadInterface({ config, sessionId }: Props) {
         )}
       </div>
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-4">
         <Button
           className="w-full"
           size="lg"
@@ -222,15 +182,6 @@ export default function UploadInterface({ config, sessionId }: Props) {
           onClick={getFeedback}
         >
           {uploadState.isLoading ? "Analyzing..." : "Get Feedback"}
-        </Button>
-
-        <Button
-          variant="outline"
-          className="w-full"
-          size="lg"
-          onClick={viewFeedback}
-        >
-          View Current Feedback
         </Button>
       </div>
 
