@@ -258,14 +258,6 @@ export default function Home() {
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-4">
             <h1 className="text-2xl font-bold text-blue-900">Durable Skills GPTs</h1>
-            <Switch
-              checked={showDeleted}
-              onCheckedChange={setShowDeleted}
-              className="ml-4"
-            />
-            <span className="text-sm text-muted-foreground">
-              Show deleted configs
-            </span>
           </div>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
