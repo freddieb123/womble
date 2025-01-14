@@ -157,18 +157,18 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
         <UserNameModal
           open={showNameModal}
           onSubmit={(name) => {
-            const newUrl = onUserNameSubmit(name);
+            onUserNameSubmit(name);
             setShowNameModal(false);
           }}
         />
       )}
 
-      <h2 className="text-2xl font-bold mb-4">{config.title}</h2>
-
+      {/*The following lines were moved up to improve UI flow.*/}
       {config.userInstructions && (
         <Alert className="mb-4">
           <Info className="h-4 w-4" />
           <AlertDescription>
+            <div className="font-semibold text-lg mb-2">{config.title}</div>
             <pre className="font-sans whitespace-pre-wrap">{config.userInstructions}</pre>
           </AlertDescription>
         </Alert>
