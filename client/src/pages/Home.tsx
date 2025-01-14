@@ -301,7 +301,12 @@ export default function Home() {
                 <CardHeader className="pb-4">
                   <div className="flex justify-between items-start">
                     <div>
-                      <CardTitle>{config.title}</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <CardTitle>{config.title}</CardTitle>
+                        <Badge variant={config.type === 'chat' ? 'default' : 'secondary'}>
+                          {config.type === 'chat' ? 'conversation' : 'upload'}
+                        </Badge>
+                      </div>
                       <CardDescription>
                         Created on: {new Date(config.createdAt).toLocaleDateString()}
                         {config.deleted && config.deletedAt && (
