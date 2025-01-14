@@ -27,7 +27,6 @@ export default function ConversationAnalysis() {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const { toast } = useToast();
 
-  // Get configId from URL
   const searchParams = new URLSearchParams(window.location.search);
   const configId = searchParams.get('configId');
 
@@ -35,59 +34,6 @@ export default function ConversationAnalysis() {
     queryKey: [`/api/chat-configs/${configId}`],
     enabled: !!configId,
   });
-
-  const regenerateAllFeedback = async () => {
-    if (!config?.feedbackCriteria || conversations.length === 0 || config.type === 'upload') return;
-
-    try {
-      setIsRegenerating(true);
-
-      const newFeedbacks = await Promise.all(
-        conversations.map(async (conversation) => {
-          const hasUserMessage = conversation.messages.some(m => m.role === 'user');
-          const hasAssistantMessage = conversation.messages.some(m => m.role === 'assistant');
-
-          if (!hasUserMessage || !hasAssistantMessage) {
-            console.warn('Skipping conversation without complete exchange');
-            return null;
-          }
-
-          const feedbackResponse = await fetch("/api/chat-feedback", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              feedbackCriteria: config.feedbackCriteria,
-              messages: conversation.messages,
-              type: config.type
-            }),
-          });
-
-          if (!feedbackResponse.ok) {
-            const errorText = await feedbackResponse.text();
-            throw new Error(`Failed to get feedback: ${errorText}`);
-          }
-
-          return feedbackResponse.json();
-        })
-      );
-
-      const validFeedbacks = newFeedbacks.filter(feedback => feedback !== null);
-      setFeedbacks(validFeedbacks);
-
-      toast({
-        title: "Feedback Updated",
-        description: "Successfully regenerated feedback for all conversations.",
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to regenerate feedback",
-      });
-    } finally {
-      setIsRegenerating(false);
-    }
-  };
 
   useEffect(() => {
     const fetchAndAnalyze = async () => {
@@ -112,49 +58,8 @@ export default function ConversationAnalysis() {
         if (config.type === 'upload') {
           const existingFeedbacks = conversationsData.map(conv => conv.feedback).filter(f => f !== null);
           setFeedbacks(existingFeedbacks);
-          return;
         }
 
-        // For chat type, get feedback for each conversation
-        const feedbackPromises = conversationsData.map(async (conversation: ConversationData) => {
-          const hasUserMessage = conversation.messages.some(m => m.role === 'user');
-          const hasAssistantMessage = conversation.messages.some(m => m.role === 'assistant');
-
-          if (!hasUserMessage || !hasAssistantMessage) {
-            console.warn('Skipping conversation without complete exchange');
-            return null;
-          }
-
-          const feedbackResponse = await fetch("/api/chat-feedback", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              feedbackCriteria: config.feedbackCriteria,
-              messages: conversation.messages,
-              type: config.type
-            }),
-          });
-
-          if (!feedbackResponse.ok) {
-            const errorText = await feedbackResponse.text();
-            console.error('Feedback error:', errorText);
-            if (errorText.includes('Please have at least one complete exchange')) {
-              return null;
-            }
-            throw new Error(`Failed to get feedback: ${errorText}`);
-          }
-
-          return feedbackResponse.json();
-        });
-
-        const allFeedback = await Promise.all(feedbackPromises);
-        const validFeedback = allFeedback.filter(feedback => feedback !== null);
-
-        if (validFeedback.length === 0) {
-          throw new Error("No valid conversations found to analyze");
-        }
-
-        setFeedbacks(validFeedback);
       } catch (error) {
         toast({
           variant: "destructive",
@@ -187,41 +92,23 @@ export default function ConversationAnalysis() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-blue-900">
-            {config?.type === 'upload' ? 'Upload' : 'Conversation'} Analysis
-          </h1>
-          {config?.type !== 'upload' && (
-            <Button
-              variant="outline"
-              onClick={regenerateAllFeedback}
-              disabled={isRegenerating || conversations.length === 0}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isRegenerating ? 'animate-spin' : ''}`} />
-              {isRegenerating ? 'Regenerating...' : 'Regenerate All Feedback'}
-            </Button>
-          )}
+          <h1 className="text-2xl font-bold text-blue-900">Upload Analysis</h1>
         </div>
 
         {isLoading ? (
           <Card>
             <CardContent className="p-6">
-              <div className="animate-pulse text-center">Analyzing {config?.type === 'upload' ? 'uploads' : 'conversations'}...</div>
+              <div className="animate-pulse text-center">Analyzing uploads...</div>
             </CardContent>
           </Card>
         ) : (
           <ScrollArea className="h-[calc(100vh-16rem)]">
             <div className="space-y-4">
               {conversations.map((conversation, index) => (
-                <Card key={index}>
+                <Card key={conversation.sessionId || index}>
                   <CardHeader>
                     <h2 className="text-lg font-semibold">
-                      <div className="flex justify-between items-center">
-                        <span>
-                          {conversation.userName
-                            ? `${conversation.userName}'s ${config?.type === 'upload' ? 'Upload' : 'Conversation'}`
-                            : `${config?.type === 'upload' ? 'Upload' : 'Conversation'} ${index + 1}`}
-                        </span>
-                      </div>
+                      {conversation.userName ? `${conversation.userName}'s Upload` : `Upload ${index + 1}`}
                     </h2>
                   </CardHeader>
                   <CardContent>
@@ -249,7 +136,7 @@ export default function ConversationAnalysis() {
                         </div>
                       </div>
                     ) : (
-                      <p className="text-muted-foreground">No feedback available for this {config?.type === 'upload' ? 'upload' : 'conversation'}.</p>
+                      <p className="text-muted-foreground">No feedback available for this upload.</p>
                     )}
                   </CardContent>
                 </Card>
