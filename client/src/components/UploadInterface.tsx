@@ -213,7 +213,7 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
       <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Feedback</DialogTitle>
+            <DialogTitle>{userName ? `${userName}'s Upload` : 'Feedback'}</DialogTitle>
           </DialogHeader>
           {uploadState.feedback && (
             <div className="space-y-6">
