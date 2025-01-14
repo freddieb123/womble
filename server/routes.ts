@@ -714,7 +714,7 @@ export function registerRoutes(app: Express): Server {
             const conversation: Conversation = {
               sessionId: conv.sessionId,
               messages,
-              userName: conv.userName || undefined,
+              userName: conv.user_name || undefined,
               feedback: parseFeedback(conv.feedback)
             };
             return conversation;
