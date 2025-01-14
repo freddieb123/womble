@@ -85,7 +85,7 @@ export default function UserView() {
 
   const config: AdminConfig = {
     id: savedConfig.id,
-    type: savedConfig.type || 'chat', 
+    type: savedConfig.type || 'chat',
     title: savedConfig.title,
     systemPrompt: savedConfig.systemPrompt,
     temperature: 0.7,
@@ -102,14 +102,16 @@ export default function UserView() {
             <UploadInterface
               config={config}
               sessionId={sessionId}
+              userName={userName}
+              onUserNameSubmit={updateUrlWithUserName}
             />
           ) : (
-            <ChatInterface 
-              config={config} 
-              sessionId={sessionId} 
-              userName={userName} 
+            <ChatInterface
+              config={config}
+              sessionId={sessionId}
+              userName={userName}
               isViewOnly={isViewOnly}
-              onUserNameSubmit={updateUrlWithUserName} 
+              onUserNameSubmit={updateUrlWithUserName}
             />
           )}
         </Card>
