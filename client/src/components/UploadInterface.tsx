@@ -6,23 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import type { AdminConfig, UploadState } from "@/lib/types";
-
-interface Conversation {
-  sessionId: string;
-  feedback?: {
-    bullets: string[];
-    score: number;
-    summary: string | null;
-  } | null;
-  messages: Array<{
-    role: string;
-    content: string;
-    timestamp: number;
-    id: string;
-    sessionId: string;
-  }>;
-}
+import type { AdminConfig, UploadState, Feedback, Message } from "@/lib/types";
 
 interface Props {
   config: AdminConfig;
@@ -40,18 +24,56 @@ export default function UploadInterface({ config, sessionId }: Props) {
   const { toast } = useToast();
 
   // Fetch existing feedback if available
-  const { data: conversations } = useQuery<Conversation[]>({
+  const { data: conversations = [], error: fetchError } = useQuery<Array<{
+    sessionId: string;
+    feedback: Feedback | null;
+    messages: Array<Message>;
+  }>>({
     queryKey: [`/api/conversations/${config.id}`],
     enabled: !!config.id,
   });
 
+  useEffect(() => {
+    if (fetchError) {
+      console.error('Error fetching conversations:', fetchError);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load feedback data"
+      });
+    }
+  }, [fetchError, toast]);
+
+  // Debug logging for conversations data
+  useEffect(() => {
+    if (conversations) {
+      console.log('Conversations data:', {
+        configId: config.id,
+        configType: config.type,
+        conversationsCount: conversations.length,
+        conversations: conversations.map(c => ({
+          sessionId: c.sessionId,
+          hasFeedback: !!c.feedback,
+          feedback: c.feedback
+        }))
+      });
+    }
+  }, [conversations, config]);
+
   // Get the latest feedback if available
   useEffect(() => {
-    if (conversations && Array.isArray(conversations) && conversations.length > 0) {
-      // Find the conversation for current session
+    if (conversations && conversations.length > 0) {
+      console.log('Looking for feedback for session:', sessionId);
       const currentConversation = conversations.find(conv => conv.sessionId === sessionId);
 
+      console.log('Found conversation:', {
+        found: !!currentConversation,
+        hasFeedback: !!currentConversation?.feedback,
+        feedback: currentConversation?.feedback
+      });
+
       if (currentConversation?.feedback) {
+        console.log('Setting feedback:', currentConversation.feedback);
         setUploadState(prev => ({
           ...prev,
           feedback: currentConversation.feedback
@@ -137,6 +159,11 @@ export default function UploadInterface({ config, sessionId }: Props) {
   };
 
   const viewFeedback = () => {
+    console.log('View feedback clicked:', {
+      hasFeedback: !!uploadState.feedback,
+      feedbackData: uploadState.feedback
+    });
+
     if (!uploadState.feedback) {
       toast({
         variant: "destructive",
@@ -162,7 +189,7 @@ export default function UploadInterface({ config, sessionId }: Props) {
         </Alert>
       )}
 
-      <div 
+      <div
         className="flex-1 border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-6 relative"
       >
         {uploadState.file ? (
@@ -188,8 +215,8 @@ export default function UploadInterface({ config, sessionId }: Props) {
       </div>
 
       <div className="mt-4 space-y-2">
-        <Button 
-          className="w-full" 
+        <Button
+          className="w-full"
           size="lg"
           disabled={!uploadState.file || uploadState.isLoading}
           onClick={getFeedback}

@@ -31,6 +31,7 @@ interface FeedbackData {
   bullets: string[];
   score: number;
   summary: string | null;
+  rawFeedback?: string;
 }
 
 interface Conversation {
@@ -342,21 +343,27 @@ export function registerRoutes(app: Express): Server {
             content: m.content.text
           });
         } else {
-          apiMessages.push({
-            role: m.role,
-            content: [
-              {
-                type: "text",
-                text: m.content.text || "Please analyze this image."
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: m.content.image
-                }
+          // Handle messages with images using proper typing for OpenAI API
+          const content: Array<{ type: "text"; text: string; } | { type: "image_url"; image_url: { url: string; } }> = [
+            {
+              type: "text",
+              text: m.content.text || "Please analyze this image."
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: m.content.image as string
               }
-            ]
-          });
+            }
+          ];
+
+          // Explicitly type the message for OpenAI API
+          const message: ChatCompletionMessageParam = {
+            role: m.role === 'user' ? 'user' : 'assistant',
+            content
+          } as ChatCompletionMessageParam;
+
+          apiMessages.push(message);
         }
       }
 
@@ -585,6 +592,8 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.configId);
+      console.log("[GET /api/conversations] ConfigId:", configId);
+
       if (isNaN(configId)) {
         return res.status(400).json({ error: "Invalid config ID" });
       }
@@ -593,6 +602,8 @@ export function registerRoutes(app: Express): Server {
       const config = await db.query.chatConfigs.findFirst({
         where: eq(chatConfigs.id, configId),
       });
+
+      console.log("[GET /api/conversations] Config type:", config?.type);
 
       if (!config) {
         return res.status(404).json({ error: "Configuration not found" });
@@ -603,28 +614,53 @@ export function registerRoutes(app: Express): Server {
         orderBy: [desc(conversations.createdAt)]
       });
 
+      console.log("[GET /api/conversations] Found conversations:", savedConversations.length);
+
       const parseMessages = (messagesData: any): Message[] => {
         try {
+          console.log("[parseMessages] Input:", typeof messagesData, messagesData);
           if (typeof messagesData === 'string') {
             return JSON.parse(messagesData);
           }
           return Array.isArray(messagesData) ? messagesData : [];
         } catch (e) {
-          console.error('Error parsing messages:', e);
+          console.error('[parseMessages] Error:', e);
           return [];
         }
       };
 
+      // Add proper parsing for doubly-encoded JSON feedback
       const parseFeedback = (feedbackData: any): FeedbackData | null => {
         try {
+          console.log("[parseFeedback] Input:", typeof feedbackData, feedbackData);
           if (!feedbackData) return null;
-          const parsed = typeof feedbackData === 'string' ? JSON.parse(feedbackData) : feedbackData;
+
+          // Handle doubly-encoded JSON strings
+          let parsed = feedbackData;
+          if (typeof feedbackData === 'string') {
+            try {
+              parsed = JSON.parse(feedbackData);
+              // If it's still a string (double encoded), parse again
+              if (typeof parsed === 'string') {
+                parsed = JSON.parse(parsed);
+              }
+            } catch (e) {
+              console.error('[parseFeedback] Error parsing JSON:', e);
+              return null;
+            }
+          }
+
           if (parsed && typeof parsed === 'object' && 'bullets' in parsed) {
-            return parsed as FeedbackData;
+            return {
+              bullets: parsed.bullets,
+              score: parsed.score,
+              summary: parsed.summary,
+              rawFeedback: typeof feedbackData === 'string' ? feedbackData : JSON.stringify(feedbackData)
+            };
           }
           return null;
         } catch (e) {
-          console.error('Error parsing feedback:', e);
+          console.error('[parseFeedback] Error:', e);
           return null;
         }
       };
@@ -633,13 +669,25 @@ export function registerRoutes(app: Express): Server {
 
       if (config.type === 'upload') {
         // For upload type, we only need the latest feedback per session
-        conversationsWithMetadata = savedConversations
+        console.log("[GET /api/conversations] Processing upload type conversations");
+        const processedConversations = savedConversations
           .map(conv => {
+            console.log("[Processing conversation]", {
+              sessionId: conv.sessionId,
+              hasFeedback: !!conv.feedback
+            });
+
             const feedback = parseFeedback(conv.feedback);
+            console.log("[Parsed feedback]", feedback);
+
             const messages = parseMessages(conv.messages);
+            console.log("[Parsed messages]", messages.length);
 
             // Only include conversations with valid feedback for upload type
-            if (!feedback) return null;
+            if (!feedback) {
+              console.log("[Skipping] No valid feedback for session", conv.sessionId);
+              return null;
+            }
 
             return {
               sessionId: conv.sessionId,
@@ -651,9 +699,11 @@ export function registerRoutes(app: Express): Server {
                 id: crypto.randomUUID(),
                 sessionId: conv.sessionId
               }]
-            };
+            } as Conversation;
           })
           .filter((conv): conv is Conversation => conv !== null);
+
+        conversationsWithMetadata = processedConversations;
       } else {
         // For chat type, include all messages and feedback
         conversationsWithMetadata = savedConversations
@@ -661,19 +711,29 @@ export function registerRoutes(app: Express): Server {
             const messages = parseMessages(conv.messages);
             if (messages.length === 0) return null;
 
-            return {
+            const conversation: Conversation = {
               sessionId: conv.sessionId,
               messages,
               userName: conv.userName || undefined,
               feedback: parseFeedback(conv.feedback)
             };
+            return conversation;
           })
           .filter((conv): conv is Conversation => conv !== null);
       }
 
+      console.log("[GET /api/conversations] Final response:", {
+        count: conversationsWithMetadata.length,
+        conversations: conversationsWithMetadata.map(c => ({
+          sessionId: c.sessionId,
+          hasFeedback: !!c.feedback,
+          messageCount: c.messages.length
+        }))
+      });
+
       res.json(conversationsWithMetadata);
     } catch (error: any) {
-      console.error("Error fetching conversations:", error);
+      console.error("[GET /api/conversations] Error:", error);
       res.status(500).json({ error: error.message });
     }
   });

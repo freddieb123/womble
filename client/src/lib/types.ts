@@ -28,13 +28,16 @@ export interface AdminConfig {
   maxTokens: number;
 }
 
+export interface Feedback {
+  bullets: string[];
+  score: number;
+  summary: string | null;
+  rawFeedback?: string;
+}
+
 export interface UploadState {
   file: string | null;
   isLoading: boolean;
   error: string | null;
-  feedback?: {
-    bullets: string[];
-    score: number;
-    summary: string | null;
-  } | null;  // Make feedback entirely optional and nullable
+  feedback: Feedback | null;
 }
