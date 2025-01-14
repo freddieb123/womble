@@ -225,11 +225,7 @@ export default function Home() {
   };
 
   const handleViewFeedback = (configToView: ChatConfig) => {
-    if (configToView.type === 'upload') {
-      setViewingFeedbackConfig(configToView);
-    } else {
-      window.open(`${window.location.origin}/analysis?configId=${configToView.id}`, '_blank');
-    }
+    window.open(`${window.location.origin}/analysis?configId=${configToView.id}`, '_blank');
   };
 
   const handleDuplicate = (configToDuplicate: ChatConfig) => {
@@ -244,16 +240,6 @@ export default function Home() {
     });
     setIsCreateOpen(true);
   };
-
-  // Add this query to fetch feedback data
-  const { data: feedbackData } = useQuery<Array<{
-    sessionId: string;
-    feedback: Feedback;
-    messages: Array<{ role: string; content: string; timestamp: number; id: string; }>;
-  }>>({
-    queryKey: [`/api/conversations/${viewingFeedbackConfig?.id}`],
-    enabled: !!viewingFeedbackConfig?.id && viewingFeedbackConfig.type === 'upload',
-  });
 
 
   if (isLoading) {
@@ -452,59 +438,6 @@ export default function Home() {
           </div>
         </ScrollArea>
       </div>
-      <Dialog 
-        open={viewingFeedbackConfig !== null} 
-        onOpenChange={(open) => !open && setViewingFeedbackConfig(null)}
-      >
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Feedback for {viewingFeedbackConfig?.title}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {viewingFeedbackConfig?.type === 'upload' && (
-              feedbackData && feedbackData.length > 0 ? (
-                <div>
-                  {feedbackData.map((conversation, idx) => (
-                    <Card key={conversation.sessionId} className={idx > 0 ? 'mt-4' : ''}>
-                      <CardHeader>
-                        <CardTitle className="text-lg">
-                          Feedback from {new Date(conversation.messages[0]?.timestamp).toLocaleDateString()}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {conversation.feedback ? (
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              {conversation.feedback.bullets.map((bullet, index) => (
-                                <div key={index} className="flex items-start gap-2 text-sm">
-                                  <span>•</span>
-                                  <span>{bullet}</span>
-                                </div>
-                              ))}
-                            </div>
-                            <div className="border-t pt-4">
-                              <div className="flex flex-col gap-2">
-                                <span className="text-2xl font-bold">{conversation.feedback.score}/10</span>
-                                {conversation.feedback.summary && (
-                                  <p className="text-sm text-muted-foreground">{conversation.feedback.summary}</p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="text-muted-foreground">No feedback available for this session.</p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-center py-4">No feedback available yet.</p>
-              )
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
       <AlertDialog
         open={deletingConfig !== null}
         onOpenChange={(open) => !open && setDeletingConfig(null)}

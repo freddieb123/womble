@@ -36,56 +36,20 @@ export default function ConversationAnalysis() {
     enabled: !!configId,
   });
 
-  const handleViewChat = (conversation: ConversationData) => {
-    try {
-      if (!configId || !config || config.type === 'upload') {
-        return;
-      }
-
-      const url = new URL(`${window.location.origin}/chat`);
-      url.searchParams.set('configId', configId);
-      url.searchParams.set('sessionId', conversation.sessionId);
-      url.searchParams.set('viewOnly', 'true');
-      if (conversation.userName) {
-        url.searchParams.set('userName', conversation.userName);
-      }
-
-      window.open(url.toString(), '_blank');
-    } catch (error) {
-      console.error('Error in handleViewChat:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to open chat view",
-      });
-    }
-  };
-
   const regenerateAllFeedback = async () => {
-    if (!config?.feedbackCriteria || conversations.length === 0) return;
+    if (!config?.feedbackCriteria || conversations.length === 0 || config.type === 'upload') return;
 
     try {
       setIsRegenerating(true);
 
       const newFeedbacks = await Promise.all(
         conversations.map(async (conversation) => {
-          if (config.type === 'upload') {
-            // For upload type, check if there's a file upload message
-            if (!conversation.messages.some(m => 
-              typeof m.content === 'object' && m.content.image !== null
-            )) {
-              console.warn('Skipping conversation without upload');
-              return null;
-            }
-          } else {
-            // For chat type, check for user-assistant exchange
-            const hasUserMessage = conversation.messages.some(m => m.role === 'user');
-            const hasAssistantMessage = conversation.messages.some(m => m.role === 'assistant');
+          const hasUserMessage = conversation.messages.some(m => m.role === 'user');
+          const hasAssistantMessage = conversation.messages.some(m => m.role === 'assistant');
 
-            if (!hasUserMessage || !hasAssistantMessage) {
-              console.warn('Skipping conversation without complete exchange');
-              return null;
-            }
+          if (!hasUserMessage || !hasAssistantMessage) {
+            console.warn('Skipping conversation without complete exchange');
+            return null;
           }
 
           const feedbackResponse = await fetch("/api/chat-feedback", {
@@ -144,25 +108,21 @@ export default function ConversationAnalysis() {
 
         setConversations(conversationsData);
 
-        // Get feedback for each conversation
-        const feedbackPromises = conversationsData.map(async (conversation: ConversationData) => {
-          if (config.type === 'upload') {
-            // For upload type, we only need to check if there's a message containing an upload
-            if (!conversation.messages.some(m => 
-              typeof m.content === 'object' && m.content.image !== null
-            )) {
-              console.warn('Skipping conversation without upload');
-              return null;
-            }
-          } else {
-            // For chat type, check for user-assistant exchange
-            const hasUserMessage = conversation.messages.some(m => m.role === 'user');
-            const hasAssistantMessage = conversation.messages.some(m => m.role === 'assistant');
+        // For upload type, use existing feedback
+        if (config.type === 'upload') {
+          const existingFeedbacks = conversationsData.map(conv => conv.feedback).filter(f => f !== null);
+          setFeedbacks(existingFeedbacks);
+          return;
+        }
 
-            if (!hasUserMessage || !hasAssistantMessage) {
-              console.warn('Skipping conversation without complete exchange');
-              return null;
-            }
+        // For chat type, get feedback for each conversation
+        const feedbackPromises = conversationsData.map(async (conversation: ConversationData) => {
+          const hasUserMessage = conversation.messages.some(m => m.role === 'user');
+          const hasAssistantMessage = conversation.messages.some(m => m.role === 'assistant');
+
+          if (!hasUserMessage || !hasAssistantMessage) {
+            console.warn('Skipping conversation without complete exchange');
+            return null;
           }
 
           const feedbackResponse = await fetch("/api/chat-feedback", {
@@ -227,21 +187,25 @@ export default function ConversationAnalysis() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-blue-900">Conversation Analysis</h1>
-          <Button
-            variant="outline"
-            onClick={regenerateAllFeedback}
-            disabled={isRegenerating || conversations.length === 0}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRegenerating ? 'animate-spin' : ''}`} />
-            {isRegenerating ? 'Regenerating...' : 'Regenerate All Feedback'}
-          </Button>
+          <h1 className="text-2xl font-bold text-blue-900">
+            {config?.type === 'upload' ? 'Upload' : 'Conversation'} Analysis
+          </h1>
+          {config?.type !== 'upload' && (
+            <Button
+              variant="outline"
+              onClick={regenerateAllFeedback}
+              disabled={isRegenerating || conversations.length === 0}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRegenerating ? 'animate-spin' : ''}`} />
+              {isRegenerating ? 'Regenerating...' : 'Regenerate All Feedback'}
+            </Button>
+          )}
         </div>
 
         {isLoading ? (
           <Card>
             <CardContent className="p-6">
-              <div className="animate-pulse text-center">Analyzing conversations...</div>
+              <div className="animate-pulse text-center">Analyzing {config?.type === 'upload' ? 'uploads' : 'conversations'}...</div>
             </CardContent>
           </Card>
         ) : (
@@ -257,20 +221,11 @@ export default function ConversationAnalysis() {
                             ? `${conversation.userName}'s ${config?.type === 'upload' ? 'Upload' : 'Conversation'}`
                             : `${config?.type === 'upload' ? 'Upload' : 'Conversation'} ${index + 1}`}
                         </span>
-                        {config?.type !== 'upload' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewChat(conversation)}
-                          >
-                            <span className="text-sm">View Chat</span>
-                          </Button>
-                        )}
                       </div>
                     </h2>
                   </CardHeader>
                   <CardContent>
-                    {feedbacks[index] && (
+                    {feedbacks[index] ? (
                       <div className="space-y-4">
                         <div className="space-y-2">
                           {feedbacks[index].bullets.map((bullet, bulletIndex) => (
@@ -293,6 +248,8 @@ export default function ConversationAnalysis() {
                           </div>
                         </div>
                       </div>
+                    ) : (
+                      <p className="text-muted-foreground">No feedback available for this {config?.type === 'upload' ? 'upload' : 'conversation'}.</p>
                     )}
                   </CardContent>
                 </Card>
