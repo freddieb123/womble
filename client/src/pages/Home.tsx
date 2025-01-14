@@ -304,7 +304,7 @@ export default function Home() {
                     <div>
                       <div className="flex items-center gap-2">
                         <CardTitle>{config.title}</CardTitle>
-                        <Badge variant={config.type === 'chat' ? 'default' : 'secondary'}>
+                        <Badge variant={config.type === 'chat' ? 'custom-green' : 'custom-purple'} className={config.type === 'chat' ? 'bg-green-100 text-green-800' : 'bg-purple-100 text-purple-800'}>
                           {config.type === 'chat' ? 'conversation' : 'upload'}
                         </Badge>
                       </div>
