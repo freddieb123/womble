@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
-import { chatConfigs, conversations } from "@db/schema";
+import { chatConfigs, conversations, uploads } from "@db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import crypto from 'crypto';
@@ -29,18 +29,21 @@ interface Message {
   sessionId: string;
 }
 
-interface FeedbackData {
-  bullets: string[];
-  score: number;
-  summary: string | null;
-  rawFeedback?: string;
+interface ConversationData {
+  messages: Message[];
+  userName: string | null;
+  sessionId: string;
 }
 
-interface Conversation {
-  sessionId: string;
+interface UploadData {
+  fileName: string;
   userName: string | null;
-  messages: Message[];
-  feedback: FeedbackData | null;
+  sessionId: string;
+  feedback: {
+    bullets: string[];
+    score: number;
+    summary: string | null;
+  } | null;
 }
 
 export function registerRoutes(app: Express): Server {
@@ -248,6 +251,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Restore chat-configs endpoints
   app.post("/api/chat-configs", async (req, res) => {
     try {
       const parsedConfig = chatConfigSchema.parse(req.body);
@@ -269,118 +273,25 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/chat-configs", async (req, res) => {
     try {
       const showDeleted = req.query.showDeleted === 'true';
-      const query = db.query.chatConfigs.findMany({
+      const configs = await db.query.chatConfigs.findMany({
         where: showDeleted ? undefined : eq(chatConfigs.deleted, false),
         orderBy: [desc(chatConfigs.createdAt)],
         with: {
           conversations: true,
+          uploads: true,
         }
       });
 
-      const configs = await query;
-
       const configsWithCount = configs.map(config => ({
         ...config,
-        conversationCount: config.conversations.length,
-        conversations: undefined
+        conversationCount: config.type === 'upload' ? config.uploads.length : config.conversations.length,
+        conversations: undefined,
+        uploads: undefined
       }));
 
       res.json(configsWithCount);
     } catch (error: any) {
       console.error("Error fetching chat configs:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
-    try {
-      const configId = parseInt(req.params.configId);
-
-      if (isNaN(configId)) {
-        return res.status(400).json({ error: "Invalid config ID" });
-      }
-
-      const config = await db.query.chatConfigs.findFirst({
-        where: eq(chatConfigs.id, configId),
-      });
-
-      if (!config) {
-        return res.status(404).json({ error: "Configuration not found" });
-      }
-
-      const savedConversations = await db.query.conversations.findMany({
-        where: eq(conversations.configId, configId),
-        orderBy: [desc(conversations.createdAt)]
-      });
-
-      const parseMessages = (messagesData: any): Message[] => {
-        try {
-          if (typeof messagesData === 'string') {
-            const parsed = JSON.parse(messagesData);
-            return Array.isArray(parsed) ? parsed : [];
-          }
-          return Array.isArray(messagesData) ? messagesData : [];
-        } catch (e) {
-          console.error('[parseMessages] Error:', e);
-          return [];
-        }
-      };
-
-      const parseFeedback = (feedbackData: any): FeedbackData | null => {
-        try {
-          if (!feedbackData) return null;
-
-          let parsed = feedbackData;
-          if (typeof feedbackData === 'string') {
-            try {
-              parsed = JSON.parse(feedbackData);
-              if (typeof parsed === 'string') {
-                parsed = JSON.parse(parsed);
-              }
-            } catch (e) {
-              console.error('[parseFeedback] Error parsing JSON:', e);
-              return null;
-            }
-          }
-
-          if (parsed && typeof parsed === 'object' && 'bullets' in parsed) {
-            return {
-              bullets: parsed.bullets,
-              score: parsed.score,
-              summary: parsed.summary,
-              rawFeedback: typeof feedbackData === 'string' ? feedbackData : JSON.stringify(feedbackData)
-            };
-          }
-          return null;
-        } catch (e) {
-          console.error('[parseFeedback] Error:', e);
-          return null;
-        }
-      };
-
-      const conversationsWithMetadata = savedConversations.map(conv => {
-        const messages = parseMessages(conv.messages);
-        const feedback = parseFeedback(conv.feedback);
-
-        const conversation: Conversation = {
-          sessionId: conv.sessionId,
-          userName: conv.userName || null,
-          messages: messages.length > 0 ? messages : [{
-            role: 'user',
-            content: 'Content not available',
-            timestamp: Date.now(),
-            id: crypto.randomUUID(),
-            sessionId: conv.sessionId
-          }],
-          feedback
-        };
-
-        return conversation;
-      });
-
-      res.json(conversationsWithMetadata);
-    } catch (error: any) {
-      console.error("[GET /api/conversations] Error:", error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -449,31 +360,20 @@ export function registerRoutes(app: Express): Server {
         summary
       };
 
-      await db.insert(conversations)
+      // Save to uploads table
+      await db.insert(uploads)
         .values({
           configId,
           sessionId,
           userName,
-          messages: JSON.stringify([{
-            role: 'user',
-            content: `Uploaded file: ${fileName}`,
-            timestamp: Date.now(),
-            id: crypto.randomUUID(),
-            sessionId
-          }]),
+          fileName,
           feedback: JSON.stringify(feedbackData)
         })
         .onConflictDoUpdate({
-          target: [conversations.configId, conversations.sessionId],
+          target: [uploads.configId, uploads.sessionId],
           set: {
             userName,
-            messages: JSON.stringify([{
-              role: 'user',
-              content: `Uploaded file: ${fileName}`,
-              timestamp: Date.now(),
-              id: crypto.randomUUID(),
-              sessionId
-            }]),
+            fileName,
             feedback: JSON.stringify(feedbackData)
           }
         });
@@ -485,128 +385,56 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/chat-feedback", async (req: Request, res: Response) => {
+  app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
     try {
-      const { feedbackCriteria, messages, type } = req.body;
-      const sessionId = getSessionId(req);
-      const configId = parseInt(new URL(req.url, `http://${req.headers.host}`).searchParams.get("configId") || "0");
-      const userName = req.query.userName as string || null;
+      const configId = parseInt(req.params.configId);
 
-      if (!feedbackCriteria) {
-        return res.status(400).json({ error: "Feedback criteria is required" });
+      if (isNaN(configId)) {
+        return res.status(400).json({ error: "Invalid config ID" });
       }
 
-      const messagesToAnalyze = messages || (sessions[sessionId] || []);
-
-      if (type === 'upload') {
-        if (!Array.isArray(messagesToAnalyze) || messagesToAnalyze.length === 0) {
-          return res.status(400).json({
-            error: "No uploads found to analyze."
-          });
-        }
-
-        const hasUploadMessage = messagesToAnalyze.some(message => {
-          const content = typeof message.content === 'string'
-            ? message.content
-            : message.content.text;
-          return content.includes('Uploaded file:');
-        });
-
-        if (!hasUploadMessage) {
-          return res.status(400).json({
-            error: "No uploads found to analyze."
-          });
-        }
-      } else {
-        if (!Array.isArray(messagesToAnalyze) || messagesToAnalyze.length === 0) {
-          return res.status(400).json({
-            error: "No chat messages to analyze. Please have a conversation first before requesting feedback."
-          });
-        }
-
-        const hasUserMessage = messagesToAnalyze.some(m => m.role === 'user');
-        const hasAssistantMessage = messagesToAnalyze.some(m => m.role === 'assistant');
-
-        if (!hasUserMessage || !hasAssistantMessage) {
-          return res.status(400).json({
-            error: "Please have at least one complete exchange before requesting feedback."
-          });
-        }
-      }
-
-      if (configId) {
-        const conversation = await db.query.conversations.findFirst({
-          where: and(
-            eq(conversations.configId, configId),
-            eq(conversations.sessionId, sessionId)
-          )
-        });
-      }
-
-      const prompt = `Analyze the user's interactions in this conversation based on these criteria: ${feedbackCriteria}
-
-      Please provide your feedback in exactly this format:
-
-      • [3 bullet points focusing ONLY on the user's conversation so far and how well they met the criteria]
-
-      Score: [1-10]
-      [Brief one-line summary of overall performance. Make sure you don't give anything above a 5 if they haven't yet come to an agreement]
-
-      Chat transcript:
-      ${messagesToAnalyze.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}`;
-
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert at evaluating user communication. Focus your feedback solely on the user's messages and interactions, taking into account how they respond to the AI assistant. Address the user directly using 'you' in your feedback. For example: 'You maintained clear communication' instead of 'The user maintained clear communication'. Keep feedback points brief, clear, and actionable."
-          },
-          { role: "user", content: prompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000,
+      const config = await db.query.chatConfigs.findFirst({
+        where: eq(chatConfigs.id, configId),
       });
 
-      const response = completion.choices[0]?.message?.content;
-      if (!response) {
-        throw new Error("Failed to get response from OpenAI");
+      if (!config) {
+        return res.status(404).json({ error: "Configuration not found" });
       }
 
+      if (config.type === 'upload') {
+        // Fetch uploads
+        const savedUploads = await db.query.uploads.findMany({
+          where: eq(uploads.configId, configId),
+          orderBy: [desc(uploads.createdAt)]
+        });
 
-      const scoreMatch = response.match(/Score:\s*(\d+)/i);
-      const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
+        const uploadsWithMetadata: UploadData[] = savedUploads.map(upload => ({
+          sessionId: upload.sessionId,
+          userName: upload.userName,
+          fileName: upload.fileName,
+          feedback: upload.feedback ? JSON.parse(upload.feedback as string) : null
+        }));
 
-      const summaryMatch = response.match(/Score:\s*\d+\s*\n([^\n]+)/i);
-      const summary = summaryMatch ? summaryMatch[1].trim() : null;
+        res.json(uploadsWithMetadata);
+      } else {
+        // Fetch conversations
+        const savedConversations = await db.query.conversations.findMany({
+          where: eq(conversations.configId, configId),
+          orderBy: [desc(conversations.createdAt)]
+        });
 
-      const bullets = response
-        .split(/Score:/i)[0]
-        .split(/[•\-\*]\s+/)
-        .filter(bullet => bullet.trim())
-        .map(bullet => bullet.trim());
+        const conversationsWithMetadata: ConversationData[] = savedConversations.map(conv => ({
+          sessionId: conv.sessionId,
+          userName: conv.userName,
+          messages: typeof conv.messages === 'string' ?
+            JSON.parse(conv.messages) :
+            conv.messages as Message[]
+        }));
 
-      const feedbackData = {
-        bullets,
-        score,
-        summary,
-        rawFeedback: response
-      };
-
-      if (configId) {
-        await db.update(conversations)
-          .set({ feedback: JSON.stringify(feedbackData) })
-          .where(
-            and(
-              eq(conversations.configId, configId),
-              eq(conversations.sessionId, sessionId)
-            )
-          );
+        res.json(conversationsWithMetadata);
       }
-
-      res.json(feedbackData);
     } catch (error: any) {
-      console.error("Error getting feedback:", error);
+      console.error("[GET /api/conversations] Error:", error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -656,7 +484,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-
   const httpServer = createServer(app);
   return httpServer;
 }
@@ -684,12 +511,6 @@ const openai = new OpenAI({
 });
 
 const sessions: Record<string, Message[]> = {};
-
-function getSessionId(req: Request): string {
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  const sessionId = url.searchParams.get("sessionId");
-  return sessionId || crypto.randomUUID();
-}
 
 const configSchema = z.object({
   systemPrompt: z.string(),

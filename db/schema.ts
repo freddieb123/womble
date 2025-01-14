@@ -20,6 +20,7 @@ export const chatConfigs = pgTable("chat_configs", {
   deletedAt: timestamp("deleted_at"),
 });
 
+// Conversations table - only for chat messages
 export const conversations = pgTable("conversations", {
   configId: integer("config_id").notNull().references(() => chatConfigs.id),
   sessionId: text("session_id").notNull(),
@@ -30,6 +31,7 @@ export const conversations = pgTable("conversations", {
   pk: primaryKey({ columns: [table.configId, table.sessionId] })
 }));
 
+// Separate uploads table for file uploads and their feedback
 export const uploads = pgTable("uploads", {
   configId: integer("config_id").notNull().references(() => chatConfigs.id),
   sessionId: text("session_id").notNull(),
