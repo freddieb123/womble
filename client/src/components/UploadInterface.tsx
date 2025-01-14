@@ -7,13 +7,16 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { AdminConfig, UploadState, Feedback, Message } from "@/lib/types";
+import UserNameModal from "./UserNameModal";
 
 interface Props {
   config: AdminConfig;
   sessionId: string;
+  userName: string | null;
+  onUserNameSubmit: (name: string) => string;
 }
 
-export default function UploadInterface({ config, sessionId }: Props) {
+export default function UploadInterface({ config, sessionId, userName, onUserNameSubmit }: Props) {
   const [uploadState, setUploadState] = useState<UploadState>({
     file: null,
     isLoading: false,
@@ -21,6 +24,7 @@ export default function UploadInterface({ config, sessionId }: Props) {
     feedback: null
   });
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [showNameModal, setShowNameModal] = useState(!userName);
   const { toast } = useToast();
 
   // Fetch existing feedback if available
@@ -98,6 +102,16 @@ export default function UploadInterface({ config, sessionId }: Props) {
       return;
     }
 
+    if (!userName) {
+      toast({
+        variant: "destructive",
+        title: "Name Required",
+        description: "Please provide your name first"
+      });
+      setShowNameModal(true);
+      return;
+    }
+
     try {
       setUploadState(prev => ({ ...prev, isLoading: true, error: null }));
       const response = await fetch("/api/upload-feedback", {
@@ -106,6 +120,7 @@ export default function UploadInterface({ config, sessionId }: Props) {
         body: JSON.stringify({
           configId: config.id,
           sessionId,
+          userName,
           fileContent: uploadState.file,
           fileName: "pasted_screenshot.png"
         }),
@@ -138,6 +153,16 @@ export default function UploadInterface({ config, sessionId }: Props) {
 
   return (
     <div className="flex flex-col h-[600px]">
+      {showNameModal && (
+        <UserNameModal
+          open={showNameModal}
+          onSubmit={(name) => {
+            const newUrl = onUserNameSubmit(name);
+            setShowNameModal(false);
+          }}
+        />
+      )}
+
       <h2 className="text-2xl font-bold mb-4">{config.title}</h2>
 
       {config.userInstructions && (
