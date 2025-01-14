@@ -16,12 +16,14 @@ const uploadFeedbackSchema = z.object({
   fileName: z.string(),
 });
 
+interface MessageContent {
+  text: string;
+  image?: string | null;
+}
+
 interface Message {
   role: 'user' | 'assistant';
-  content: string | {
-    text: string;
-    image?: string | null;
-  };
+  content: string | MessageContent;
   timestamp: number;
   id: string;
   sessionId: string;
@@ -36,9 +38,9 @@ interface FeedbackData {
 
 interface Conversation {
   sessionId: string;
-  feedback?: FeedbackData | null;
+  userName: string | null;
   messages: Message[];
-  userName?: string;
+  feedback: FeedbackData | null;
 }
 
 export function registerRoutes(app: Express): Server {
@@ -47,6 +49,7 @@ export function registerRoutes(app: Express): Server {
       const url = new URL(req.url, `http://${req.headers.host}`);
       const configId = parseInt(url.searchParams.get("configId") || "");
       const sessionId = url.searchParams.get("sessionId") || crypto.randomUUID();
+      const userName = url.searchParams.get("userName") || null;
 
       if (isNaN(configId) || configId <= 0) {
         return res.status(400).json({ error: "Valid config ID is required" });
@@ -84,179 +87,20 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/chat-configs", async (req, res) => {
-    try {
-      const parsedConfig = chatConfigSchema.parse(req.body);
-      const result = await db.insert(chatConfigs).values({
-        title: parsedConfig.title,
-        type: parsedConfig.type || 'chat',
-        systemPrompt: parsedConfig.systemPrompt,
-        userInstructions: parsedConfig.userInstructions,
-        feedbackCriteria: parsedConfig.feedbackCriteria,
-      }).returning();
-
-      console.log("Saved chat config:", result[0]);
-      res.json(result[0]);
-    } catch (error: any) {
-      console.error("Error saving chat config:", error);
-      res.status(400).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/chat-configs/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ error: "Invalid ID" });
-      }
-
-      const config = await db.query.chatConfigs.findFirst({
-        where: eq(chatConfigs.id, id),
-      });
-
-      if (!config) {
-        return res.status(404).json({ error: "Configuration not found" });
-      }
-
-      res.json(config);
-    } catch (error: any) {
-      console.error("Error fetching chat config:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-  app.get("/api/chat-configs", async (req, res) => {
-    try {
-      const showDeleted = req.query.showDeleted === 'true';
-      const query = db.query.chatConfigs.findMany({
-        where: showDeleted ? undefined : eq(chatConfigs.deleted, false),
-        orderBy: (chatConfigs, { desc }) => [desc(chatConfigs.createdAt)],
-        with: {
-          conversations: true,
-        }
-      });
-
-      const configs = await query;
-
-      const configsWithCount = configs.map(config => ({
-        ...config,
-        conversationCount: config.conversations.length,
-        conversations: undefined
-      }));
-
-      res.json(configsWithCount);
-    } catch (error: any) {
-      console.error("Error fetching chat configs:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.put("/api/chat-configs/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ error: "Invalid ID" });
-      }
-
-      const parsedConfig = chatConfigSchema.parse(req.body);
-      const result = await db.update(chatConfigs)
-        .set({
-          title: parsedConfig.title,
-          type: parsedConfig.type || 'chat',
-          systemPrompt: parsedConfig.systemPrompt,
-          userInstructions: parsedConfig.userInstructions,
-          feedbackCriteria: parsedConfig.feedbackCriteria,
-        })
-        .where(eq(chatConfigs.id, id))
-        .returning();
-
-      if (!result.length) {
-        return res.status(404).json({ error: "Configuration not found" });
-      }
-
-      res.json(result[0]);
-    } catch (error: any) {
-      console.error("Error updating chat config:", error);
-      res.status(400).json({ error: error.message });
-    }
-  });
-
-  app.delete("/api/chat-configs/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ error: "Invalid ID" });
-      }
-
-      const result = await db.update(chatConfigs)
-        .set({
-          deleted: true,
-          deletedAt: new Date()
-        })
-        .where(eq(chatConfigs.id, id))
-        .returning();
-
-      if (!result.length) {
-        return res.status(404).json({ error: "Configuration not found" });
-      }
-
-      res.json(result[0]);
-    } catch (error: any) {
-      console.error("Error soft deleting chat config:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post("/api/chat-configs/:id/restore", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ error: "Invalid ID" });
-      }
-
-      const result = await db.update(chatConfigs)
-        .set({
-          deleted: false,
-          deletedAt: null
-        })
-        .where(eq(chatConfigs.id, id))
-        .returning();
-
-      if (!result.length) {
-        return res.status(404).json({ error: "Configuration not found" });
-      }
-
-      res.json(result[0]);
-    } catch (error: any) {
-      console.error("Error restoring chat config:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
   app.post("/api/messages", async (req: Request, res: Response) => {
     try {
       const { content, config } = req.body;
       const url = new URL(req.url, `http://${req.headers.host}`);
       const configId = parseInt(url.searchParams.get("configId") || "");
       const sessionId = url.searchParams.get("sessionId") || crypto.randomUUID();
-      const userName = url.searchParams.get('userName');
+      const userName = url.searchParams.get('userName') || null;
 
-      try {
-        messageContentSchema.parse(content);
-      } catch (e) {
-        console.error("Message content validation failed:", e);
-        return res.status(400).json({ error: "Invalid message content format" });
-      }
-
-      if (!content.text && !content.image) {
+      if (!content || (typeof content === 'object' && !content.text && !content.image)) {
         return res.status(400).json({ error: "Message must contain either text or an image" });
       }
 
       if (isNaN(configId) || configId <= 0) {
         return res.status(400).json({ error: "Valid config ID is required" });
-      }
-
-      if (!userName) {
-        return res.status(400).json({ error: "userName is required" });
       }
 
       const parsedConfig = configSchema.parse(config);
@@ -275,7 +119,7 @@ export function registerRoutes(app: Express): Server {
 
       const userMessage: Message = {
         id: crypto.randomUUID(),
-        content: {
+        content: typeof content === 'string' ? content : {
           text: content.text,
           image: content.image
         },
@@ -286,33 +130,21 @@ export function registerRoutes(app: Express): Server {
       sessions[sessionId].push(userMessage);
 
       try {
-        const existingConversation = await db.query.conversations.findFirst({
-          where: and(
-            eq(conversations.configId, configId),
-            eq(conversations.sessionId, sessionId)
-          ),
-        });
-
-        if (existingConversation) {
-          await db
-            .update(conversations)
-            .set({
-              messages: JSON.stringify(sessions[sessionId])
-            })
-            .where(and(
-              eq(conversations.configId, configId),
-              eq(conversations.sessionId, sessionId)
-            ));
-        } else {
-          await db
-            .insert(conversations)
-            .values({
-              configId,
-              sessionId,
+        await db
+          .insert(conversations)
+          .values({
+            configId,
+            sessionId,
+            userName,
+            messages: JSON.stringify(sessions[sessionId])
+          })
+          .onConflictDoUpdate({
+            target: [conversations.configId, conversations.sessionId],
+            set: {
               userName,
               messages: JSON.stringify(sessions[sessionId])
-            });
-        }
+            }
+          });
       } catch (error) {
         console.error("Error saving conversation:", error);
       }
@@ -321,16 +153,12 @@ export function registerRoutes(app: Express): Server {
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
-      const enhancedSystemPrompt = userName
-        ? `${parsedConfig.systemPrompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${userName}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${userName}!" or "Hi ${userName}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much!`
-        : parsedConfig.systemPrompt;
+      const enhancedSystemPrompt = `${parsedConfig.systemPrompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${userName || 'Anonymous'}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${userName || 'Anonymous'}!" or "Hi ${userName || 'Anonymous'}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much!`;
 
-      // Fix the chat API messages array construction type error
       const apiMessages: ChatCompletionMessageParam[] = [
         { role: "system", content: enhancedSystemPrompt }
       ];
 
-      // Add messages with proper format for Vision API
       for (const m of sessions[sessionId]) {
         if (typeof m.content === 'string') {
           apiMessages.push({
@@ -343,7 +171,6 @@ export function registerRoutes(app: Express): Server {
             content: m.content.text
           });
         } else {
-          // Handle messages with images using proper typing for OpenAI API
           const content: Array<{ type: "text"; text: string; } | { type: "image_url"; image_url: { url: string; } }> = [
             {
               type: "text",
@@ -352,12 +179,11 @@ export function registerRoutes(app: Express): Server {
             {
               type: "image_url",
               image_url: {
-                url: m.content.image as string
+                url: m.content.image
               }
             }
           ];
 
-          // Explicitly type the message for OpenAI API
           const message: ChatCompletionMessageParam = {
             role: m.role === 'user' ? 'user' : 'assistant',
             content
@@ -372,7 +198,6 @@ export function registerRoutes(app: Express): Server {
 
       try {
         const stream = await openai.chat.completions.create({
-          // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
           model: "gpt-4o",
           messages: apiMessages,
           temperature: parsedConfig.temperature,
@@ -399,11 +224,21 @@ export function registerRoutes(app: Express): Server {
         };
         sessions[sessionId].push(assistantMessage);
 
+        await db
+          .update(conversations)
+          .set({
+            messages: JSON.stringify(sessions[sessionId])
+          })
+          .where(and(
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId)
+          ));
+
         res.write('data: [DONE]\n\n');
         res.end();
       } catch (streamError) {
         console.error("Stream error:", streamError);
-        res.write(`data: ${JSON.stringify({ error: "Error processing image or generating response" })}\n\n`);
+        res.write(`data: ${JSON.stringify({ error: "Error processing request" })}\n\n`);
         res.end();
       }
     } catch (error: any) {
@@ -411,7 +246,243 @@ export function registerRoutes(app: Express): Server {
       res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
       res.end();
     }
+  });
 
+  app.post("/api/chat-configs", async (req, res) => {
+    try {
+      const parsedConfig = chatConfigSchema.parse(req.body);
+      const result = await db.insert(chatConfigs).values({
+        title: parsedConfig.title,
+        type: parsedConfig.type || 'chat',
+        systemPrompt: parsedConfig.systemPrompt,
+        userInstructions: parsedConfig.userInstructions,
+        feedbackCriteria: parsedConfig.feedbackCriteria,
+      }).returning();
+
+      res.json(result[0]);
+    } catch (error: any) {
+      console.error("Error saving chat config:", error);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/chat-configs", async (req, res) => {
+    try {
+      const showDeleted = req.query.showDeleted === 'true';
+      const query = db.query.chatConfigs.findMany({
+        where: showDeleted ? undefined : eq(chatConfigs.deleted, false),
+        orderBy: [desc(chatConfigs.createdAt)],
+        with: {
+          conversations: true,
+        }
+      });
+
+      const configs = await query;
+
+      const configsWithCount = configs.map(config => ({
+        ...config,
+        conversationCount: config.conversations.length,
+        conversations: undefined
+      }));
+
+      res.json(configsWithCount);
+    } catch (error: any) {
+      console.error("Error fetching chat configs:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.configId);
+
+      if (isNaN(configId)) {
+        return res.status(400).json({ error: "Invalid config ID" });
+      }
+
+      const config = await db.query.chatConfigs.findFirst({
+        where: eq(chatConfigs.id, configId),
+      });
+
+      if (!config) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+
+      const savedConversations = await db.query.conversations.findMany({
+        where: eq(conversations.configId, configId),
+        orderBy: [desc(conversations.createdAt)]
+      });
+
+      const parseMessages = (messagesData: any): Message[] => {
+        try {
+          if (typeof messagesData === 'string') {
+            const parsed = JSON.parse(messagesData);
+            return Array.isArray(parsed) ? parsed : [];
+          }
+          return Array.isArray(messagesData) ? messagesData : [];
+        } catch (e) {
+          console.error('[parseMessages] Error:', e);
+          return [];
+        }
+      };
+
+      const parseFeedback = (feedbackData: any): FeedbackData | null => {
+        try {
+          if (!feedbackData) return null;
+
+          let parsed = feedbackData;
+          if (typeof feedbackData === 'string') {
+            try {
+              parsed = JSON.parse(feedbackData);
+              if (typeof parsed === 'string') {
+                parsed = JSON.parse(parsed);
+              }
+            } catch (e) {
+              console.error('[parseFeedback] Error parsing JSON:', e);
+              return null;
+            }
+          }
+
+          if (parsed && typeof parsed === 'object' && 'bullets' in parsed) {
+            return {
+              bullets: parsed.bullets,
+              score: parsed.score,
+              summary: parsed.summary,
+              rawFeedback: typeof feedbackData === 'string' ? feedbackData : JSON.stringify(feedbackData)
+            };
+          }
+          return null;
+        } catch (e) {
+          console.error('[parseFeedback] Error:', e);
+          return null;
+        }
+      };
+
+      const conversationsWithMetadata = savedConversations.map(conv => {
+        const messages = parseMessages(conv.messages);
+        const feedback = parseFeedback(conv.feedback);
+
+        const conversation: Conversation = {
+          sessionId: conv.sessionId,
+          userName: conv.userName || null,
+          messages: messages.length > 0 ? messages : [{
+            role: 'user',
+            content: 'Content not available',
+            timestamp: Date.now(),
+            id: crypto.randomUUID(),
+            sessionId: conv.sessionId
+          }],
+          feedback
+        };
+
+        return conversation;
+      });
+
+      res.json(conversationsWithMetadata);
+    } catch (error: any) {
+      console.error("[GET /api/conversations] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/upload-feedback", async (req: Request, res: Response) => {
+    try {
+      const { configId, sessionId, fileContent, fileName } = uploadFeedbackSchema.parse(req.body);
+      const userName = req.query.userName as string || null;
+
+      const config = await db.query.chatConfigs.findFirst({
+        where: eq(chatConfigs.id, configId),
+      });
+
+      if (!config) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+
+      if (!config.feedbackCriteria) {
+        return res.status(400).json({ error: "Feedback criteria not set for this configuration" });
+      }
+
+      const prompt = `Analyze the uploaded screenshot based on these criteria:\n${config.feedbackCriteria}\n\nPlease provide your analysis in exactly this format:\n\n• [3 bullet points focusing on how well the screenshot meets the criteria]\n\nScore: [1-10]\n[Brief one-line summary of overall quality]`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert at analyzing screenshots and providing constructive feedback. Focus on visual elements, clarity, and how well the content meets the specified criteria."
+          },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              {
+                type: "image_url",
+                image_url: { url: fileContent }
+              }
+            ]
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+      });
+
+      const response = completion.choices[0]?.message?.content;
+      if (!response) {
+        throw new Error("Failed to get response from OpenAI");
+      }
+
+      const scoreMatch = response.match(/Score:\s*(\d+)/i);
+      const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
+
+      const summaryMatch = response.match(/Score:\s*\d+\s*\n([^\n]+)/i);
+      const summary = summaryMatch ? summaryMatch[1].trim() : null;
+
+      const bullets = response
+        .split(/Score:/i)[0]
+        .split(/[•\-\*]\s+/)
+        .filter(bullet => bullet.trim())
+        .map(bullet => bullet.trim());
+
+      const feedbackData = {
+        bullets,
+        score,
+        summary
+      };
+
+      await db.insert(conversations)
+        .values({
+          configId,
+          sessionId,
+          userName,
+          messages: JSON.stringify([{
+            role: 'user',
+            content: `Uploaded file: ${fileName}`,
+            timestamp: Date.now(),
+            id: crypto.randomUUID(),
+            sessionId
+          }]),
+          feedback: JSON.stringify(feedbackData)
+        })
+        .onConflictDoUpdate({
+          target: [conversations.configId, conversations.sessionId],
+          set: {
+            userName,
+            messages: JSON.stringify([{
+              role: 'user',
+              content: `Uploaded file: ${fileName}`,
+              timestamp: Date.now(),
+              id: crypto.randomUUID(),
+              sessionId
+            }]),
+            feedback: JSON.stringify(feedbackData)
+          }
+        });
+
+      res.json(feedbackData);
+    } catch (error: any) {
+      console.error("Error processing upload feedback:", error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   app.post("/api/chat-feedback", async (req: Request, res: Response) => {
@@ -419,8 +490,7 @@ export function registerRoutes(app: Express): Server {
       const { feedbackCriteria, messages, type } = req.body;
       const sessionId = getSessionId(req);
       const configId = parseInt(new URL(req.url, `http://${req.headers.host}`).searchParams.get("configId") || "0");
-
-      console.log('Received feedback request:', { feedbackCriteria, messageCount: messages?.length, configId, sessionId, type });
+      const userName = req.query.userName as string || null;
 
       if (!feedbackCriteria) {
         return res.status(400).json({ error: "Feedback criteria is required" });
@@ -429,14 +499,12 @@ export function registerRoutes(app: Express): Server {
       const messagesToAnalyze = messages || (sessions[sessionId] || []);
 
       if (type === 'upload') {
-        // For upload type, we need at least one message and it should be an upload
         if (!Array.isArray(messagesToAnalyze) || messagesToAnalyze.length === 0) {
           return res.status(400).json({
             error: "No uploads found to analyze."
           });
         }
 
-        // Verify if there's at least one upload message
         const hasUploadMessage = messagesToAnalyze.some(message => {
           const content = typeof message.content === 'string'
             ? message.content
@@ -450,7 +518,6 @@ export function registerRoutes(app: Express): Server {
           });
         }
       } else {
-        // For chat type, we need the regular message validation
         if (!Array.isArray(messagesToAnalyze) || messagesToAnalyze.length === 0) {
           return res.status(400).json({
             error: "No chat messages to analyze. Please have a conversation first before requesting feedback."
@@ -547,6 +614,7 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/chat-hint", async (req: Request, res: Response) => {
     try {
       const { feedbackCriteria, userInstructions, messages } = req.body;
+      const userName = req.query.userName as string || null;
 
       if (!feedbackCriteria) {
         return res.status(400).json({ error: "Feedback criteria is required" });
@@ -588,288 +656,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add better type checking and error handling for conversations endpoint
-  app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
-    try {
-      const configId = parseInt(req.params.configId);
-      console.log("[GET /api/conversations] ConfigId:", configId);
-
-      if (isNaN(configId)) {
-        return res.status(400).json({ error: "Invalid config ID" });
-      }
-
-      // First get the config to determine its type
-      const config = await db.query.chatConfigs.findFirst({
-        where: eq(chatConfigs.id, configId),
-      });
-
-      console.log("[GET /api/conversations] Config type:", config?.type);
-
-      if (!config) {
-        return res.status(404).json({ error: "Configuration not found" });
-      }
-
-      const savedConversations = await db.query.conversations.findMany({
-        where: eq(conversations.configId, configId),
-        orderBy: [desc(conversations.createdAt)]
-      });
-
-      console.log("[GET /api/conversations] Found conversations:", savedConversations.length);
-
-      const parseMessages = (messagesData: any): Message[] => {
-        try {
-          console.log("[parseMessages] Input:", typeof messagesData, messagesData);
-          if (typeof messagesData === 'string') {
-            return JSON.parse(messagesData);
-          }
-          return Array.isArray(messagesData) ? messagesData : [];
-        } catch (e) {
-          console.error('[parseMessages] Error:', e);
-          return [];
-        }
-      };
-
-      // Add proper parsing for doubly-encoded JSON feedback
-      const parseFeedback = (feedbackData: any): FeedbackData | null => {
-        try {
-          console.log("[parseFeedback] Input:", typeof feedbackData, feedbackData);
-          if (!feedbackData) return null;
-
-          // Handle doubly-encoded JSON strings
-          let parsed = feedbackData;
-          if (typeof feedbackData === 'string') {
-            try {
-              parsed = JSON.parse(feedbackData);
-              // If it's still a string (double encoded), parse again
-              if (typeof parsed === 'string') {
-                parsed = JSON.parse(parsed);
-              }
-            } catch (e) {
-              console.error('[parseFeedback] Error parsing JSON:', e);
-              return null;
-            }
-          }
-
-          if (parsed && typeof parsed === 'object' && 'bullets' in parsed) {
-            return {
-              bullets: parsed.bullets,
-              score: parsed.score,
-              summary: parsed.summary,
-              rawFeedback: typeof feedbackData === 'string' ? feedbackData : JSON.stringify(feedbackData)
-            };
-          }
-          return null;
-        } catch (e) {
-          console.error('[parseFeedback] Error:', e);
-          return null;
-        }
-      };
-
-      let conversationsWithMetadata: Conversation[] = [];
-
-      if (config.type === 'upload') {
-        // For upload type, we only need the latest feedback per session
-        console.log("[GET /api/conversations] Processing upload type conversations");
-        const processedConversations = savedConversations
-          .map(conv => {
-            console.log("[Processing conversation]", {
-              sessionId: conv.sessionId,
-              hasFeedback: !!conv.feedback
-            });
-
-            const feedback = parseFeedback(conv.feedback);
-            console.log("[Parsed feedback]", feedback);
-
-            const messages = parseMessages(conv.messages);
-            console.log("[Parsed messages]", messages.length);
-
-            // Only include conversations with valid feedback for upload type
-            if (!feedback) {
-              console.log("[Skipping] No valid feedback for session", conv.sessionId);
-              return null;
-            }
-
-            return {
-              sessionId: conv.sessionId,
-              feedback,
-              messages: messages.length > 0 ? messages : [{
-                role: 'user',
-                content: 'Upload content not available',
-                timestamp: Date.now(),
-                id: crypto.randomUUID(),
-                sessionId: conv.sessionId
-              }]
-            } as Conversation;
-          })
-          .filter((conv): conv is Conversation => conv !== null);
-
-        conversationsWithMetadata = processedConversations;
-      } else {
-        // For chat type, include all messages and feedback
-        conversationsWithMetadata = savedConversations
-          .map(conv => {
-            const messages = parseMessages(conv.messages);
-            if (messages.length === 0) return null;
-
-            const conversation: Conversation = {
-              sessionId: conv.sessionId,
-              messages,
-              userName: conv.user_name || undefined,
-              feedback: parseFeedback(conv.feedback)
-            };
-            return conversation;
-          })
-          .filter((conv): conv is Conversation => conv !== null);
-      }
-
-      console.log("[GET /api/conversations] Final response:", {
-        count: conversationsWithMetadata.length,
-        conversations: conversationsWithMetadata.map(c => ({
-          sessionId: c.sessionId,
-          hasFeedback: !!c.feedback,
-          messageCount: c.messages.length
-        }))
-      });
-
-      res.json(conversationsWithMetadata);
-    } catch (error: any) {
-      console.error("[GET /api/conversations] Error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post("/api/improve-criteria", async (req: Request, res: Response) => {
-    try {
-      const { feedbackCriteria } = req.body;
-
-      if (!feedbackCriteria) {
-        return res.status(400).json({ error: "Feedback criteria is required" });
-      }
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert at creating effective feedback criteria for evaluating soft skills and interactions. Your goal is to enhance existing feedback criteria to be more comprehensive, clear, and actionable while maintaining its core purpose."
-          },
-          {
-            role: "user",
-            content: `Please improve the following feedback criteria to be more comprehensive, specific, and effective at evaluating user interactions. Maintain the same general purpose but make it as actionable as possible. Don't make it longer than 5 points. Here's the current criteria:\n\n${feedbackCriteria}`
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000,
-      });
-
-      const improvedCriteria = response.choices[0]?.message?.content;
-      if (!improvedCriteria) {
-        throw new Error("Failed to get improved criteria from OpenAI");
-      }
-
-      res.json({ improvedCriteria });
-    } catch (error: any) {
-      console.error("Error improving criteria:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Add new upload feedback route
-  app.post("/api/upload-feedback", async (req: Request, res: Response) => {
-    try {
-      const { configId, sessionId, fileContent, fileName } = uploadFeedbackSchema.parse(req.body);
-
-      const config = await db.query.chatConfigs.findFirst({
-        where: eq(chatConfigs.id, configId),
-      });
-
-      if (!config) {
-        return res.status(404).json({ error: "Configuration not found" });
-      }
-
-      if (!config.feedbackCriteria) {
-        return res.status(400).json({ error: "Feedback criteria not set for this configuration" });
-      }
-
-      const prompt = `Analyze the uploaded screenshot based on these criteria:\n${config.feedbackCriteria}\n\nPlease provide your analysis in exactly this format:\n\n• [3 bullet points focusing on how well the screenshot meets the criteria]\n\nScore: [1-10]\n[Brief one-line summary of overall quality]`;
-
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert at analyzing screenshots and providing constructive feedback. Focus on visual elements, clarity, and how well the content meets the specified criteria."
-          },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: prompt },
-              {
-                type: "image_url",
-                image_url: { url: fileContent }
-              }
-            ]
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000,
-      });
-
-      const response = completion.choices[0]?.message?.content;
-      if (!response) {
-        throw new Error("Failed to get response from OpenAI");
-      }
-
-      const scoreMatch = response.match(/Score:\s*(\d+)/i);
-      const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
-
-      const summaryMatch = response.match(/Score:\s*\d+\s*\n([^\n]+)/i);
-      const summary = summaryMatch ? summaryMatch[1].trim() : null;
-
-      const bullets = response
-        .split(/Score:/i)[0]
-        .split(/[•\-\*]\s+/)
-        .filter(bullet => bullet.trim())
-        .map(bullet => bullet.trim());
-
-      const feedbackData = {
-        bullets,
-        score,
-        summary
-      };
-
-      // Insert or update the conversation with feedback
-      await db.insert(conversations)
-        .values({
-          configId,
-          sessionId,
-          messages: JSON.stringify([{
-            role: 'user',
-            content: `Uploaded file: ${fileName}`,
-            timestamp: Date.now(),
-            id: crypto.randomUUID()
-          }]),
-          feedback: JSON.stringify(feedbackData)
-        })
-        .onConflictDoUpdate({
-          target: [conversations.configId, conversations.sessionId],
-          set: {
-            messages: JSON.stringify([{
-              role: 'user',
-              content: `Uploaded file: ${fileName}`,
-              timestamp: Date.now(),
-              id: crypto.randomUUID()
-            }]),
-            feedback: JSON.stringify(feedbackData)
-          }
-        });
-
-      res.json(feedbackData);
-    } catch (error: any) {
-      console.error("Error processing upload feedback:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
 
   const httpServer = createServer(app);
   return httpServer;

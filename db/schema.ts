@@ -25,6 +25,16 @@ export const conversations = pgTable("conversations", {
   sessionId: text("session_id").notNull(),
   userName: text("user_name"),
   messages: jsonb("messages").notNull().default('[]'),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.configId, table.sessionId] })
+}));
+
+export const uploads = pgTable("uploads", {
+  configId: integer("config_id").notNull().references(() => chatConfigs.id),
+  sessionId: text("session_id").notNull(),
+  userName: text("user_name"),
+  fileName: text("file_name").notNull(),
   feedback: jsonb("feedback").default('{}'),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
@@ -34,11 +44,19 @@ export const conversations = pgTable("conversations", {
 // Relations
 export const chatConfigsRelations = relations(chatConfigs, ({ many }) => ({
   conversations: many(conversations),
+  uploads: many(uploads),
 }));
 
 export const conversationsRelations = relations(conversations, ({ one }) => ({
   config: one(chatConfigs, {
     fields: [conversations.configId],
+    references: [chatConfigs.id],
+  }),
+}));
+
+export const uploadsRelations = relations(uploads, ({ one }) => ({
+  config: one(chatConfigs, {
+    fields: [uploads.configId],
     references: [chatConfigs.id],
   }),
 }));
@@ -50,6 +68,8 @@ export const insertChatConfigSchema = createInsertSchema(chatConfigs);
 export const selectChatConfigSchema = createSelectSchema(chatConfigs);
 export const insertConversationSchema = createInsertSchema(conversations);
 export const selectConversationSchema = createSelectSchema(conversations);
+export const insertUploadSchema = createInsertSchema(uploads);
+export const selectUploadSchema = createSelectSchema(uploads);
 
 // Types
 export type InsertUser = typeof users.$inferInsert;
@@ -58,3 +78,5 @@ export type InsertChatConfig = typeof chatConfigs.$inferInsert;
 export type SelectChatConfig = typeof chatConfigs.$inferSelect;
 export type InsertConversation = typeof conversations.$inferInsert;
 export type SelectConversation = typeof conversations.$inferSelect;
+export type InsertUpload = typeof uploads.$inferInsert;
+export type SelectUpload = typeof uploads.$inferSelect;

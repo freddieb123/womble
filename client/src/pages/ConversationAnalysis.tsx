@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
 import type { Message, AdminConfig } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 
@@ -15,7 +13,7 @@ interface ConversationFeedback {
 
 interface ConversationData {
   messages: Message[];
-  userName: string | null;
+  userName: string;
   sessionId: string;
   feedback: ConversationFeedback | null;
 }
@@ -24,7 +22,6 @@ export default function ConversationAnalysis() {
   const [conversations, setConversations] = useState<ConversationData[]>([]);
   const [feedbacks, setFeedbacks] = useState<ConversationFeedback[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isRegenerating, setIsRegenerating] = useState(false);
   const { toast } = useToast();
 
   const searchParams = new URLSearchParams(window.location.search);
@@ -80,7 +77,7 @@ export default function ConversationAnalysis() {
         <div className="max-w-4xl mx-auto">
           <Card>
             <CardContent className="p-6">
-              <div className="text-center text-red-600">No GPT ID provided</div>
+              <div className="text-center text-red-600">No config ID provided</div>
             </CardContent>
           </Card>
         </div>
@@ -92,13 +89,17 @@ export default function ConversationAnalysis() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-blue-900">Upload Analysis</h1>
+          <h1 className="text-2xl font-bold text-blue-900">
+            {config?.type === 'upload' ? 'Upload Analysis' : 'Conversation Analysis'}
+          </h1>
         </div>
 
         {isLoading ? (
           <Card>
             <CardContent className="p-6">
-              <div className="animate-pulse text-center">Analyzing uploads...</div>
+              <div className="animate-pulse text-center">
+                {config?.type === 'upload' ? 'Analyzing uploads...' : 'Analyzing conversations...'}
+              </div>
             </CardContent>
           </Card>
         ) : (
@@ -108,14 +109,14 @@ export default function ConversationAnalysis() {
                 <Card key={conversation.sessionId || index}>
                   <CardHeader>
                     <h2 className="text-lg font-semibold">
-                      {conversation.userName && conversation.userName !== 'null' ? `${conversation.userName}'s Upload` : `Anonymous Upload ${index + 1}`}
+                      {conversation.userName ? `${conversation.userName}'s ${config?.type === 'upload' ? 'Upload' : 'Conversation'}` : `Anonymous ${config?.type === 'upload' ? 'Upload' : 'Conversation'} ${index + 1}`}
                     </h2>
                   </CardHeader>
                   <CardContent>
-                    {feedbacks[index] ? (
+                    {conversation.feedback ? (
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          {feedbacks[index].bullets.map((bullet, bulletIndex) => (
+                          {conversation.feedback.bullets.map((bullet, bulletIndex) => (
                             <div key={bulletIndex} className="flex items-start gap-2 text-sm">
                               <span>•</span>
                               <span>{bullet}</span>
@@ -125,18 +126,18 @@ export default function ConversationAnalysis() {
                         <div className="border-t pt-4">
                           <div className="flex flex-col gap-2 bg-blue-50 p-4 rounded-lg">
                             <span className="text-2xl font-bold text-blue-900">
-                              {feedbacks[index].score}/10
+                              {conversation.feedback.score}/10
                             </span>
-                            {feedbacks[index].summary && (
+                            {conversation.feedback.summary && (
                               <p className="text-sm text-blue-700">
-                                {feedbacks[index].summary}
+                                {conversation.feedback.summary}
                               </p>
                             )}
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <p className="text-muted-foreground">No feedback available for this upload.</p>
+                      <p className="text-muted-foreground">No feedback available for this {config?.type === 'upload' ? 'upload' : 'conversation'}.</p>
                     )}
                   </CardContent>
                 </Card>
