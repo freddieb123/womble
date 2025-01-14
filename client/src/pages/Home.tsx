@@ -4,9 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Plus, Pencil, Copy, ExternalLink, MoreVertical, BarChart2, Trash2, ArrowUpCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import AdminPanel from "@/components/AdminPanel";
-import type { AdminConfig } from "@/lib/types";
+import type { AdminConfig, Feedback } from "@/lib/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -31,7 +31,7 @@ import { Switch } from "@/components/ui/switch";
 type ChatConfig = {
   id: number;
   title: string;
-  type: 'chat' | 'upload';  // Make type required and properly typed
+  type: 'chat' | 'upload';
   systemPrompt: string;
   userInstructions: string | null;
   feedbackCriteria: string | null;
@@ -46,6 +46,7 @@ export default function Home() {
   const [editingConfig, setEditingConfig] = useState<ChatConfig | null>(null);
   const [deletingConfig, setDeletingConfig] = useState<ChatConfig | null>(null);
   const [showDeleted, setShowDeleted] = useState(false);
+  const [viewingFeedbackConfig, setViewingFeedbackConfig] = useState<ChatConfig | null>(null);
   const [config, setConfig] = useState<AdminConfig>({
     title: "",
     type: "chat",
@@ -223,8 +224,12 @@ export default function Home() {
     }
   };
 
-  const handleViewFeedback = (configId: number) => {
-    window.open(`${window.location.origin}/analysis?configId=${configId}`, '_blank');
+  const handleViewFeedback = (configToView: ChatConfig) => {
+    if (configToView.type === 'upload') {
+      setViewingFeedbackConfig(configToView);
+    } else {
+      window.open(`${window.location.origin}/analysis?configId=${configToView.id}`, '_blank');
+    }
   };
 
   const handleDuplicate = (configToDuplicate: ChatConfig) => {
@@ -239,6 +244,17 @@ export default function Home() {
     });
     setIsCreateOpen(true);
   };
+
+  // Add this query to fetch feedback data
+  const { data: feedbackData } = useQuery<Array<{
+    sessionId: string;
+    feedback: Feedback;
+    messages: Array<{ role: string; content: string; timestamp: number; id: string; }>;
+  }>>({
+    queryKey: [`/api/conversations/${viewingFeedbackConfig?.id}`],
+    enabled: !!viewingFeedbackConfig?.id && viewingFeedbackConfig.type === 'upload',
+  });
+
 
   if (isLoading) {
     return (
@@ -417,7 +433,7 @@ export default function Home() {
                         <Button
                           size="sm"
                           variant="secondary"
-                          onClick={() => handleViewFeedback(config.id)}
+                          onClick={() => handleViewFeedback(config)}
                           disabled={!config.feedbackCriteria || config.conversationCount === 0}
                         >
                           <BarChart2 className="h-4 w-4 mr-2" />
@@ -436,6 +452,59 @@ export default function Home() {
           </div>
         </ScrollArea>
       </div>
+      <Dialog 
+        open={viewingFeedbackConfig !== null} 
+        onOpenChange={(open) => !open && setViewingFeedbackConfig(null)}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Feedback for {viewingFeedbackConfig?.title}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {viewingFeedbackConfig?.type === 'upload' && (
+              feedbackData && feedbackData.length > 0 ? (
+                <div>
+                  {feedbackData.map((conversation, idx) => (
+                    <Card key={conversation.sessionId} className={idx > 0 ? 'mt-4' : ''}>
+                      <CardHeader>
+                        <CardTitle className="text-lg">
+                          Feedback from {new Date(conversation.messages[0]?.timestamp).toLocaleDateString()}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {conversation.feedback ? (
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              {conversation.feedback.bullets.map((bullet, index) => (
+                                <div key={index} className="flex items-start gap-2 text-sm">
+                                  <span>•</span>
+                                  <span>{bullet}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="border-t pt-4">
+                              <div className="flex flex-col gap-2">
+                                <span className="text-2xl font-bold">{conversation.feedback.score}/10</span>
+                                {conversation.feedback.summary && (
+                                  <p className="text-sm text-muted-foreground">{conversation.feedback.summary}</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-muted-foreground">No feedback available for this session.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-4">No feedback available yet.</p>
+              )
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
       <AlertDialog
         open={deletingConfig !== null}
         onOpenChange={(open) => !open && setDeletingConfig(null)}
