@@ -24,6 +24,20 @@ const chatConfigSchema = z.object({
   feedbackCriteria: z.string().nullable(),
 });
 
+const configSchema = z.object({
+  systemPrompt: z.string(),
+  temperature: z.number().min(0).max(2).default(0.7),
+  maxTokens: z.number().min(100).max(4000).default(1000)
+});
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  dangerouslyAllowBrowser: false
+});
+
+// Store sessions in memory
+const sessions: Record<string, Message[]> = {};
+
 export function registerRoutes(app: Express): Server {
   // Chat configs endpoints
   app.get("/api/chat-configs", async (req: Request, res: Response) => {
@@ -75,6 +89,194 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Messages endpoints
+  app.get("/api/messages", async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.query.configId as string);
+      const sessionId = req.query.sessionId as string || crypto.randomUUID();
+      const userName = req.query.userName as string || null;
+
+      if (isNaN(configId)) {
+        return res.status(400).json({ error: "Valid config ID is required" });
+      }
+
+      const conversation = await db.query.conversations.findFirst({
+        where: and(
+          eq(conversations.configId, configId),
+          eq(conversations.sessionId, sessionId)
+        ),
+      });
+
+      if (!sessions[sessionId]) {
+        sessions[sessionId] = conversation?.messages || [];
+      }
+
+      res.json({
+        messages: sessions[sessionId],
+        isLoading: false,
+        error: null
+      });
+    } catch (error: any) {
+      console.error("Error fetching messages:", error);
+      res.status(500).json({
+        messages: [],
+        isLoading: false,
+        error: "Failed to fetch messages"
+      });
+    }
+  });
+
+  app.post("/api/messages", async (req: Request, res: Response) => {
+    try {
+      const { content, config: configData } = req.body;
+      const configId = parseInt(req.query.configId as string);
+      const sessionId = req.query.sessionId as string || crypto.randomUUID();
+      const userName = req.query.userName as string || null;
+
+      if (!content) {
+        return res.status(400).json({ error: "Message content is required" });
+      }
+
+      if (isNaN(configId)) {
+        return res.status(400).json({ error: "Valid config ID is required" });
+      }
+
+      const parsedConfig = configSchema.parse(configData);
+
+      if (!sessions[sessionId]) {
+        const existingConversation = await db.query.conversations.findFirst({
+          where: and(
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId)
+          ),
+        });
+        sessions[sessionId] = existingConversation?.messages || [];
+      }
+
+      const userMessage: Message = {
+        id: crypto.randomUUID(),
+        content: typeof content === 'string' ? content : {
+          text: content.text,
+          image: content.image
+        },
+        role: 'user',
+        timestamp: Date.now(),
+        sessionId
+      };
+      sessions[sessionId].push(userMessage);
+
+      try {
+        await db
+          .insert(conversations)
+          .values({
+            configId,
+            sessionId,
+            userName,
+            messages: sessions[sessionId],
+          })
+          .onConflictDoUpdate({
+            target: [conversations.configId, conversations.sessionId],
+            set: {
+              messages: sessions[sessionId]
+            }
+          });
+      } catch (error) {
+        console.error("Error saving conversation:", error);
+      }
+
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      const enhancedSystemPrompt = `${parsedConfig.systemPrompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${userName || 'Anonymous'}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${userName || 'Anonymous'}!" or "Hi ${userName || 'Anonymous'}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much!`;
+
+      const apiMessages: ChatCompletionMessageParam[] = [
+        { role: "system", content: enhancedSystemPrompt }
+      ];
+
+      for (const m of sessions[sessionId]) {
+        if (typeof m.content === 'string') {
+          apiMessages.push({
+            role: m.role,
+            content: m.content
+          });
+        } else if (!m.content.image) {
+          apiMessages.push({
+            role: m.role,
+            content: m.content.text
+          });
+        } else {
+          apiMessages.push({
+            role: m.role,
+            content: [
+              {
+                type: "text",
+                text: m.content.text || "Please analyze this image."
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: m.content.image
+                }
+              }
+            ]
+          });
+        }
+      }
+
+      let accumulatedMessage = '';
+      const messageId = crypto.randomUUID();
+
+      try {
+        const stream = await openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: apiMessages,
+          temperature: parsedConfig.temperature,
+          max_tokens: parsedConfig.maxTokens,
+          stream: true,
+        });
+
+        for await (const chunk of stream) {
+          const content = chunk.choices[0]?.delta?.content || '';
+          if (content) {
+            accumulatedMessage += content;
+            res.write(`data: ${JSON.stringify({ content, messageId })}\n\n`);
+          }
+        }
+
+        const assistantMessage: Message = {
+          id: messageId,
+          content: accumulatedMessage,
+          role: 'assistant',
+          timestamp: Date.now(),
+          sessionId
+        };
+        sessions[sessionId].push(assistantMessage);
+
+        await db
+          .update(conversations)
+          .set({
+            messages: sessions[sessionId]
+          })
+          .where(and(
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId)
+          ));
+
+        res.write('data: [DONE]\n\n');
+        res.end();
+      } catch (streamError) {
+        console.error("Stream error:", streamError);
+        res.write(`data: ${JSON.stringify({ error: "Error processing request" })}\n\n`);
+        res.end();
+      }
+    } catch (error: any) {
+      console.error("Error processing message:", error);
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      res.end();
+    }
+  });
+
   app.post("/api/upload-feedback", async (req: Request, res: Response) => {
     try {
       const { configId, sessionId, fileContent, fileName, userName } = uploadFeedbackSchema.parse(req.body);
@@ -90,11 +292,6 @@ export function registerRoutes(app: Express): Server {
       if (!config.feedbackCriteria) {
         return res.status(400).json({ error: "Feedback criteria not set for this configuration" });
       }
-
-      const openai = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
-        dangerouslyAllowBrowser: false
-      });
 
       const prompt = `Analyze the uploaded screenshot based on these criteria:\n${config.feedbackCriteria}\n\nPlease provide your analysis in exactly this format:\n\n• [3 bullet points focusing on how well the screenshot meets the criteria]\n\nScore: [1-10]\n[Brief one-line summary of overall quality]`;
 
