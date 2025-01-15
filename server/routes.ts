@@ -365,6 +365,88 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/chat-feedback", async (req: Request, res: Response) => {
+    try {
+      const { configId, sessionId, messages } = req.body;
+
+      if (!configId || !sessionId || !messages) {
+        return res.status(400).json({ error: "Missing required parameters" });
+      }
+
+      const config = await db.query.chatConfigs.findFirst({
+        where: eq(chatConfigs.id, configId),
+      });
+
+      if (!config) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+
+      if (!config.feedbackCriteria) {
+        return res.status(400).json({ error: "Feedback criteria not set for this configuration" });
+      }
+
+      const prompt = `Analyze the conversation based on these criteria:\n${config.feedbackCriteria}\n\nPlease provide your analysis in exactly this format:\n\n• [3 bullet points focusing on how well the conversation meets the criteria]\n\nScore: [1-10]\n[Brief one-line summary of overall quality]`;
+
+      const conversation = messages.map((m: Message) =>
+        `${m.role}: ${typeof m.content === 'string' ? m.content : m.content.text}`
+      ).join('\n');
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert at analyzing conversations and providing constructive feedback. Focus on communication effectiveness and how well the content meets the specified criteria."
+          },
+          {
+            role: "user",
+            content: `${prompt}\n\nConversation to analyze:\n${conversation}`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+      });
+
+      const response = completion.choices[0]?.message?.content;
+      if (!response) {
+        throw new Error("Failed to get response from OpenAI");
+      }
+
+      const scoreMatch = response.match(/Score:\s*(\d+)/i);
+      const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
+
+      const summaryMatch = response.match(/Score:\s*\d+\s*\n([^\n]+)/i);
+      const summary = summaryMatch ? summaryMatch[1].trim() : null;
+
+      const bullets = response
+        .split(/Score:/i)[0]
+        .split(/[•\-\*]\s+/)
+        .filter(bullet => bullet.trim())
+        .map(bullet => bullet.trim());
+
+      const feedbackData: ConversationFeedback = {
+        bullets,
+        score,
+        summary
+      };
+
+      await db
+        .update(conversations)
+        .set({
+          feedback: feedbackData
+        })
+        .where(and(
+          eq(conversations.configId, configId),
+          eq(conversations.sessionId, sessionId)
+        ));
+
+      res.json(feedbackData);
+    } catch (error: any) {
+      console.error("Error processing chat feedback:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.configId);
