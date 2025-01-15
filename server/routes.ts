@@ -16,7 +16,6 @@ const uploadFeedbackSchema = z.object({
   userName: z.string().nullable(),
 });
 
-// Add other schemas and types back
 const chatConfigSchema = z.object({
   title: z.string().min(1, "Title is required"),
   type: z.enum(['chat', 'upload']).default('chat'),
@@ -26,6 +25,56 @@ const chatConfigSchema = z.object({
 });
 
 export function registerRoutes(app: Express): Server {
+  // Chat configs endpoints
+  app.get("/api/chat-configs", async (req: Request, res: Response) => {
+    try {
+      const showDeleted = req.query.showDeleted === 'true';
+      const configs = await db.query.chatConfigs.findMany({
+        where: showDeleted ? undefined : eq(chatConfigs.deleted, false),
+        orderBy: [desc(chatConfigs.createdAt)],
+        with: {
+          conversations: true,
+          uploads: true,
+        }
+      });
+
+      const configsWithCount = configs.map(config => ({
+        ...config,
+        conversationCount: config.type === 'upload' ? config.uploads.length : config.conversations.length,
+        conversations: undefined,
+        uploads: undefined
+      }));
+
+      res.json(configsWithCount);
+    } catch (error: any) {
+      console.error("Error fetching chat configs:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/chat-configs/:id", async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.id);
+
+      if (isNaN(configId)) {
+        return res.status(400).json({ error: "Invalid config ID" });
+      }
+
+      const config = await db.query.chatConfigs.findFirst({
+        where: eq(chatConfigs.id, configId),
+      });
+
+      if (!config) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+
+      res.json(config);
+    } catch (error: any) {
+      console.error("Error fetching chat config:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/upload-feedback", async (req: Request, res: Response) => {
     try {
       const { configId, sessionId, fileContent, fileName, userName } = uploadFeedbackSchema.parse(req.body);
@@ -119,7 +168,56 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Include other routes here...
+  app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.configId);
+
+      if (isNaN(configId)) {
+        return res.status(400).json({ error: "Invalid config ID" });
+      }
+
+      const config = await db.query.chatConfigs.findFirst({
+        where: eq(chatConfigs.id, configId),
+      });
+
+      if (!config) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+
+      if (config.type === 'upload') {
+        const uploadData = await db.query.uploads.findMany({
+          where: eq(uploads.configId, configId),
+          orderBy: [desc(uploads.createdAt)]
+        });
+
+        const uploadsWithMetadata = uploadData.map(upload => ({
+          sessionId: upload.sessionId,
+          userName: upload.userName,
+          fileName: upload.fileName,
+          feedback: upload.feedback
+        }));
+
+        res.json(uploadsWithMetadata);
+      } else {
+        const conversationData = await db.query.conversations.findMany({
+          where: eq(conversations.configId, configId),
+          orderBy: [desc(conversations.createdAt)]
+        });
+
+        const conversationsWithMetadata = conversationData.map(conv => ({
+          sessionId: conv.sessionId,
+          userName: conv.userName,
+          messages: conv.messages,
+          feedback: conv.feedback
+        }));
+
+        res.json(conversationsWithMetadata);
+      }
+    } catch (error: any) {
+      console.error("[GET /api/conversations] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
