@@ -385,7 +385,8 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({
-                                feedbackCriteria: config.feedbackCriteria,
+                                configId: config.id,
+                                sessionId,
                                 messages: chatState.messages,
                                 type: config.type
                               }),
