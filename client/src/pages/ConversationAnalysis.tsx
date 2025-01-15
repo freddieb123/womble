@@ -109,7 +109,9 @@ export default function ConversationAnalysis() {
                 <Card key={conversation.sessionId || index}>
                   <CardHeader>
                     <h2 className="text-lg font-semibold">
-                      {conversation.userName ? `${conversation.userName}'s ${config?.type === 'upload' ? 'Upload' : 'Conversation'}` : `Anonymous ${config?.type === 'upload' ? 'Upload' : 'Conversation'} ${index + 1}`}
+                      {conversation.userName ? 
+                        `${conversation.userName}'s ${config?.type === 'upload' ? 'Upload' : 'Conversation'}` : 
+                        `Anonymous ${config?.type === 'upload' ? 'Upload' : 'Conversation'} ${index + 1}`}
                     </h2>
                   </CardHeader>
                   <CardContent>
