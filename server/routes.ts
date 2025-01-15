@@ -492,11 +492,22 @@ Provide a single, friendly sentence starting with "Try to" or "Consider" that di
   app.post("/api/chat-feedback", async (req: Request, res: Response) => {
     try {
       const { configId, sessionId, messages } = req.body;
-      const userName = req.query.userName as string || null;
+
+      // Add logging to debug the incoming request
+      console.log('Received chat feedback request:', { configId, sessionId, messages });
+
+      if (!configId || !sessionId || !messages) {
+        return res.status(400).json({ error: "Missing required parameters" });
+      }
 
       const config = await db.query.chatConfigs.findFirst({
-        where: eq(chatConfigs.id, configId),
+        where: and(
+          eq(chatConfigs.id, configId),
+          eq(chatConfigs.deleted, false)
+        ),
       });
+
+      console.log('Found config:', config); // Debug log
 
       if (!config) {
         return res.status(404).json({ error: "Configuration not found" });
@@ -551,6 +562,7 @@ Provide a single, friendly sentence starting with "Try to" or "Consider" that di
         summary
       };
 
+      // Update the conversation with feedback
       await db
         .update(conversations)
         .set({
