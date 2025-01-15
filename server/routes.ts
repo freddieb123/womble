@@ -6,16 +6,18 @@ import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
-import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
+import type { ChatCompletionMessageParam } from 'openai/resources';
 
-// Add file handling schema
-const uploadFeedbackSchema = z.object({
-  configId: z.number(),
-  sessionId: z.string(),
-  fileContent: z.string(),
-  fileName: z.string(),
+// Schema definitions
+const chatConfigSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  type: z.enum(['chat', 'upload']).default('chat'),
+  systemPrompt: z.string().min(1, "System prompt is required"),
+  userInstructions: z.string().nullable(),
+  feedbackCriteria: z.string().nullable(),
 });
 
+// Types for our routes
 interface MessageContent {
   text: string;
   image?: string | null;
@@ -35,7 +37,53 @@ interface UploadData {
   feedback: UploadFeedback | null;
 }
 
+// Add the chat configs endpoints back
 export function registerRoutes(app: Express): Server {
+  // Chat configs endpoints
+  app.post("/api/chat-configs", async (req: Request, res: Response) => {
+    try {
+      const parsedConfig = chatConfigSchema.parse(req.body);
+      const result = await db.insert(chatConfigs).values({
+        title: parsedConfig.title,
+        type: parsedConfig.type,
+        systemPrompt: parsedConfig.systemPrompt,
+        userInstructions: parsedConfig.userInstructions,
+        feedbackCriteria: parsedConfig.feedbackCriteria,
+      }).returning();
+
+      res.json(result[0]);
+    } catch (error: any) {
+      console.error("Error creating chat config:", error);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/chat-configs", async (req: Request, res: Response) => {
+    try {
+      const showDeleted = req.query.showDeleted === 'true';
+      const configs = await db.query.chatConfigs.findMany({
+        where: showDeleted ? undefined : eq(chatConfigs.deleted, false),
+        orderBy: [desc(chatConfigs.createdAt)],
+        with: {
+          conversations: true,
+          uploads: true,
+        }
+      });
+
+      const configsWithCount = configs.map(config => ({
+        ...config,
+        conversationCount: config.type === 'upload' ? config.uploads.length : config.conversations.length,
+        conversations: undefined,
+        uploads: undefined
+      }));
+
+      res.json(configsWithCount);
+    } catch (error: any) {
+      console.error("Error fetching chat configs:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/messages", async (req: Request, res: Response) => {
     try {
       const url = new URL(req.url, `http://${req.headers.host}`);
@@ -426,6 +474,13 @@ const configSchema = z.object({
   systemPrompt: z.string(),
   temperature: z.number().min(0).max(2),
   maxTokens: z.number().min(100).max(4000)
+});
+
+const uploadFeedbackSchema = z.object({
+  configId: z.number(),
+  sessionId: z.string(),
+  fileContent: z.string(),
+  fileName: z.string(),
 });
 
 const sessions: Record<string, Message[]> = {};
