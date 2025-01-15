@@ -20,17 +20,25 @@ export const chatConfigs = pgTable("chat_configs", {
   deletedAt: timestamp("deleted_at"),
 });
 
-// Combined table for both conversations and uploads
-export const messages = pgTable("messages", {
+// Conversations table - for chat messages
+export const conversations = pgTable("conversations", {
   configId: integer("config_id").notNull().references(() => chatConfigs.id),
   sessionId: text("session_id").notNull(),
-  type: text("type", { enum: ['conversation', 'upload'] }).notNull(),
   userName: text("user_name"),
-  // For conversations
-  messages: jsonb("messages").$type<Message[]>().default([]),
-  // For uploads
-  fileName: text("file_name"),
-  feedback: jsonb("feedback").$type<FeedbackData>(),
+  messages: jsonb("messages").$type<Message[]>().notNull().default([]),
+  feedback: jsonb("feedback").$type<ConversationFeedback>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.configId, table.sessionId] })
+}));
+
+// Separate uploads table for file uploads
+export const uploads = pgTable("uploads", {
+  configId: integer("config_id").notNull().references(() => chatConfigs.id),
+  sessionId: text("session_id").notNull(),
+  userName: text("user_name"),
+  fileName: text("file_name").notNull(),
+  feedback: jsonb("feedback").$type<UploadFeedback>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   pk: primaryKey({ columns: [table.configId, table.sessionId] })
@@ -48,20 +56,34 @@ export interface Message {
   sessionId: string;
 }
 
-export interface FeedbackData {
+export interface ConversationFeedback {
   bullets: string[];
-  score: number;  
+  score: number;
+  summary: string | null;
+}
+
+export interface UploadFeedback {
+  bullets: string[];
+  score: number;
   summary: string | null;
 }
 
 // Relations
 export const chatConfigsRelations = relations(chatConfigs, ({ many }) => ({
-  messages: many(messages),
+  conversations: many(conversations),
+  uploads: many(uploads),
 }));
 
-export const messagesRelations = relations(messages, ({ one }) => ({
+export const conversationsRelations = relations(conversations, ({ one }) => ({
   config: one(chatConfigs, {
-    fields: [messages.configId],
+    fields: [conversations.configId],
+    references: [chatConfigs.id],
+  }),
+}));
+
+export const uploadsRelations = relations(uploads, ({ one }) => ({
+  config: one(chatConfigs, {
+    fields: [uploads.configId],
     references: [chatConfigs.id],
   }),
 }));
@@ -71,13 +93,17 @@ export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
 export const insertChatConfigSchema = createInsertSchema(chatConfigs);
 export const selectChatConfigSchema = createSelectSchema(chatConfigs);
-export const insertMessageSchema = createInsertSchema(messages);
-export const selectMessageSchema = createSelectSchema(messages);
+export const insertConversationSchema = createInsertSchema(conversations);
+export const selectConversationSchema = createSelectSchema(conversations);
+export const insertUploadSchema = createInsertSchema(uploads);
+export const selectUploadSchema = createSelectSchema(uploads);
 
 // Types
 export type InsertUser = typeof users.$inferInsert;
 export type SelectUser = typeof users.$inferSelect;
 export type InsertChatConfig = typeof chatConfigs.$inferInsert;
 export type SelectChatConfig = typeof chatConfigs.$inferSelect;
-export type InsertMessage = typeof messages.$inferInsert;
-export type SelectMessage = typeof messages.$inferSelect;
+export type InsertConversation = typeof conversations.$inferInsert;
+export type SelectConversation = typeof conversations.$inferSelect;
+export type InsertUpload = typeof uploads.$inferInsert;
+export type SelectUpload = typeof uploads.$inferSelect;

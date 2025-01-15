@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
-import { chatConfigs, messages, type Message, type FeedbackData } from "@db/schema";
+import { chatConfigs, conversations, uploads, type Message, type ConversationFeedback, type UploadFeedback } from "@db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import crypto from 'crypto';
@@ -28,17 +28,11 @@ interface ConversationData {
   feedback: ConversationFeedback | null;
 }
 
-interface ConversationFeedback {
-  bullets: string[];
-  score: number;
-  summary: string | null;
-}
-
 interface UploadData {
   fileName: string;
   userName: string | null;
   sessionId: string;
-  feedback: FeedbackData | null;
+  feedback: UploadFeedback | null;
 }
 
 export function registerRoutes(app: Express): Server {
@@ -53,11 +47,10 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Valid config ID is required" });
       }
 
-      const conversation = await db.query.messages.findFirst({
+      const conversation = await db.query.conversations.findFirst({
         where: and(
-          eq(messages.configId, configId),
-          eq(messages.sessionId, sessionId),
-          eq(messages.type, 'conversation')
+          eq(conversations.configId, configId),
+          eq(conversations.sessionId, sessionId)
         ),
       });
 
@@ -101,11 +94,10 @@ export function registerRoutes(app: Express): Server {
       const parsedConfig = configSchema.parse(config);
 
       if (!sessions[sessionId]) {
-        const existingConversation = await db.query.messages.findFirst({
+        const existingConversation = await db.query.conversations.findFirst({
           where: and(
-            eq(messages.configId, configId),
-            eq(messages.sessionId, sessionId),
-            eq(messages.type, 'conversation')
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId)
           ),
         });
 
@@ -126,16 +118,15 @@ export function registerRoutes(app: Express): Server {
 
       try {
         await db
-          .insert(messages)
+          .insert(conversations)
           .values({
             configId,
             sessionId,
-            type: 'conversation',
             userName,
             messages: sessions[sessionId],
           })
           .onConflictDoUpdate({
-            target: [messages.configId, messages.sessionId],
+            target: [conversations.configId, conversations.sessionId],
             set: {
               messages: sessions[sessionId]
             }
@@ -220,14 +211,13 @@ export function registerRoutes(app: Express): Server {
         sessions[sessionId].push(assistantMessage);
 
         await db
-          .update(messages)
+          .update(conversations)
           .set({
             messages: sessions[sessionId]
           })
           .where(and(
-            eq(messages.configId, configId),
-            eq(messages.sessionId, sessionId),
-            eq(messages.type, 'conversation')
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId)
           ));
 
         res.write('data: [DONE]\n\n');
@@ -291,7 +281,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       const scoreMatch = response.match(/Score:\s*(\d+)/i);
-      const score = scoreMatch ? parseInt(scoreMatch[1]) : 0; // Default to 0 if no score found
+      const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
 
       const summaryMatch = response.match(/Score:\s*\d+\s*\n([^\n]+)/i);
       const summary = summaryMatch ? summaryMatch[1].trim() : null;
@@ -302,24 +292,23 @@ export function registerRoutes(app: Express): Server {
         .filter(bullet => bullet.trim())
         .map(bullet => bullet.trim());
 
-      const feedbackData: FeedbackData = {
+      const feedbackData: UploadFeedback = {
         bullets,
         score,
         summary
       };
 
       await db
-        .insert(messages)
+        .insert(uploads)
         .values({
           configId,
           sessionId,
-          type: 'upload',
           userName,
           fileName,
           feedback: feedbackData
         })
         .onConflictDoUpdate({
-          target: [messages.configId, messages.sessionId],
+          target: [uploads.configId, uploads.sessionId],
           set: {
             userName,
             fileName,
@@ -351,36 +340,30 @@ export function registerRoutes(app: Express): Server {
       }
 
       if (config.type === 'upload') {
-        const uploadData = await db.query.messages.findMany({
-          where: and(
-            eq(messages.configId, configId),
-            eq(messages.type, 'upload')
-          ),
-          orderBy: [desc(messages.createdAt)]
+        const uploadData = await db.query.uploads.findMany({
+          where: eq(uploads.configId, configId),
+          orderBy: [desc(uploads.createdAt)]
         });
 
         const uploadsWithMetadata: UploadData[] = uploadData.map(upload => ({
           sessionId: upload.sessionId,
           userName: upload.userName || null,
-          fileName: upload.fileName!,
+          fileName: upload.fileName,
           feedback: upload.feedback
         }));
 
         res.json(uploadsWithMetadata);
       } else {
-        const conversationData = await db.query.messages.findMany({
-          where: and(
-            eq(messages.configId, configId),
-            eq(messages.type, 'conversation')
-          ),
-          orderBy: [desc(messages.createdAt)]
+        const conversationData = await db.query.conversations.findMany({
+          where: eq(conversations.configId, configId),
+          orderBy: [desc(conversations.createdAt)]
         });
 
         const conversationsWithMetadata: ConversationData[] = conversationData.map(conv => ({
           sessionId: conv.sessionId,
           userName: conv.userName || null,
-          messages: conv.messages || [],
-          feedback: null
+          messages: conv.messages,
+          feedback: conv.feedback
         }));
 
         res.json(conversationsWithMetadata);
