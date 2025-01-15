@@ -84,6 +84,29 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/chat-configs/:id", async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.id);
+
+      if (isNaN(configId)) {
+        return res.status(400).json({ error: "Invalid config ID" });
+      }
+
+      const config = await db.query.chatConfigs.findFirst({
+        where: eq(chatConfigs.id, configId),
+      });
+
+      if (!config) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+
+      res.json(config);
+    } catch (error: any) {
+      console.error("Error fetching chat config:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/messages", async (req: Request, res: Response) => {
     try {
       const url = new URL(req.url, `http://${req.headers.host}`);
