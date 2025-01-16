@@ -50,7 +50,7 @@ export function registerRoutes(app: Express): Server {
           conversations: true,
           uploads: true,
         }
-      });
+      }).then(configs => configs.filter(config => showDeleted || !config.deleted));
 
       const configsWithCount = configs.map(config => ({
         ...config,
@@ -495,7 +495,7 @@ export function registerRoutes(app: Express): Server {
 
     await db
       .update(chatConfigs)
-      .set({ deleted: true, deletedAt: new Date().toISOString() })
+      .set({ deleted: true, deletedAt: new Date() })
       .where(eq(chatConfigs.id, configId));
 
     res.json({ success: true });
