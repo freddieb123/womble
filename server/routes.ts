@@ -485,7 +485,27 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
+  app.delete("/api/chat-configs/:id", async (req: Request, res: Response) => {
+  try {
+    const configId = parseInt(req.params.id);
+
+    if (isNaN(configId)) {
+      return res.status(400).json({ error: "Invalid config ID" });
+    }
+
+    await db
+      .update(chatConfigs)
+      .set({ deleted: true, deletedAt: new Date().toISOString() })
+      .where(eq(chatConfigs.id, configId));
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("Error deleting chat config:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.configId);
 
