@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button"; // Add Button import
+import { MessageSquare } from "lucide-react"; // Import icon for the button
 import type { Message, AdminConfig } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 
@@ -107,12 +109,25 @@ export default function ConversationAnalysis() {
             <div className="space-y-4">
               {conversations.map((conversation, index) => (
                 <Card key={conversation.sessionId || index}>
-                  <CardHeader>
+                  <CardHeader className="flex flex-row items-center justify-between">
                     <h2 className="text-lg font-semibold">
                       {conversation.userName ? 
                         `${conversation.userName}'s ${config?.type === 'upload' ? 'Upload' : 'Conversation'}` : 
                         `Anonymous ${config?.type === 'upload' ? 'Upload' : 'Conversation'} ${index + 1}`}
                     </h2>
+                    {config?.type === 'chat' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                        onClick={() => {
+                          window.open(`/chat?configId=${configId}&sessionId=${conversation.sessionId}`, '_blank');
+                        }}
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                        Open Conversation
+                      </Button>
+                    )}
                   </CardHeader>
                   <CardContent>
                     {conversation.feedback ? (
