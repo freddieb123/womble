@@ -121,7 +121,7 @@ export default function ConversationAnalysis() {
                         size="sm"
                         className="flex items-center gap-2"
                         onClick={() => {
-                          window.open(`/chat?configId=${configId}&sessionId=${conversation.sessionId}`, '_blank');
+                          window.open(`/conversation?configId=${configId}&sessionId=${conversation.sessionId}`, '_blank');
                         }}
                       >
                         <MessageSquare className="h-4 w-4" />

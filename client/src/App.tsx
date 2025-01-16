@@ -2,6 +2,7 @@ import { Switch, Route } from "wouter";
 import Home from "./pages/Home";
 import UserView from "./pages/UserView";
 import ConversationAnalysis from "./pages/ConversationAnalysis";
+import StaticConversationView from "./pages/StaticConversationView";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
 
@@ -11,6 +12,7 @@ function App() {
       <Route path="/" component={Home} />
       <Route path="/chat" component={UserView} />
       <Route path="/analysis" component={ConversationAnalysis} />
+      <Route path="/conversation" component={StaticConversationView} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -26,6 +28,7 @@ function NotFound() {
             <AlertCircle className="h-8 w-8 text-red-500" />
             <h1 className="text-2xl font-bold text-gray-900">404 Page Not Found</h1>
           </div>
+
           <p className="mt-4 text-sm text-gray-600">
             The requested page could not be found.
           </p>
