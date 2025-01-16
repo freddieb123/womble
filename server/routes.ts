@@ -89,6 +89,44 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/chat-hint", async (req: Request, res: Response) => {
+    try {
+      const { feedbackCriteria, userInstructions, messages } = req.body;
+
+      if (!feedbackCriteria) {
+        return res.status(400).json({ error: "Feedback criteria is required" });
+      }
+
+      const prompt = `Based on these criteria:\n${feedbackCriteria}\n\nAnd these instructions:\n${userInstructions || 'No specific instructions'}\n\nAnalyze the current conversation and provide a helpful hint for the user to improve their responses. Keep the hint concise and specific.`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert at providing constructive hints and guidance. Keep your hints brief, specific, and actionable."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 200,
+      });
+
+      const hint = completion.choices[0]?.message?.content;
+      if (!hint) {
+        throw new Error("Failed to generate hint");
+      }
+
+      res.json({ message: hint });
+    } catch (error: any) {
+      console.error("Error generating hint:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Messages endpoints
   app.get("/api/messages", async (req: Request, res: Response) => {
     try {
