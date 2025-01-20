@@ -259,7 +259,7 @@ export default function Home() {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-blue-900">Durable Skills GPTs</h1>
+            <h1 className="text-2xl font-bold text-blue-900">Create and manage your GPTs - Trainer view</h1>
           </div>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
