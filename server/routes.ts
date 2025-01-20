@@ -110,6 +110,38 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.put("/api/chat-configs/:id", async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.id);
+
+      if (isNaN(configId)) {
+        return res.status(400).json({ error: "Invalid config ID" });
+      }
+
+      const { title, type, systemPrompt, userInstructions, feedbackCriteria } = chatConfigSchema.parse(req.body);
+
+      const updatedConfig = await db.update(chatConfigs)
+        .set({
+          title,
+          type,
+          systemPrompt,
+          userInstructions,
+          feedbackCriteria,
+        })
+        .where(eq(chatConfigs.id, configId))
+        .returning();
+
+      if (!updatedConfig.length) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+
+      res.json(updatedConfig[0]);
+    } catch (error: any) {
+      console.error("Error updating chat config:", error);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   app.post("/api/chat-hint", async (req: Request, res: Response) => {
     try {
       const { feedbackCriteria, userInstructions, messages } = req.body;

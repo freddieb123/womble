@@ -123,14 +123,17 @@ export default function Home() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...configToUpdate,
+          title: configToUpdate.title,
           type: configToUpdate.type,
+          systemPrompt: configToUpdate.systemPrompt,
+          userInstructions: configToUpdate.userInstructions || "",
+          feedbackCriteria: configToUpdate.feedbackCriteria || "",
         }),
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to update GPT");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update GPT");
       }
 
       return response.json();
