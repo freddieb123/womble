@@ -73,21 +73,33 @@ export default function Home() {
 
   const saveConfig = useMutation({
     mutationFn: async () => {
-      const response = await fetch("/api/chat-configs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: config.title,
-          type: config.type,
-          systemPrompt: config.systemPrompt,
-          userInstructions: config.userInstructions,
-          feedbackCriteria: config.feedbackCriteria,
-        }),
-      });
+      try {
+        const response = await fetch("/api/chat-configs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: config.title,
+            type: config.type,
+            systemPrompt: config.systemPrompt,
+            userInstructions: config.userInstructions || "",
+            feedbackCriteria: config.feedbackCriteria || "",
+          }),
+        });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to save GPT");
+        const data = await response.text();
+        let parsedData;
+        try {
+          parsedData = JSON.parse(data);
+        } catch (e) {
+          throw new Error("Invalid response format");
+        }
+
+        if (!response.ok) {
+          throw new Error(parsedData.error || "Failed to save GPT");
+        }
+        return parsedData;
+      } catch (error) {
+        throw new Error(error instanceof Error ? error.message : "Failed to save GPT");
       }
 
       return response.json();
