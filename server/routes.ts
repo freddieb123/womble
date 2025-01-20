@@ -89,6 +89,27 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/chat-configs", async (req: Request, res: Response) => {
+    try {
+      const { title, type, systemPrompt, userInstructions, feedbackCriteria } = chatConfigSchema.parse(req.body);
+
+      const newConfig = await db.insert(chatConfigs).values({
+        title,
+        type,
+        systemPrompt,
+        userInstructions,
+        feedbackCriteria,
+        deleted: false,
+        createdAt: new Date()
+      }).returning();
+
+      res.json(newConfig[0]);
+    } catch (error: any) {
+      console.error("Error creating chat config:", error);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   app.post("/api/chat-hint", async (req: Request, res: Response) => {
     try {
       const { feedbackCriteria, userInstructions, messages } = req.body;
@@ -486,26 +507,26 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.delete("/api/chat-configs/:id", async (req: Request, res: Response) => {
-  try {
-    const configId = parseInt(req.params.id);
+    try {
+      const configId = parseInt(req.params.id);
 
-    if (isNaN(configId)) {
-      return res.status(400).json({ error: "Invalid config ID" });
+      if (isNaN(configId)) {
+        return res.status(400).json({ error: "Invalid config ID" });
+      }
+
+      await db
+        .update(chatConfigs)
+        .set({ deleted: true, deletedAt: new Date() })
+        .where(eq(chatConfigs.id, configId));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting chat config:", error);
+      res.status(500).json({ error: error.message });
     }
+  });
 
-    await db
-      .update(chatConfigs)
-      .set({ deleted: true, deletedAt: new Date() })
-      .where(eq(chatConfigs.id, configId));
-
-    res.json({ success: true });
-  } catch (error: any) {
-    console.error("Error deleting chat config:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
+  app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.configId);
 
