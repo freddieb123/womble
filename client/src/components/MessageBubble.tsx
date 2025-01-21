@@ -30,7 +30,29 @@ export default function MessageBubble({ message }: Props) {
             />
           </div>
         )}
-        {content.text}
+        {content.text?.split('\n').map((line, index) => {
+          // Check if line starts with a number followed by a dot and space
+          const numberedMatch = line.match(/^(\d+)\.\s(.+)/);
+          if (numberedMatch) {
+            line = numberedMatch[2]; // Get the text after the number
+          }
+          
+          // Handle bold text
+          const parts = line.split(/(\*\*.*?\*\*)/g);
+          const formattedLine = parts.map((part, i) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+              return <strong key={i}>{part.slice(2, -2)}</strong>;
+            }
+            return part;
+          });
+
+          return (
+            <div key={index} className={numberedMatch ? 'ml-4' : ''}>
+              {numberedMatch && <span className="mr-2">{numberedMatch[1]}.</span>}
+              {formattedLine}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
