@@ -19,10 +19,6 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
   const [hasImproved, setHasImproved] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    setHasImproved(false);
-  }, [config.feedbackCriteria]);
-
   const improveCriteria = async () => {
     if (!config.feedbackCriteria) {
       toast({
