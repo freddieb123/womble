@@ -164,18 +164,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
           <p className="text-sm text-muted-foreground">
             Specify criteria that will be used to assess and provide feedback on {config.type === 'upload' ? 'uploads' : 'user interactions'}.
           </p>
-          {!isEditMode && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={improveCriteria}
-              disabled={isImproving || hasImproved || !config.feedbackCriteria}
-              className="w-full"
-            >
-              <Wand2 className="h-4 w-4 mr-2" />
-              {isImproving ? "Improving..." : "Improve criteria"}
-            </Button>
-          )}
+          
         </div>
       </div>
     </div>
