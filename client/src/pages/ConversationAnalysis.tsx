@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button"; // Add Button import
-import { MessageSquare } from "lucide-react"; // Import icon for the button
+import { Button } from "@/components/ui/button";
+import { MessageSquare, TrendingUp } from "lucide-react";
 import type { Message, AdminConfig } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 
@@ -20,10 +20,21 @@ interface ConversationData {
   feedback: ConversationFeedback | null;
 }
 
+interface FeedbackSummary {
+  feedbackCount: number;
+  totalCount: number;
+  averageScore: number;
+  keyThemes: {
+    positive: string;
+    constructive: string[];
+  };
+}
+
 export default function ConversationAnalysis() {
   const [conversations, setConversations] = useState<ConversationData[]>([]);
   const [feedbacks, setFeedbacks] = useState<ConversationFeedback[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [summary, setSummary] = useState<FeedbackSummary | null>(null);
   const { toast } = useToast();
 
   const searchParams = new URLSearchParams(window.location.search);
@@ -33,6 +44,49 @@ export default function ConversationAnalysis() {
     queryKey: [`/api/chat-configs/${configId}`],
     enabled: !!configId,
   });
+
+  const generateSummary = (conversationsData: ConversationData[]): FeedbackSummary => {
+    // Count conversations with feedback
+    const withFeedback = conversationsData.filter(conv => conv.feedback !== null);
+    const feedbackCount = withFeedback.length;
+    const totalCount = conversationsData.length;
+
+    // Calculate average score
+    const totalScore = withFeedback.reduce((sum, conv) => 
+      sum + (conv.feedback?.score || 0), 0);
+    const averageScore = feedbackCount > 0 ? totalScore / feedbackCount : 0;
+
+    // Analyze themes from feedback bullets
+    const allBullets = withFeedback
+      .flatMap(conv => conv.feedback?.bullets || [])
+      .map(bullet => bullet.toLowerCase());
+
+    // Simple theme analysis (this could be enhanced with more sophisticated analysis)
+    const positiveKeywords = ['excellent', 'great', 'good', 'well', 'effective', 'clear'];
+    const constructiveKeywords = ['could', 'should', 'improve', 'better', 'consider', 'suggest'];
+
+    const positiveBullets = allBullets.filter(bullet => 
+      positiveKeywords.some(keyword => bullet.includes(keyword)));
+    const constructiveBullets = allBullets.filter(bullet => 
+      constructiveKeywords.some(keyword => bullet.includes(keyword)));
+
+    // Select representative themes
+    const positiveTheme = positiveBullets[Math.floor(Math.random() * positiveBullets.length)] || 
+      "Positive feedback insufficient";
+    const constructiveThemes = constructiveBullets
+      .slice(0, 2)
+      .map(theme => theme || "Constructive feedback insufficient");
+
+    return {
+      feedbackCount,
+      totalCount,
+      averageScore,
+      keyThemes: {
+        positive: positiveTheme,
+        constructive: constructiveThemes
+      }
+    };
+  };
 
   useEffect(() => {
     const fetchAndAnalyze = async () => {
@@ -52,6 +106,7 @@ export default function ConversationAnalysis() {
         }
 
         setConversations(conversationsData);
+        setSummary(generateSummary(conversationsData));
 
         // For upload type, use existing feedback
         if (config.type === 'upload') {
@@ -105,62 +160,108 @@ export default function ConversationAnalysis() {
             </CardContent>
           </Card>
         ) : (
-          <ScrollArea className="h-[calc(100vh-16rem)]">
-            <div className="space-y-4">
-              {conversations.map((conversation, index) => (
-                <Card key={conversation.sessionId || index}>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <h2 className="text-lg font-semibold">
-                      {conversation.userName ? 
-                        `${conversation.userName}'s ${config?.type === 'upload' ? 'Upload' : 'Conversation'}` : 
-                        `Anonymous ${config?.type === 'upload' ? 'Upload' : 'Conversation'} ${index + 1}`}
-                    </h2>
-                    {config?.type === 'chat' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-2"
-                        onClick={() => {
-                          window.open(`/conversation?configId=${configId}&sessionId=${conversation.sessionId}`, '_blank');
-                        }}
-                      >
-                        <MessageSquare className="h-4 w-4" />
-                        Open Conversation
-                      </Button>
-                    )}
-                  </CardHeader>
-                  <CardContent>
-                    {conversation.feedback ? (
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          {conversation.feedback.bullets.map((bullet, bulletIndex) => (
-                            <div key={bulletIndex} className="flex items-start gap-2 text-sm">
-                              <span>•</span>
-                              <span>{bullet}</span>
-                            </div>
-                          ))}
+          <>
+            {/* Summary Section */}
+            {summary && (
+              <Card className="mb-6">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-blue-600" />
+                    <h2 className="text-xl font-semibold">Analysis Summary</h2>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-medium text-gray-500">Feedback Coverage</h3>
+                      <p className="text-2xl font-bold text-blue-900">{summary.feedbackCount}/{summary.totalCount}</p>
+                      <p className="text-sm text-gray-600">conversations with feedback</p>
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
+                      <p className="text-2xl font-bold text-blue-900">
+                        {summary.averageScore.toFixed(1)}/10
+                      </p>
+                      <p className="text-sm text-gray-600">across all feedback</p>
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-medium text-gray-500">Key Themes</h3>
+                      <div className="space-y-2">
+                        <div className="text-sm">
+                          <span className="text-green-600 font-medium">Positive: </span>
+                          {summary.keyThemes.positive}
                         </div>
-                        <div className="border-t pt-4">
-                          <div className="flex flex-col gap-2 bg-blue-50 p-4 rounded-lg">
-                            <span className="text-2xl font-bold text-blue-900">
-                              {conversation.feedback.score}/10
-                            </span>
-                            {conversation.feedback.summary && (
-                              <p className="text-sm text-blue-700">
-                                {conversation.feedback.summary}
-                              </p>
-                            )}
+                        {summary.keyThemes.constructive.map((theme, index) => (
+                          <div key={index} className="text-sm">
+                            <span className="text-amber-600 font-medium">Constructive {index + 1}: </span>
+                            {theme}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Existing conversation list */}
+            <ScrollArea className="h-[calc(100vh-16rem)]">
+              <div className="space-y-4">
+                {conversations.map((conversation, index) => (
+                  <Card key={conversation.sessionId || index}>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <h2 className="text-lg font-semibold">
+                        {conversation.userName ? 
+                          `${conversation.userName}'s ${config?.type === 'upload' ? 'Upload' : 'Conversation'}` : 
+                          `Anonymous ${config?.type === 'upload' ? 'Upload' : 'Conversation'} ${index + 1}`}
+                      </h2>
+                      {config?.type === 'chat' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2"
+                          onClick={() => {
+                            window.open(`/conversation?configId=${configId}&sessionId=${conversation.sessionId}`, '_blank');
+                          }}
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                          Open Conversation
+                        </Button>
+                      )}
+                    </CardHeader>
+                    <CardContent>
+                      {conversation.feedback ? (
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            {conversation.feedback.bullets.map((bullet, bulletIndex) => (
+                              <div key={bulletIndex} className="flex items-start gap-2 text-sm">
+                                <span>•</span>
+                                <span>{bullet}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="border-t pt-4">
+                            <div className="flex flex-col gap-2 bg-blue-50 p-4 rounded-lg">
+                              <span className="text-2xl font-bold text-blue-900">
+                                {conversation.feedback.score}/10
+                              </span>
+                              {conversation.feedback.summary && (
+                                <p className="text-sm text-blue-700">
+                                  {conversation.feedback.summary}
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ) : (
-                      <p className="text-muted-foreground">No feedback available for this {config?.type === 'upload' ? 'upload' : 'conversation'}.</p>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </ScrollArea>
+                      ) : (
+                        <p className="text-muted-foreground">No feedback available for this {config?.type === 'upload' ? 'upload' : 'conversation'}.</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </ScrollArea>
+          </>
         )}
       </div>
     </div>
