@@ -62,19 +62,54 @@ export default function ConversationAnalysis() {
 
     const allBullets = withFeedback
       .flatMap(conv => conv.feedback?.bullets || [])
-      .map(bullet => bullet.toLowerCase());
+      .map(bullet => {
+        // Convert second person to third person
+        return bullet.toLowerCase()
+          .replace(/\byou\b/g, 'learners')
+          .replace(/\byour\b/g, 'their')
+          .replace(/\byourself\b/g, 'themselves');
+      });
 
-    const positiveKeywords = ['excellent', 'great', 'good', 'well', 'effective', 'clear'];
-    const constructiveKeywords = ['could', 'should', 'improve', 'better', 'consider', 'suggest'];
+    // Keywords that indicate clear positive or constructive feedback
+    const positiveKeywords = ['excellent', 'effective', 'successfully', 'well done', 'strong'];
+    const constructiveKeywords = ['could improve', 'should consider', 'need to', 'would benefit from', 'lacking'];
 
-    const positiveBullets = allBullets.filter(bullet => 
-      positiveKeywords.some(keyword => bullet.includes(keyword)));
-    const constructiveBullets = allBullets.filter(bullet => 
-      constructiveKeywords.some(keyword => bullet.includes(keyword)));
+    // Filter for single-point feedback
+    const positiveBullets = allBullets
+      .filter(bullet => 
+        positiveKeywords.some(keyword => bullet.includes(keyword)) &&
+        !constructiveKeywords.some(keyword => bullet.includes(keyword)) &&
+        !bullet.includes('but') &&
+        !bullet.includes('however')
+      )
+      .map(bullet => {
+        // Extract the main point before any qualifying statements
+        const mainPoint = bullet.split(/[,.]/).filter(part => 
+          positiveKeywords.some(keyword => part.includes(keyword))
+        )[0];
+        return mainPoint || bullet;
+      });
 
-    const positiveTheme = positiveBullets[Math.floor(Math.random() * positiveBullets.length)] || 
-      "Positive feedback insufficient";
-    const constructiveTheme = constructiveBullets[0] || "Constructive feedback insufficient";
+    const constructiveBullets = allBullets
+      .filter(bullet => 
+        constructiveKeywords.some(keyword => bullet.includes(keyword)) &&
+        !positiveKeywords.some(keyword => bullet.includes(keyword))
+      )
+      .map(bullet => {
+        // Extract the main constructive point
+        const mainPoint = bullet.split(/[,.]/).filter(part => 
+          constructiveKeywords.some(keyword => part.includes(keyword))
+        )[0];
+        return mainPoint || bullet;
+      });
+
+    const positiveTheme = positiveBullets.length > 0 ?
+      positiveBullets[Math.floor(Math.random() * positiveBullets.length)] :
+      "Learners demonstrated effective communication skills";
+
+    const constructiveTheme = constructiveBullets.length > 0 ?
+      constructiveBullets[0] :
+      "Learners should consider incorporating more structured approaches";
 
     return {
       feedbackCount,
