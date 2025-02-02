@@ -226,12 +226,10 @@ export default function ConversationAnalysis() {
                       <div className="border-t pt-4">
                         <h3 className="text-sm font-medium text-gray-500 mb-3">Key Themes</h3>
                         <div className="space-y-3">
-                          <div className="text-sm">
-                            <span className="text-green-600 font-medium">Positive Theme: </span>
+                          <div className="text-sm text-green-600">
                             {summary.keyThemes.positive}
                           </div>
-                          <div className="text-sm">
-                            <span className="text-amber-600 font-medium">Constructive Theme: </span>
+                          <div className="text-sm text-amber-600">
                             {summary.keyThemes.constructive[0]}
                           </div>
                         </div>
