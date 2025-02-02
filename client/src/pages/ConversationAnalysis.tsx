@@ -52,75 +52,84 @@ export default function ConversationAnalysis() {
   });
 
   const generateSummary = (conversationsData: ConversationData[]): FeedbackSummary => {
-    const withFeedback = conversationsData.filter(conv => conv.feedback !== null);
-    const feedbackCount = withFeedback.length;
-    const totalCount = conversationsData.length;
+      const withFeedback = conversationsData.filter(conv => conv.feedback !== null);
+      const feedbackCount = withFeedback.length;
+      const totalCount = conversationsData.length;
 
-    const totalScore = withFeedback.reduce((sum, conv) => 
-      sum + (conv.feedback?.score || 0), 0);
-    const averageScore = feedbackCount > 0 ? totalScore / feedbackCount : 0;
+      const totalScore = withFeedback.reduce((sum, conv) => 
+        sum + (conv.feedback?.score || 0), 0);
+      const averageScore = feedbackCount > 0 ? totalScore / feedbackCount : 0;
 
-    const allBullets = withFeedback
-      .flatMap(conv => conv.feedback?.bullets || [])
-      .map(bullet => {
-        // Convert second person to third person
-        return bullet.toLowerCase()
-          .replace(/\byou\b/g, 'learners')
-          .replace(/\byour\b/g, 'their')
-          .replace(/\byourself\b/g, 'themselves');
-      });
+      const allBullets = withFeedback
+        .flatMap(conv => conv.feedback?.bullets || [])
+        .map(bullet => {
+          // Convert second person to third person
+          return bullet.toLowerCase()
+            .replace(/\byou\b/g, 'learners')
+            .replace(/\byour\b/g, 'their')
+            .replace(/\byourself\b/g, 'themselves');
+        });
 
-    // Keywords that indicate clear positive or constructive feedback
-    const positiveKeywords = ['excellent', 'effective', 'successfully', 'well done', 'strong'];
-    const constructiveKeywords = ['could improve', 'should consider', 'need to', 'would benefit from', 'lacking'];
+      // Keywords that indicate clear positive or constructive feedback
+      const positiveKeywords = ['excellent', 'effective', 'successfully', 'well done', 'strong'];
+      const constructiveKeywords = ['could improve', 'should consider', 'need to', 'would benefit from', 'lacking'];
 
-    // Filter for single-point feedback
-    const positiveBullets = allBullets
-      .filter(bullet => 
-        positiveKeywords.some(keyword => bullet.includes(keyword)) &&
-        !constructiveKeywords.some(keyword => bullet.includes(keyword)) &&
-        !bullet.includes('but') &&
-        !bullet.includes('however')
-      )
-      .map(bullet => {
-        // Extract the main point before any qualifying statements
-        const mainPoint = bullet.split(/[,.]/).filter(part => 
-          positiveKeywords.some(keyword => part.includes(keyword))
-        )[0];
-        return mainPoint || bullet;
-      });
+      // Filter for single-point feedback
+      const positiveBullets = allBullets
+        .filter(bullet => {
+          const hasPositive = positiveKeywords.some(keyword => bullet.includes(keyword));
+          const isCleanPositive = !bullet.includes('but') && 
+                                !bullet.includes('however') && 
+                                !bullet.includes('could') &&
+                                !bullet.includes('should');
+          return hasPositive && isCleanPositive;
+        })
+        .map(bullet => {
+          // Extract the main point before any qualifying statements
+          const mainPoint = bullet.split(/[,.]/).find(part => 
+            positiveKeywords.some(keyword => part.includes(keyword)) &&
+            part.length > 20  // Ensure it's a complete thought
+          );
+          return mainPoint?.trim() || bullet;
+        });
 
-    const constructiveBullets = allBullets
-      .filter(bullet => 
-        constructiveKeywords.some(keyword => bullet.includes(keyword)) &&
-        !positiveKeywords.some(keyword => bullet.includes(keyword))
-      )
-      .map(bullet => {
-        // Extract the main constructive point
-        const mainPoint = bullet.split(/[,.]/).filter(part => 
-          constructiveKeywords.some(keyword => part.includes(keyword))
-        )[0];
-        return mainPoint || bullet;
-      });
+      const constructiveBullets = allBullets
+        .filter(bullet => {
+          const hasConstructive = constructiveKeywords.some(keyword => bullet.includes(keyword));
+          const isCleanConstructive = !bullet.includes('well done') && 
+                                    !bullet.includes('excellent') &&
+                                    (bullet.includes('need') || 
+                                     bullet.includes('should') || 
+                                     bullet.includes('could'));
+          return hasConstructive && isCleanConstructive;
+        })
+        .map(bullet => {
+          // Extract the main constructive point that includes the improvement suggestion
+          const mainPoint = bullet.split(/[,.]/).find(part => 
+            constructiveKeywords.some(keyword => part.includes(keyword)) &&
+            part.length > 20  // Ensure it's a complete thought
+          );
+          return mainPoint?.trim() || bullet;
+        });
 
-    const positiveTheme = positiveBullets.length > 0 ?
-      positiveBullets[Math.floor(Math.random() * positiveBullets.length)] :
-      "Learners demonstrated effective communication skills";
+      const positiveTheme = positiveBullets.length > 0 ?
+        positiveBullets[Math.floor(Math.random() * positiveBullets.length)] :
+        "Learners demonstrated effective communication skills";
 
-    const constructiveTheme = constructiveBullets.length > 0 ?
-      constructiveBullets[0] :
-      "Learners should consider incorporating more structured approaches";
+      const constructiveTheme = constructiveBullets.length > 0 ?
+        constructiveBullets[0] :
+        "Learners should work on providing more specific examples in their responses";
 
-    return {
-      feedbackCount,
-      totalCount,
-      averageScore,
-      keyThemes: {
-        positive: positiveTheme,
-        constructive: [constructiveTheme]
-      }
+      return {
+        feedbackCount,
+        totalCount,
+        averageScore,
+        keyThemes: {
+          positive: positiveTheme,
+          constructive: [constructiveTheme]
+        }
+      };
     };
-  };
 
   useEffect(() => {
     const fetchAndAnalyze = async () => {
