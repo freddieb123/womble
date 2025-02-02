@@ -163,7 +163,7 @@ export default function ConversationAnalysis() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       <div className="max-w-4xl mx-auto">
-        <div className="sticky top-0 z-10 bg-white p-4 md:p-8 pb-4 shadow-sm">
+        <div className="sticky top-0 z-10 p-4 md:p-8 pb-4">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-blue-900">
               {config?.type === 'upload' ? 'Upload Analysis' : 'Conversation Analysis'}
