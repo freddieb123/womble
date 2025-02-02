@@ -31,7 +31,7 @@ interface FeedbackSummary {
   averageScore: number;
   keyThemes: {
     positive: string;
-    constructive: string[];
+    constructive: string;
   };
 }
 
@@ -51,85 +51,57 @@ export default function ConversationAnalysis() {
     enabled: !!configId,
   });
 
-  const generateSummary = (conversationsData: ConversationData[]): FeedbackSummary => {
-      const withFeedback = conversationsData.filter(conv => conv.feedback !== null);
-      const feedbackCount = withFeedback.length;
-      const totalCount = conversationsData.length;
+  const generateSummary = async (conversationsData: ConversationData[]): Promise<FeedbackSummary> => {
+    const withFeedback = conversationsData.filter(conv => conv.feedback !== null);
+    const feedbackCount = withFeedback.length;
+    const totalCount = conversationsData.length;
 
-      const totalScore = withFeedback.reduce((sum, conv) => 
-        sum + (conv.feedback?.score || 0), 0);
-      const averageScore = feedbackCount > 0 ? totalScore / feedbackCount : 0;
+    const totalScore = withFeedback.reduce((sum, conv) => 
+      sum + (conv.feedback?.score || 0), 0);
+    const averageScore = feedbackCount > 0 ? totalScore / feedbackCount : 0;
 
-      const allBullets = withFeedback
-        .flatMap(conv => conv.feedback?.bullets || [])
-        .map(bullet => {
-          // Convert second person to third person
-          return bullet.toLowerCase()
-            .replace(/\byou\b/g, 'learners')
-            .replace(/\byour\b/g, 'their')
-            .replace(/\byourself\b/g, 'themselves');
-        });
-
-      // Keywords that indicate clear positive or constructive feedback
-      const positiveKeywords = ['excellent', 'effective', 'successfully', 'well done', 'strong'];
-      const constructiveKeywords = ['could improve', 'should consider', 'need to', 'would benefit from', 'lacking'];
-
-      // Filter for single-point feedback
-      const positiveBullets = allBullets
-        .filter(bullet => {
-          const hasPositive = positiveKeywords.some(keyword => bullet.includes(keyword));
-          const isCleanPositive = !bullet.includes('but') && 
-                                !bullet.includes('however') && 
-                                !bullet.includes('could') &&
-                                !bullet.includes('should');
-          return hasPositive && isCleanPositive;
-        })
-        .map(bullet => {
-          // Extract the main point before any qualifying statements
-          const mainPoint = bullet.split(/[,.]/).find(part => 
-            positiveKeywords.some(keyword => part.includes(keyword)) &&
-            part.length > 20  // Ensure it's a complete thought
-          );
-          return mainPoint?.trim() || bullet;
-        });
-
-      const constructiveBullets = allBullets
-        .filter(bullet => {
-          const hasConstructive = constructiveKeywords.some(keyword => bullet.includes(keyword));
-          const isCleanConstructive = !bullet.includes('well done') && 
-                                    !bullet.includes('excellent') &&
-                                    (bullet.includes('need') || 
-                                     bullet.includes('should') || 
-                                     bullet.includes('could'));
-          return hasConstructive && isCleanConstructive;
-        })
-        .map(bullet => {
-          // Extract the main constructive point that includes the improvement suggestion
-          const mainPoint = bullet.split(/[,.]/).find(part => 
-            constructiveKeywords.some(keyword => part.includes(keyword)) &&
-            part.length > 20  // Ensure it's a complete thought
-          );
-          return mainPoint?.trim() || bullet;
-        });
-
-      const positiveTheme = positiveBullets.length > 0 ?
-        positiveBullets[Math.floor(Math.random() * positiveBullets.length)] :
-        "Learners demonstrated effective communication skills";
-
-      const constructiveTheme = constructiveBullets.length > 0 ?
-        constructiveBullets[0] :
-        "Learners should work on providing more specific examples in their responses";
-
-      return {
-        feedbackCount,
-        totalCount,
-        averageScore,
-        keyThemes: {
-          positive: positiveTheme,
-          constructive: [constructiveTheme]
-        }
-      };
+    let themes = {
+      positive: "No feedback available yet",
+      constructive: "No feedback available yet"
     };
+
+    if (withFeedback.length > 0) {
+      try {
+        const response = await fetch('/api/analyze-themes', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            feedbacks: withFeedback.map(conv => conv.feedback)
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to analyze themes: ${response.statusText}`);
+        }
+
+        themes = await response.json();
+      } catch (error) {
+        console.error('Error analyzing themes:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to analyze feedback themes",
+        });
+      }
+    }
+
+    return {
+      feedbackCount,
+      totalCount,
+      averageScore,
+      keyThemes: {
+        positive: themes.positive,
+        constructive: themes.constructive
+      }
+    };
+  };
 
   useEffect(() => {
     const fetchAndAnalyze = async () => {
@@ -149,10 +121,14 @@ export default function ConversationAnalysis() {
         }
 
         setConversations(conversationsData);
-        setSummary(generateSummary(conversationsData));
+        const summaryData = await generateSummary(conversationsData);
+        setSummary(summaryData);
+
 
         if (config.type === 'upload') {
-          const existingFeedbacks = conversationsData.map(conv => conv.feedback).filter(f => f !== null);
+          const existingFeedbacks = conversationsData
+            .map(conv => conv.feedback)
+            .filter(f => f !== null);
           setFeedbacks(existingFeedbacks);
         }
 
@@ -230,7 +206,7 @@ export default function ConversationAnalysis() {
                             {summary.keyThemes.positive}
                           </div>
                           <div className="text-sm text-gray-900">
-                            {summary.keyThemes.constructive[0]}
+                            {summary.keyThemes.constructive}
                           </div>
                         </div>
                       </div>

@@ -609,6 +609,69 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/analyze-themes", async (req: Request, res: Response) => {
+    try {
+      const { feedbacks } = req.body;
+  
+      if (!Array.isArray(feedbacks)) {
+        return res.status(400).json({ error: "Feedbacks must be an array" });
+      }
+  
+      const allBullets = feedbacks
+        .flatMap(feedback => feedback.bullets || [])
+        .filter(bullet => bullet);
+  
+      if (allBullets.length === 0) {
+        return res.json({
+          positive: "No positive themes identified yet",
+          constructive: "No constructive feedback available yet"
+        });
+      }
+  
+      const prompt = `Analyze these feedback points and identify two key themes:
+  
+  Feedback points:
+  ${allBullets.map(bullet => `- ${bullet}`).join('\n')}
+  
+  Please provide exactly two themes in JSON format:
+  1. One positive theme highlighting what's being done well
+  2. One constructive theme suggesting an area for improvement
+  
+  Response Format:
+  {
+    "positive": "A clear, concise positive theme",
+    "constructive": "A clear, concise constructive theme"
+  }
+  
+  Rules:
+  - Each theme should be 1-2 sentences
+  - Use third-person perspective (e.g., "learners" or "users", not "you")
+  - Be specific and actionable
+  - Base themes on patterns across multiple feedback points when possible`;
+  
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert at analyzing feedback and identifying key themes. Focus on patterns and provide clear, actionable insights."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" }
+      });
+  
+      const themes = JSON.parse(completion.choices[0].message.content);
+      res.json(themes);
+    } catch (error: any) {
+      console.error("Error analyzing themes:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
