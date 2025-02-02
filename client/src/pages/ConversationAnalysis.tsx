@@ -3,9 +3,14 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, TrendingUp } from "lucide-react";
+import { MessageSquare, TrendingUp, ChevronDown } from "lucide-react";
 import type { Message, AdminConfig } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface ConversationFeedback {
   bullets: string[];
@@ -35,6 +40,7 @@ export default function ConversationAnalysis() {
   const [feedbacks, setFeedbacks] = useState<ConversationFeedback[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [summary, setSummary] = useState<FeedbackSummary | null>(null);
+  const [isOpen, setIsOpen] = useState(true);
   const { toast } = useToast();
 
   const searchParams = new URLSearchParams(window.location.search);
@@ -46,22 +52,18 @@ export default function ConversationAnalysis() {
   });
 
   const generateSummary = (conversationsData: ConversationData[]): FeedbackSummary => {
-    // Count conversations with feedback
     const withFeedback = conversationsData.filter(conv => conv.feedback !== null);
     const feedbackCount = withFeedback.length;
     const totalCount = conversationsData.length;
 
-    // Calculate average score
     const totalScore = withFeedback.reduce((sum, conv) => 
       sum + (conv.feedback?.score || 0), 0);
     const averageScore = feedbackCount > 0 ? totalScore / feedbackCount : 0;
 
-    // Analyze themes from feedback bullets
     const allBullets = withFeedback
       .flatMap(conv => conv.feedback?.bullets || [])
       .map(bullet => bullet.toLowerCase());
 
-    // Simple theme analysis
     const positiveKeywords = ['excellent', 'great', 'good', 'well', 'effective', 'clear'];
     const constructiveKeywords = ['could', 'should', 'improve', 'better', 'consider', 'suggest'];
 
@@ -70,7 +72,6 @@ export default function ConversationAnalysis() {
     const constructiveBullets = allBullets.filter(bullet => 
       constructiveKeywords.some(keyword => bullet.includes(keyword)));
 
-    // Select representative themes
     const positiveTheme = positiveBullets[Math.floor(Math.random() * positiveBullets.length)] || 
       "Positive feedback insufficient";
     const constructiveTheme = constructiveBullets[0] || "Constructive feedback insufficient";
@@ -106,7 +107,6 @@ export default function ConversationAnalysis() {
         setConversations(conversationsData);
         setSummary(generateSummary(conversationsData));
 
-        // For upload type, use existing feedback
         if (config.type === 'upload') {
           const existingFeedbacks = conversationsData.map(conv => conv.feedback).filter(f => f !== null);
           setFeedbacks(existingFeedbacks);
@@ -141,68 +141,75 @@ export default function ConversationAnalysis() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-blue-900">
-            {config?.type === 'upload' ? 'Upload Analysis' : 'Conversation Analysis'}
-          </h1>
+        <div className="sticky top-0 z-10 bg-gradient-to-b from-blue-50 to-white p-4 md:p-8 pb-4">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold text-blue-900">
+              {config?.type === 'upload' ? 'Upload Analysis' : 'Conversation Analysis'}
+            </h1>
+          </div>
+
+          {summary && (
+            <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+              <Card className="mb-2">
+                <CardHeader className="pb-2">
+                  <CollapsibleTrigger className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-blue-600" />
+                      <h2 className="text-xl font-semibold">Analysis Summary</h2>
+                    </div>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'transform rotate-180' : ''}`} />
+                  </CollapsibleTrigger>
+                </CardHeader>
+                <CollapsibleContent>
+                  <CardContent>
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <h3 className="text-sm font-medium text-gray-500">Feedback Coverage</h3>
+                          <p className="text-2xl font-bold text-blue-900">{summary.feedbackCount}/{summary.totalCount}</p>
+                          <p className="text-sm text-gray-600">conversations with feedback</p>
+                        </div>
+                        <div className="space-y-2">
+                          <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
+                          <p className="text-2xl font-bold text-blue-900">
+                            {summary.averageScore.toFixed(1)}/10
+                          </p>
+                          <p className="text-sm text-gray-600">across all feedback</p>
+                        </div>
+                      </div>
+                      <div className="border-t pt-4">
+                        <h3 className="text-sm font-medium text-gray-500 mb-3">Key Themes</h3>
+                        <div className="space-y-3">
+                          <div className="text-sm">
+                            <span className="text-green-600 font-medium">Positive Theme: </span>
+                            {summary.keyThemes.positive}
+                          </div>
+                          <div className="text-sm">
+                            <span className="text-amber-600 font-medium">Constructive Theme: </span>
+                            {summary.keyThemes.constructive[0]}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+          )}
         </div>
 
-        {isLoading ? (
-          <Card>
-            <CardContent className="p-6">
-              <div className="animate-pulse text-center">
-                {config?.type === 'upload' ? 'Analyzing uploads...' : 'Analyzing conversations...'}
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            {/* Summary Section */}
-            {summary && (
-              <Card className="mb-6">
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-blue-600" />
-                    <h2 className="text-xl font-semibold">Analysis Summary</h2>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-medium text-gray-500">Feedback Coverage</h3>
-                        <p className="text-2xl font-bold text-blue-900">{summary.feedbackCount}/{summary.totalCount}</p>
-                        <p className="text-sm text-gray-600">conversations with feedback</p>
-                      </div>
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
-                        <p className="text-2xl font-bold text-blue-900">
-                          {summary.averageScore.toFixed(1)}/10
-                        </p>
-                        <p className="text-sm text-gray-600">across all feedback</p>
-                      </div>
-                    </div>
-                    <div className="border-t pt-4">
-                      <h3 className="text-sm font-medium text-gray-500 mb-3">Key Themes</h3>
-                      <div className="space-y-3">
-                        <div className="text-sm">
-                          <span className="text-green-600 font-medium">Positive Theme: </span>
-                          {summary.keyThemes.positive}
-                        </div>
-                        <div className="text-sm">
-                          <span className="text-amber-600 font-medium">Constructive Theme: </span>
-                          {summary.keyThemes.constructive[0]}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Existing conversation list */}
+        <div className="px-4 md:px-8">
+          {isLoading ? (
+            <Card>
+              <CardContent className="p-6">
+                <div className="animate-pulse text-center">
+                  {config?.type === 'upload' ? 'Analyzing uploads...' : 'Analyzing conversations...'}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
             <ScrollArea className="h-[calc(100vh-16rem)]">
               <div className="space-y-4">
                 {conversations.map((conversation, index) => (
@@ -259,8 +266,8 @@ export default function ConversationAnalysis() {
                 ))}
               </div>
             </ScrollArea>
-          </>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
