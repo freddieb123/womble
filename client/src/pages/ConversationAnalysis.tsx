@@ -173,7 +173,7 @@ export default function ConversationAnalysis() {
           {summary && (
                 <Collapsible open={isOpen} onOpenChange={setIsOpen}>
                   <Card className="mb-2 bg-white">
-                    <CardHeader className="pb-2">
+                    <CardHeader className="pb-4">
                       <CollapsibleTrigger className="flex items-center justify-between w-full">
                         <div className="flex items-center gap-2">
                           <TrendingUp className="h-5 w-5 text-blue-600" />
