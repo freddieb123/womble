@@ -61,7 +61,7 @@ export default function ConversationAnalysis() {
       .flatMap(conv => conv.feedback?.bullets || [])
       .map(bullet => bullet.toLowerCase());
 
-    // Simple theme analysis (this could be enhanced with more sophisticated analysis)
+    // Simple theme analysis
     const positiveKeywords = ['excellent', 'great', 'good', 'well', 'effective', 'clear'];
     const constructiveKeywords = ['could', 'should', 'improve', 'better', 'consider', 'suggest'];
 
@@ -73,9 +73,7 @@ export default function ConversationAnalysis() {
     // Select representative themes
     const positiveTheme = positiveBullets[Math.floor(Math.random() * positiveBullets.length)] || 
       "Positive feedback insufficient";
-    const constructiveThemes = constructiveBullets
-      .slice(0, 2)
-      .map(theme => theme || "Constructive feedback insufficient");
+    const constructiveTheme = constructiveBullets[0] || "Constructive feedback insufficient";
 
     return {
       feedbackCount,
@@ -83,7 +81,7 @@ export default function ConversationAnalysis() {
       averageScore,
       keyThemes: {
         positive: positiveTheme,
-        constructive: constructiveThemes
+        constructive: [constructiveTheme]
       }
     };
   };
@@ -171,32 +169,32 @@ export default function ConversationAnalysis() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-medium text-gray-500">Feedback Coverage</h3>
-                      <p className="text-2xl font-bold text-blue-900">{summary.feedbackCount}/{summary.totalCount}</p>
-                      <p className="text-sm text-gray-600">conversations with feedback</p>
-                    </div>
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
-                      <p className="text-2xl font-bold text-blue-900">
-                        {summary.averageScore.toFixed(1)}/10
-                      </p>
-                      <p className="text-sm text-gray-600">across all feedback</p>
-                    </div>
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-medium text-gray-500">Key Themes</h3>
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
+                        <h3 className="text-sm font-medium text-gray-500">Feedback Coverage</h3>
+                        <p className="text-2xl font-bold text-blue-900">{summary.feedbackCount}/{summary.totalCount}</p>
+                        <p className="text-sm text-gray-600">conversations with feedback</p>
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
+                        <p className="text-2xl font-bold text-blue-900">
+                          {summary.averageScore.toFixed(1)}/10
+                        </p>
+                        <p className="text-sm text-gray-600">across all feedback</p>
+                      </div>
+                    </div>
+                    <div className="border-t pt-4">
+                      <h3 className="text-sm font-medium text-gray-500 mb-3">Key Themes</h3>
+                      <div className="space-y-3">
                         <div className="text-sm">
-                          <span className="text-green-600 font-medium">Positive: </span>
+                          <span className="text-green-600 font-medium">Positive Theme: </span>
                           {summary.keyThemes.positive}
                         </div>
-                        {summary.keyThemes.constructive.map((theme, index) => (
-                          <div key={index} className="text-sm">
-                            <span className="text-amber-600 font-medium">Constructive {index + 1}: </span>
-                            {theme}
-                          </div>
-                        ))}
+                        <div className="text-sm">
+                          <span className="text-amber-600 font-medium">Constructive Theme: </span>
+                          {summary.keyThemes.constructive[0]}
+                        </div>
                       </div>
                     </div>
                   </div>
