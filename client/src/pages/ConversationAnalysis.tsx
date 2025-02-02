@@ -200,16 +200,22 @@ export default function ConversationAnalysis() {
                         </div>
                       </div>
                       <div className="border-t pt-4">
-                        <h3 className="text-sm font-medium text-gray-500 mb-3">Key Themes</h3>
-                        <div className="space-y-3">
-                          <div className="text-sm text-gray-900">
-                            {summary.keyThemes.positive}
-                          </div>
-                          <div className="text-sm text-gray-900">
-                            {summary.keyThemes.constructive}
+                          <h3 className="text-sm font-medium text-gray-500 mb-3">Key Themes</h3>
+                          <div className="space-y-3">
+                            <div className="space-y-1">
+                              <h4 className="text-sm font-medium text-green-600">Positive theme:</h4>
+                              <div className="text-sm text-gray-900">
+                                {summary.keyThemes.positive}
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <h4 className="text-sm font-medium text-amber-600">Constructive theme:</h4>
+                              <div className="text-sm text-gray-900">
+                                {summary.keyThemes.constructive}
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
                     </div>
                   </CardContent>
                 </CollapsibleContent>
