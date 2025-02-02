@@ -171,57 +171,57 @@ export default function ConversationAnalysis() {
           </div>
 
           {summary && (
-            <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-              <Card className="mb-2">
-                <CardHeader className="pb-2">
-                  <CollapsibleTrigger className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5 text-blue-600" />
-                      <h2 className="text-xl font-semibold">Analysis Summary</h2>
-                    </div>
-                    <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'transform rotate-180' : ''}`} />
-                  </CollapsibleTrigger>
-                </CardHeader>
-                <CollapsibleContent>
-                  <CardContent>
-                    <div className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-medium text-gray-500">Feedback Coverage</h3>
-                          <p className="text-2xl font-bold text-blue-900">{summary.feedbackCount}/{summary.totalCount}</p>
-                          <p className="text-sm text-gray-600">conversations with feedback</p>
+                <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+                  <Card className="mb-2 bg-white">
+                    <CardHeader className="pb-2">
+                      <CollapsibleTrigger className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-5 w-5 text-blue-600" />
+                          <h2 className="text-xl font-semibold">Analysis Summary</h2>
                         </div>
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
-                          <p className="text-2xl font-bold text-blue-900">
-                            {summary.averageScore.toFixed(1)}/10
-                          </p>
-                          <p className="text-sm text-gray-600">across all feedback</p>
-                        </div>
-                      </div>
-                      <div className="border-t pt-4">
-                          <h3 className="text-sm font-medium text-gray-500 mb-3">Key Themes</h3>
-                          <div className="space-y-3">
-                            <div className="space-y-1">
-                              <h4 className="text-sm font-medium text-green-600">Positive theme:</h4>
-                              <div className="text-sm text-gray-900">
-                                {summary.keyThemes.positive}
-                              </div>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'transform rotate-180' : ''}`} />
+                      </CollapsibleTrigger>
+                    </CardHeader>
+                    <CollapsibleContent>
+                      <CardContent>
+                        <div className="space-y-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                              <h3 className="text-sm font-medium text-gray-500">Feedback Coverage</h3>
+                              <p className="text-2xl font-bold text-blue-900">{summary.feedbackCount}/{summary.totalCount}</p>
+                              <p className="text-sm text-gray-600">conversations with feedback</p>
                             </div>
-                            <div className="space-y-1">
-                              <h4 className="text-sm font-medium text-amber-600">Constructive theme:</h4>
-                              <div className="text-sm text-gray-900">
-                                {summary.keyThemes.constructive}
+                            <div className="space-y-2">
+                              <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
+                              <p className="text-2xl font-bold text-blue-900">
+                                {summary.averageScore.toFixed(1)}/10
+                              </p>
+                              <p className="text-sm text-gray-600">across all feedback</p>
+                            </div>
+                          </div>
+                          <div className="border-t pt-4">
+                            <h3 className="text-sm font-medium text-gray-500 mb-3">Key Themes</h3>
+                            <div className="space-y-3">
+                              <div className="space-y-1">
+                                <h4 className="text-sm font-medium text-green-600">Positive theme:</h4>
+                                <div className="text-sm text-gray-900">
+                                  {summary.keyThemes.positive}
+                                </div>
+                              </div>
+                              <div className="space-y-1">
+                                <h4 className="text-sm font-medium text-amber-600">Constructive theme:</h4>
+                                <div className="text-sm text-gray-900">
+                                  {summary.keyThemes.constructive}
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
-                    </div>
-                  </CardContent>
-                </CollapsibleContent>
-              </Card>
-            </Collapsible>
-          )}
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              )}
         </div>
 
         <div className="px-4 md:px-8">
