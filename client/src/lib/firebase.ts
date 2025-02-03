@@ -22,12 +22,19 @@ if (projectId.includes(':')) {
   throw new Error('Invalid project ID format. Make sure you are using the Firebase project ID, not the app ID.');
 }
 
+// Validate app ID format (should contain two colons)
+const appId = import.meta.env.VITE_FIREBASE_APP_ID;
+if (!appId.includes(':') || appId.split(':').length !== 3) {
+  console.warn('Warning: Firebase App ID format looks incorrect. Expected format: "1:123456789:web:abcdef"');
+}
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: `${projectId}.firebaseapp.com`,
   projectId: projectId,
   storageBucket: `${projectId}.appspot.com`,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  appId: appId,
+  measurementId: `G-${appId.split(':')[1]}`
 };
 
 console.log("Firebase Config:", {
