@@ -1,35 +1,18 @@
-import sgMail from '@sendgrid/mail';
-
-if (!process.env.SENDGRID_API_KEY) {
-  throw new Error('SendGrid API key is required');
-}
-
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-
-interface EmailOptions {
+// Placeholder for future email implementation
+export interface EmailOptions {
   to: string;
   subject: string;
   html: string;
 }
 
-export async function sendEmail({ to, subject, html }: EmailOptions) {
-  try {
-    await sgMail.send({
-      to,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@yourdomain.com',
-      subject,
-      html,
-    });
-    return true;
-  } catch (error) {
-    console.error('SendGrid error:', error);
-    return false;
-  }
+export async function sendEmail(_options: EmailOptions) {
+  console.log('Email sending is not implemented yet');
+  return true;
 }
 
 export function generatePasswordResetEmail(username: string, resetToken: string) {
   const resetUrl = `${process.env.APP_URL || 'http://localhost:5000'}/reset-password?token=${resetToken}`;
-  
+
   return {
     subject: 'Password Reset Request',
     html: `
