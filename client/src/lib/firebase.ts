@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -12,3 +12,31 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+export async function handleGoogleRedirect() {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result) {
+      // Get the ID token
+      const idToken = await result.user.getIdToken();
+
+      // Send token to backend
+      const response = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idToken }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to authenticate with server');
+      }
+
+      return await response.json();
+    }
+  } catch (error) {
+    console.error('Google redirect error:', error);
+    throw error;
+  }
+}

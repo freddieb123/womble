@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,9 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SiGoogle } from "react-icons/si";
+import { signInWithRedirect } from "firebase/auth";
+import { auth, googleProvider, handleGoogleRedirect } from "@/lib/firebase";
+import { useToast } from "@/hooks/use-toast";
 
 const authSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -18,8 +21,9 @@ const authSchema = z.object({
 type AuthForm = z.infer<typeof authSchema>;
 
 export default function AuthPage() {
-  const { user, loginMutation, registerMutation, signInWithGoogle } = useAuth();
+  const { user, loginMutation, registerMutation } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
+  const { toast } = useToast();
 
   const form = useForm<AuthForm>({
     resolver: zodResolver(authSchema),
@@ -28,6 +32,17 @@ export default function AuthPage() {
       password: "",
     },
   });
+
+  useEffect(() => {
+    // Handle redirect result when the page loads
+    handleGoogleRedirect().catch((error) => {
+      toast({
+        variant: "destructive",
+        title: "Authentication Error",
+        description: error.message
+      });
+    });
+  }, [toast]);
 
   if (user) {
     return <Redirect to="/" />;
@@ -38,6 +53,18 @@ export default function AuthPage() {
       loginMutation.mutate(data);
     } else {
       registerMutation.mutate(data);
+    }
+  };
+
+  const signInWithGoogle = async () => {
+    try {
+      await signInWithRedirect(auth, googleProvider);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to start Google sign-in"
+      });
     }
   };
 
