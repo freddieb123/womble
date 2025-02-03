@@ -55,8 +55,17 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/chat-configs", requireAuth, async (req: Request, res: Response) => {
     try {
       const showDeleted = req.query.showDeleted === 'true';
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
       const configs = await db.query.chatConfigs.findMany({
-        where: showDeleted ? undefined : eq(chatConfigs.deleted, false),
+        where: and(
+          showDeleted ? undefined : eq(chatConfigs.deleted, false),
+          eq(chatConfigs.userId, userId)
+        ),
         orderBy: [desc(chatConfigs.createdAt)],
         with: {
           conversations: true,
@@ -105,12 +114,19 @@ export function registerRoutes(app: Express): Server {
     try {
       const { title, type, systemPrompt, userInstructions, feedbackCriteria } = chatConfigSchema.parse(req.body);
 
+      // Get the user ID from the authenticated request
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
       const newConfig = await db.insert(chatConfigs).values({
         title,
         type,
         systemPrompt,
         userInstructions,
         feedbackCriteria,
+        userId, // Add the user ID here
         deleted: false,
         createdAt: new Date()
       }).returning();
@@ -570,7 +586,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/conversations/:configId", requireAuth, async (req: Request, res: Response) => {
+    app.get("/api/conversations/:configId", requireAuth, async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.configId);
 
