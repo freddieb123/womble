@@ -9,7 +9,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SiGoogle } from "react-icons/si";
-import { signInWithRedirect, signInWithPopup } from "firebase/auth";
+import { signInWithRedirect } from "firebase/auth";
 import { auth, googleProvider, handleGoogleRedirect } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
@@ -35,7 +35,6 @@ export default function AuthPage() {
 
   useEffect(() => {
     console.log("Checking for Google redirect result...");
-    // Handle redirect result when the page loads
     handleGoogleRedirect().catch((error) => {
       console.error("Google redirect handling error:", error);
       toast({
@@ -61,13 +60,7 @@ export default function AuthPage() {
   const signInWithGoogle = async () => {
     try {
       console.log("Starting Google sign-in process...");
-      // Try popup first, fall back to redirect
-      try {
-        await signInWithPopup(auth, googleProvider);
-      } catch (popupError) {
-        console.log("Popup blocked, trying redirect...");
-        await signInWithRedirect(auth, googleProvider);
-      }
+      await signInWithRedirect(auth, googleProvider);
     } catch (error) {
       console.error("Google sign-in error:", error);
       toast({
@@ -144,7 +137,7 @@ export default function AuthPage() {
                   type="button"
                   variant="outline"
                   className="w-full flex items-center gap-2"
-                  onClick={() => signInWithGoogle()}
+                  onClick={signInWithGoogle}
                 >
                   <SiGoogle className="h-4 w-4" />
                   Sign in with Google
