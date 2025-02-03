@@ -1,31 +1,44 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from "firebase/auth";
 
+// Validate required environment variables
+const requiredEnvVars = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
+};
+
+// Check if any required variables are missing
+Object.entries(requiredEnvVars).forEach(([key, value]) => {
+  if (!value) {
+    throw new Error(`Missing required environment variable: VITE_FIREBASE_${key.toUpperCase()}`);
+  }
+});
+
+const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.appspot.com`,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  // Add this to ensure proper redirect handling
-  redirectUri: window.location.origin + '/auth'
+  authDomain: `${projectId}.firebaseapp.com`,
+  projectId: projectId,
+  storageBucket: `${projectId}.appspot.com`,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 console.log("Firebase Config (without sensitive data):", {
   authDomain: firebaseConfig.authDomain,
-  projectId: firebaseConfig.projectId,
-  redirectUri: firebaseConfig.redirectUri
+  projectId: firebaseConfig.projectId
 });
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+// Configure Google Provider
 googleProvider.addScope('email');
 googleProvider.addScope('profile');
 googleProvider.setCustomParameters({
-  prompt: 'select_account',
-  // Explicitly set the redirect URL
-  redirect_uri: window.location.origin + '/auth'
+  prompt: 'select_account'
 });
 
 export async function handleGoogleRedirect() {
