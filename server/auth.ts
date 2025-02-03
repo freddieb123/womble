@@ -14,20 +14,65 @@ import { sendEmail, generatePasswordResetEmail } from "./email";
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 
-// Initialize Firebase Admin with properly formatted private key
-const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-if (!privateKey) {
-  throw new Error("FIREBASE_PRIVATE_KEY environment variable is required");
-}
-
-initializeApp({
+// Validate Firebase Admin configuration
+const requiredFirebaseEnvVars = {
   projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-  credential: cert({
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  privateKey: process.env.FIREBASE_PRIVATE_KEY,
+};
+
+// Check for missing environment variables
+Object.entries(requiredFirebaseEnvVars).forEach(([key, value]) => {
+  if (!value) {
+    throw new Error(`Missing required Firebase Admin environment variable: ${key}`);
+  }
+});
+
+// Initialize Firebase Admin with properly formatted private key
+try {
+  console.log("Initializing Firebase Admin with project ID:", process.env.VITE_FIREBASE_PROJECT_ID);
+
+  // Format private key properly - replace escaped newlines and quotes
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY
+    ?.replace(/\\n/g, '\n')
+    ?.replace(/\\/g, '')
+    ?.replace(/^"(.*)"$/, '$1');
+
+  if (!privateKey) {
+    throw new Error("FIREBASE_PRIVATE_KEY environment variable is required");
+  }
+
+  // Validate private key format
+  if (!privateKey.includes('BEGIN PRIVATE KEY') || !privateKey.includes('END PRIVATE KEY')) {
+    console.error("Invalid private key format. Private key should contain BEGIN and END markers");
+    throw new Error("Invalid private key format");
+  }
+
+  console.log("Private key validation passed, initializing Firebase Admin...");
+
+  initializeApp({
+    credential: cert({
+      projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: privateKey,
+    }),
+  });
+
+  console.log("Firebase Admin initialized successfully");
+} catch (error) {
+  console.error("Firebase Admin initialization error:", error);
+  console.error("Firebase Admin initialization details:", {
     projectId: process.env.VITE_FIREBASE_PROJECT_ID,
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey: privateKey,
-  }),
-});
+    privateKeyLength: process.env.FIREBASE_PRIVATE_KEY?.length,
+    error: error instanceof Error ? {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    } : String(error)
+  });
+  throw error;
+}
 
 declare global {
   namespace Express {
