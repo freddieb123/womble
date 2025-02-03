@@ -63,6 +63,11 @@ export default function AuthPage() {
       await signInWithRedirect(auth, googleProvider);
     } catch (error) {
       console.error("Google sign-in error:", error);
+      console.error("Error details:", {
+        code: error instanceof Error ? (error as any).code : 'unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       toast({
         variant: "destructive",
         title: "Error",

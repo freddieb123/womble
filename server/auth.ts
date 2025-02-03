@@ -123,12 +123,14 @@ export function setupAuth(app: Express) {
   app.post("/api/auth/google", async (req, res) => {
     try {
       const { idToken } = req.body;
+      console.log("Processing Google auth with token:", idToken?.substring(0, 10) + "...");
 
       // Verify the ID token using Firebase Admin SDK
       const decodedToken = await getAuth().verifyIdToken(idToken);
       const { email } = decodedToken;
 
       if (!email) {
+        console.error("Google auth failed: No email in decoded token");
         return res.status(400).json({ error: "No email provided" });
       }
 
