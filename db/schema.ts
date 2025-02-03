@@ -10,6 +10,7 @@ export const users = pgTable("users", {
 
 export const chatConfigs = pgTable("chat_configs", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
   type: text("type", { enum: ['chat', 'upload'] }).default('chat').notNull(),
   title: text("title").notNull(),
   systemPrompt: text("system_prompt").notNull(),
@@ -69,7 +70,15 @@ export interface UploadFeedback {
 }
 
 // Relations
-export const chatConfigsRelations = relations(chatConfigs, ({ many }) => ({
+export const userRelations = relations(users, ({ many }) => ({
+  chatConfigs: many(chatConfigs),
+}));
+
+export const chatConfigsRelations = relations(chatConfigs, ({ one, many }) => ({
+  user: one(users, {
+    fields: [chatConfigs.userId],
+    references: [users.id],
+  }),
   conversations: many(conversations),
   uploads: many(uploads),
 }));

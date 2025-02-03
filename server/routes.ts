@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import { setupAuth } from "./auth";
 import { db } from "@db";
 import { chatConfigs, conversations, uploads, type Message, type ConversationFeedback, type UploadFeedback } from "@db/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -39,8 +40,19 @@ const openai = new OpenAI({
 const sessions: Record<string, Message[]> = {};
 
 export function registerRoutes(app: Express): Server {
-  // Chat configs endpoints
-  app.get("/api/chat-configs", async (req: Request, res: Response) => {
+  // Set up authentication routes and middleware
+  setupAuth(app);
+
+  // Middleware to check authentication for API routes
+  const requireAuth = (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    next();
+  };
+
+  // Protect all chat config related routes
+  app.get("/api/chat-configs", requireAuth, async (req: Request, res: Response) => {
     try {
       const showDeleted = req.query.showDeleted === 'true';
       const configs = await db.query.chatConfigs.findMany({
@@ -66,7 +78,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/chat-configs/:id", async (req: Request, res: Response) => {
+  app.get("/api/chat-configs/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.id);
 
@@ -89,7 +101,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/chat-configs", async (req: Request, res: Response) => {
+  app.post("/api/chat-configs", requireAuth, async (req: Request, res: Response) => {
     try {
       const { title, type, systemPrompt, userInstructions, feedbackCriteria } = chatConfigSchema.parse(req.body);
 
@@ -110,7 +122,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.put("/api/chat-configs/:id", async (req: Request, res: Response) => {
+  app.put("/api/chat-configs/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.id);
 
@@ -142,7 +154,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/chat-hint", async (req: Request, res: Response) => {
+  app.post("/api/chat-hint", requireAuth, async (req: Request, res: Response) => {
     try {
       const { feedbackCriteria, userInstructions, messages } = req.body;
 
@@ -181,7 +193,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Messages endpoints
-  app.get("/api/messages", async (req: Request, res: Response) => {
+  app.get("/api/messages", requireAuth, async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.query.configId as string);
       const sessionId = req.query.sessionId as string || crypto.randomUUID();
@@ -217,7 +229,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/messages", async (req: Request, res: Response) => {
+  app.post("/api/messages", requireAuth, async (req: Request, res: Response) => {
     try {
       const { content, config: configData } = req.body;
       const configId = parseInt(req.query.configId as string);
@@ -368,7 +380,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/upload-feedback", async (req: Request, res: Response) => {
+  app.post("/api/upload-feedback", requireAuth, async (req: Request, res: Response) => {
     try {
       const { configId, sessionId, fileContent, fileName, userName } = uploadFeedbackSchema.parse(req.body);
 
@@ -456,7 +468,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/chat-feedback", async (req: Request, res: Response) => {
+  app.post("/api/chat-feedback", requireAuth, async (req: Request, res: Response) => {
     try {
       const { configId, sessionId, messages } = req.body;
 
@@ -538,7 +550,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.delete("/api/chat-configs/:id", async (req: Request, res: Response) => {
+  app.delete("/api/chat-configs/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.id);
 
@@ -558,7 +570,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
+  app.get("/api/conversations/:configId", requireAuth, async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.configId);
 
@@ -609,7 +621,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/analyze-themes", async (req: Request, res: Response) => {
+  app.post("/api/analyze-themes", requireAuth, async (req: Request, res: Response) => {
     try {
       const { feedbacks } = req.body;
   

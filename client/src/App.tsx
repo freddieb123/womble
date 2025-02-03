@@ -3,22 +3,27 @@ import Home from "./pages/Home";
 import UserView from "./pages/UserView";
 import ConversationAnalysis from "./pages/ConversationAnalysis";
 import StaticConversationView from "./pages/StaticConversationView";
+import AuthPage from "./pages/auth-page";
+import { AuthProvider } from "./hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
+import { ProtectedRoute } from "./lib/protected-route";
 
 function App() {
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/chat" component={UserView} />
-      <Route path="/analysis" component={ConversationAnalysis} />
-      <Route path="/conversation" component={StaticConversationView} />
-      <Route component={NotFound} />
-    </Switch>
+    <AuthProvider>
+      <Switch>
+        <Route path="/auth" component={AuthPage} />
+        <ProtectedRoute path="/" component={Home} />
+        <ProtectedRoute path="/chat" component={UserView} />
+        <ProtectedRoute path="/analysis" component={ConversationAnalysis} />
+        <ProtectedRoute path="/conversation" component={StaticConversationView} />
+        <Route component={NotFound} />
+      </Switch>
+    </AuthProvider>
   );
 }
 
-// fallback 404 not found page
 function NotFound() {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
@@ -28,7 +33,6 @@ function NotFound() {
             <AlertCircle className="h-8 w-8 text-red-500" />
             <h1 className="text-2xl font-bold text-gray-900">404 Page Not Found</h1>
           </div>
-
           <p className="mt-4 text-sm text-gray-600">
             The requested page could not be found.
           </p>
