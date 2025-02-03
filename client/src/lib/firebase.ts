@@ -7,7 +7,15 @@ const firebaseConfig = {
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.appspot.com`,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  // Add this to ensure proper redirect handling
+  redirectUri: window.location.origin + '/auth'
 };
+
+console.log("Firebase Config (without sensitive data):", {
+  authDomain: firebaseConfig.authDomain,
+  projectId: firebaseConfig.projectId,
+  redirectUri: firebaseConfig.redirectUri
+});
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
@@ -16,11 +24,13 @@ googleProvider.addScope('email');
 googleProvider.addScope('profile');
 googleProvider.setCustomParameters({
   prompt: 'select_account',
+  // Explicitly set the redirect URL
+  redirect_uri: window.location.origin + '/auth'
 });
 
 export async function handleGoogleRedirect() {
   try {
-    console.log("Getting redirect result...");
+    console.log("Getting redirect result... Current URL:", window.location.href);
     const result = await getRedirectResult(auth);
     console.log("Redirect result:", result ? "Success" : "No result");
 
@@ -44,7 +54,11 @@ export async function handleGoogleRedirect() {
       return await response.json();
     }
   } catch (error) {
-    console.error("Google redirect error:", error);
+    console.error("Google redirect error details:", {
+      code: error instanceof Error ? (error as any).code : 'unknown',
+      message: error instanceof Error ? error.message : String(error),
+      location: window.location.href
+    });
     throw error;
   }
 }
