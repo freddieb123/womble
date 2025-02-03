@@ -44,6 +44,10 @@ console.log("Firebase Config:", {
   apiKeyPrefix: import.meta.env.VITE_FIREBASE_API_KEY?.substring(0, 6)
 });
 
+// Log current domain for authorized domains configuration
+console.log("Current application domain:", window.location.hostname);
+console.log("Full origin URL:", window.location.origin);
+
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
