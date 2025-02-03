@@ -34,8 +34,10 @@ export default function AuthPage() {
   });
 
   useEffect(() => {
+    console.log("Checking for Google redirect result...");
     // Handle redirect result when the page loads
     handleGoogleRedirect().catch((error) => {
+      console.error("Google redirect handling error:", error);
       toast({
         variant: "destructive",
         title: "Authentication Error",
@@ -58,8 +60,11 @@ export default function AuthPage() {
 
   const signInWithGoogle = async () => {
     try {
+      console.log("Starting Google sign-in process...");
       await signInWithRedirect(auth, googleProvider);
+      console.log("Redirect initiated"); // Note: This might not show due to redirect
     } catch (error) {
+      console.error("Google sign-in error:", error);
       toast({
         variant: "destructive",
         title: "Error",

@@ -15,12 +15,15 @@ export const googleProvider = new GoogleAuthProvider();
 
 export async function handleGoogleRedirect() {
   try {
+    console.log("Getting redirect result...");
     const result = await getRedirectResult(auth);
+    console.log("Redirect result:", result ? "Success" : "No result");
+
     if (result) {
-      // Get the ID token
+      console.log("User signed in, getting ID token...");
       const idToken = await result.user.getIdToken();
 
-      // Send token to backend
+      console.log("Sending token to backend...");
       const response = await fetch('/api/auth/google', {
         method: 'POST',
         headers: {
@@ -36,7 +39,7 @@ export async function handleGoogleRedirect() {
       return await response.json();
     }
   } catch (error) {
-    console.error('Google redirect error:', error);
+    console.error("Google redirect error:", error);
     throw error;
   }
 }
