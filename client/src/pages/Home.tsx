@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Pencil, Copy, ExternalLink, MoreVertical, BarChart2, Trash2, ArrowUpCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import AdminPanel from "@/components/AdminPanel";
 import type { AdminConfig, Feedback } from "@/lib/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -42,6 +43,7 @@ type ChatConfig = {
 };
 
 export default function Home() {
+  const { logoutMutation } = useAuth();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingConfig, setEditingConfig] = useState<ChatConfig | null>(null);
   const [deletingConfig, setDeletingConfig] = useState<ChatConfig | null>(null);
@@ -260,8 +262,14 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-4">
+        <div className="flex justify-between items-start mb-6">
+          <div className="flex flex-col items-start gap-4">
+            <button
+              onClick={() => logoutMutation.mutate()}
+              className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+            >
+              Logout
+            </button>
             <h1 className="text-2xl font-bold text-blue-900">Create and manage your GPTs - Trainer view</h1>
           </div>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
