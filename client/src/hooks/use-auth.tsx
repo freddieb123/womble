@@ -1,4 +1,4 @@
-import { ReactNode, createContext, useContext } from "react";
+import { ReactNode, createContext, useContext, useEffect } from "react";
 import {
   useQuery,
   useMutation,
@@ -8,6 +8,8 @@ import {
 import type { SelectUser, InsertUser } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { auth, signInWithGoogle, signOutUser } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 type AuthContextType = {
   user: SelectUser | null;
@@ -16,6 +18,7 @@ type AuthContextType = {
   loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
+  signInWithGoogleMutation: UseMutationResult<any, Error, void>;
 };
 
 type LoginData = Pick<InsertUser, "username" | "password">;
@@ -26,6 +29,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
+
+  // Listen to Firebase auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // Update the user in your backend
+        try {
+          const res = await fetch("/api/auth/firebase", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              displayName: firebaseUser.displayName,
+            }),
+          });
+          if (!res.ok) throw new Error("Failed to authenticate with backend");
+          const user = await res.json();
+          queryClient.setQueryData(["/api/user"], user);
+        } catch (error) {
+          console.error("Error syncing with backend:", error);
+          toast({
+            title: "Authentication Error",
+            description: "Failed to sync with backend",
+            variant: "destructive",
+          });
+        }
+      } else {
+        queryClient.setQueryData(["/api/user"], null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [queryClient, toast]);
 
   const {
     data: user,
@@ -38,6 +75,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (res.status === 401) return null;
       if (!res.ok) throw new Error("Failed to fetch user");
       return res.json();
+    },
+  });
+
+  const signInWithGoogleMutation = useMutation({
+    mutationFn: async () => {
+      return await signInWithGoogle();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Google Sign-in failed",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -98,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
+      await signOutUser();
       const res = await fetch("/api/logout", { method: "POST" });
       if (!res.ok) throw new Error("Logout failed");
     },
@@ -123,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginMutation,
         logoutMutation,
         registerMutation,
+        signInWithGoogleMutation,
       }}
     >
       {children}

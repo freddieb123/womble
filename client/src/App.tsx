@@ -4,7 +4,6 @@ import UserView from "./pages/UserView";
 import ConversationAnalysis from "./pages/ConversationAnalysis";
 import StaticConversationView from "./pages/StaticConversationView";
 import AuthPage from "./pages/auth-page";
-import ResetPasswordPage from "./pages/reset-password-page";
 import { AuthProvider } from "./hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
@@ -15,7 +14,6 @@ function App() {
     <AuthProvider>
       <Switch>
         <Route path="/auth" component={AuthPage} />
-        <Route path="/reset-password" component={ResetPasswordPage} />
         <ProtectedRoute path="/" component={Home} />
         <ProtectedRoute path="/chat" component={UserView} />
         <ProtectedRoute path="/analysis" component={ConversationAnalysis} />
