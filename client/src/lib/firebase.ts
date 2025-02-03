@@ -17,6 +17,11 @@ Object.entries(requiredEnvVars).forEach(([key, value]) => {
 
 const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
 
+// Validate project ID format (should not contain ':' which would indicate it's an app ID)
+if (projectId.includes(':')) {
+  throw new Error('Invalid project ID format. Make sure you are using the Firebase project ID, not the app ID.');
+}
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: `${projectId}.firebaseapp.com`,
@@ -25,9 +30,11 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-console.log("Firebase Config (without sensitive data):", {
+console.log("Firebase Config:", {
   authDomain: firebaseConfig.authDomain,
-  projectId: firebaseConfig.projectId
+  projectId: firebaseConfig.projectId,
+  // Logging partial API key for verification (first 6 chars)
+  apiKeyPrefix: import.meta.env.VITE_FIREBASE_API_KEY?.substring(0, 6)
 });
 
 const app = initializeApp(firebaseConfig);
