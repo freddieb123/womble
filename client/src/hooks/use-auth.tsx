@@ -3,9 +3,11 @@ import {
   useQuery,
   useMutation,
   UseMutationResult,
+  useQueryClient,
 } from "@tanstack/react-query";
 import type { SelectUser, InsertUser } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 type AuthContextType = {
   user: SelectUser | null;
@@ -22,7 +24,9 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
-  
+  const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+
   const {
     data: user,
     error,
@@ -47,10 +51,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!res.ok) throw new Error("Invalid credentials");
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (user) => {
+      queryClient.setQueryData(["/api/user"], user);
       toast({
         description: "Logged in successfully",
       });
+      setLocation("/");
     },
     onError: (error: Error) => {
       toast({
@@ -74,10 +80,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (user) => {
+      queryClient.setQueryData(["/api/user"], user);
       toast({
         description: "Registered successfully",
       });
+      setLocation("/");
     },
     onError: (error: Error) => {
       toast({
@@ -94,7 +102,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!res.ok) throw new Error("Logout failed");
     },
     onSuccess: () => {
-      window.location.href = "/auth";
+      queryClient.setQueryData(["/api/user"], null);
+      setLocation("/auth");
     },
     onError: (error: Error) => {
       toast({
