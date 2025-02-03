@@ -1,21 +1,25 @@
-import { ReactNode, createContext, useContext } from "react";
+import { ReactNode, createContext, useContext, useEffect } from "react";
 import {
   useQuery,
   useMutation,
   UseMutationResult,
   useQueryClient,
 } from "@tanstack/react-query";
+import { signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/auth";
 import type { SelectUser, InsertUser } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { auth, googleProvider } from "@/lib/firebase";
 
 type AuthContextType = {
   user: SelectUser | null;
+  firebaseUser: User | null;
   isLoading: boolean;
   error: Error | null;
   loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
+  signInWithGoogle: () => Promise<void>;
 };
 
 type LoginData = Pick<InsertUser, "username" | "password">;
@@ -98,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
+      await signOut(auth);
       const res = await fetch("/api/logout", { method: "POST" });
       if (!res.ok) throw new Error("Logout failed");
     },
@@ -114,15 +119,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  const signInWithGoogle = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const idToken = await result.user.getIdToken();
+
+      // Send the token to your backend
+      const res = await fetch("/api/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+
+      if (!res.ok) throw new Error("Failed to authenticate with server");
+
+      const user = await res.json();
+      queryClient.setQueryData(["/api/user"], user);
+      toast({
+        description: "Signed in with Google successfully",
+      });
+      setLocation("/");
+    } catch (error) {
+      toast({
+        title: "Google Sign-in failed",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
         user: user ?? null,
+        firebaseUser: auth.currentUser,
         isLoading,
         error,
         loginMutation,
         logoutMutation,
         registerMutation,
+        signInWithGoogle,
       }}
     >
       {children}

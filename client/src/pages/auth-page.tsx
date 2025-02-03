@@ -8,6 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { SiGoogle } from "react-icons/si";
 
 const authSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -17,7 +18,7 @@ const authSchema = z.object({
 type AuthForm = z.infer<typeof authSchema>;
 
 export default function AuthPage() {
-  const { user, loginMutation, registerMutation } = useAuth();
+  const { user, loginMutation, registerMutation, signInWithGoogle } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
 
   const form = useForm<AuthForm>({
@@ -91,6 +92,25 @@ export default function AuthPage() {
                   disabled={loginMutation.isPending || registerMutation.isPending}
                 >
                   {isLogin ? "Login" : "Register"}
+                </Button>
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">
+                      Or continue with
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full flex items-center gap-2"
+                  onClick={() => signInWithGoogle()}
+                >
+                  <SiGoogle className="h-4 w-4" />
+                  Sign in with Google
                 </Button>
                 <Button
                   type="button"

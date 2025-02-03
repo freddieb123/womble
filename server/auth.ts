@@ -11,6 +11,23 @@ import { eq } from "drizzle-orm";
 import { fromZodError } from "zod-validation-error";
 import { z } from "zod";
 import { sendEmail, generatePasswordResetEmail } from "./email";
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+
+// Initialize Firebase Admin with properly formatted private key
+const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+if (!privateKey) {
+  throw new Error("FIREBASE_PRIVATE_KEY environment variable is required");
+}
+
+initializeApp({
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+  credential: cert({
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: privateKey,
+  }),
+});
 
 declare global {
   namespace Express {
@@ -103,6 +120,51 @@ export function setupAuth(app: Express) {
     });
   });
 
+  app.post("/api/auth/google", async (req, res) => {
+    try {
+      const { idToken } = req.body;
+
+      // Verify the ID token using Firebase Admin SDK
+      const decodedToken = await getAuth().verifyIdToken(idToken);
+      const { email } = decodedToken;
+
+      if (!email) {
+        return res.status(400).json({ error: "No email provided" });
+      }
+
+      // Check if user exists
+      const [existingUser] = await getUserByUsername(email);
+
+      let user;
+      if (existingUser) {
+        user = existingUser;
+      } else {
+        // Create new user
+        const randomPassword = randomBytes(16).toString('hex');
+        const [newUser] = await db
+          .insert(users)
+          .values({
+            username: email,
+            password: await hashPassword(randomPassword),
+          })
+          .returning();
+        user = newUser;
+      }
+
+      // Log the user in
+      req.login(user, (err) => {
+        if (err) {
+          console.error("Login error:", err);
+          return res.status(500).json({ error: "Failed to login" });
+        }
+        res.status(200).json(user);
+      });
+    } catch (error) {
+      console.error("Google auth error:", error);
+      res.status(401).json({ error: "Invalid token" });
+    }
+  });
+
   app.post("/api/login", passport.authenticate("local"), (req, res) => {
     res.status(200).json(req.user);
   });
@@ -118,6 +180,4 @@ export function setupAuth(app: Express) {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     res.json(req.user);
   });
-  
-  // Password reset endpoints temporarily removed
 }
