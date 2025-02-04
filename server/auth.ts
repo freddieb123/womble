@@ -170,8 +170,16 @@ export function setupAuth(app: Express) {
       const { idToken } = req.body;
       console.log("Processing Google auth with token:", idToken?.substring(0, 10) + "...");
 
+      if (!idToken) {
+        console.error("Google auth failed: No token provided");
+        return res.status(400).json({ error: "No token provided" });
+      }
+
       // Verify the ID token using Firebase Admin SDK
+      console.log("Verifying token with Firebase Admin...");
       const decodedToken = await getAuth().verifyIdToken(idToken);
+      console.log("Token verified successfully");
+
       const { email } = decodedToken;
 
       if (!email) {
@@ -179,14 +187,19 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ error: "No email provided" });
       }
 
+      console.log("Processing authentication for email:", email);
+
       // Check if user exists
       const [existingUser] = await getUserByUsername(email);
+      console.log("User exists?", !!existingUser);
 
       let user;
       if (existingUser) {
         user = existingUser;
+        console.log("Using existing user account");
       } else {
         // Create new user
+        console.log("Creating new user account");
         const randomPassword = randomBytes(16).toString('hex');
         const [newUser] = await db
           .insert(users)
@@ -196,19 +209,27 @@ export function setupAuth(app: Express) {
           })
           .returning();
         user = newUser;
+        console.log("New user created successfully");
       }
 
       // Log the user in
+      console.log("Logging in user...");
       req.login(user, (err) => {
         if (err) {
           console.error("Login error:", err);
-          return res.status(500).json({ error: "Failed to login" });
+          return res.status(500).json({ error: "Failed to login", details: err.message });
         }
+        console.log("User logged in successfully");
         res.status(200).json(user);
       });
     } catch (error) {
       console.error("Google auth error:", error);
-      res.status(401).json({ error: "Invalid token" });
+      console.error("Complete error details:", {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      res.status(401).json({ error: "Invalid token", details: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 

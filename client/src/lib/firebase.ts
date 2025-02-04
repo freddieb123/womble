@@ -68,6 +68,7 @@ export async function handleGoogleRedirect() {
     if (result) {
       console.log("User signed in, getting ID token...");
       const idToken = await result.user.getIdToken();
+      console.log("Got ID token, length:", idToken.length);
 
       console.log("Sending token to backend...");
       const response = await fetch('/api/auth/google', {
@@ -78,17 +79,27 @@ export async function handleGoogleRedirect() {
         body: JSON.stringify({ idToken }),
       });
 
+      console.log("Backend response status:", response.status);
+
       if (!response.ok) {
-        throw new Error('Failed to authenticate with server');
+        const errorText = await response.text();
+        console.error("Backend error:", errorText);
+        throw new Error(`Failed to authenticate with server: ${errorText}`);
       }
 
-      return await response.json();
+      const userData = await response.json();
+      console.log("Authentication successful, user data received");
+      return userData;
+    } else {
+      console.log("No redirect result - this is normal if not redirecting from Google");
+      return null;
     }
   } catch (error) {
     console.error("Google redirect error details:", {
       code: error instanceof Error ? (error as any).code : 'unknown',
       message: error instanceof Error ? error.message : String(error),
-      location: window.location.href
+      location: window.location.href,
+      stack: error instanceof Error ? error.stack : undefined
     });
     throw error;
   }
