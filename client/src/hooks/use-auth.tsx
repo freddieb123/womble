@@ -1,4 +1,4 @@
-import { ReactNode, createContext, useContext, useEffect } from "react";
+import { ReactNode, createContext, useContext, useEffect, useState } from "react";
 import {
   useQuery,
   useMutation,
@@ -30,6 +30,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+
+  // Listen to Firebase auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log("Firebase auth state changed:", user ? "User logged in" : "No user");
+      setFirebaseUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const {
     data: user,
@@ -121,25 +131,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
+      console.log("Starting Google sign-in process...");
       const result = await signInWithPopup(auth, googleProvider);
+      console.log("Google sign-in successful, getting ID token...");
       const idToken = await result.user.getIdToken();
 
       // Send the token to your backend
+      console.log("Sending token to backend...");
       const res = await fetch("/api/auth/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken }),
       });
 
-      if (!res.ok) throw new Error("Failed to authenticate with server");
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("Backend authentication failed:", errorText);
+        throw new Error("Failed to authenticate with server");
+      }
 
       const user = await res.json();
+      console.log("Backend authentication successful");
       queryClient.setQueryData(["/api/user"], user);
       toast({
         description: "Signed in with Google successfully",
       });
       setLocation("/");
     } catch (error) {
+      console.error("Google sign-in error:", {
+        code: error instanceof Error ? (error as any).code : 'unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       toast({
         title: "Google Sign-in failed",
         description: error instanceof Error ? error.message : "An error occurred",
@@ -152,7 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user: user ?? null,
-        firebaseUser: auth.currentUser,
+        firebaseUser,
         isLoading,
         error,
         loginMutation,

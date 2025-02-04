@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,10 +9,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SiGoogle } from "react-icons/si";
-import { signInWithRedirect } from "firebase/auth";
-import { auth, googleProvider, handleGoogleRedirect } from "@/lib/firebase";
-import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
 
 const authSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -22,10 +18,8 @@ const authSchema = z.object({
 type AuthForm = z.infer<typeof authSchema>;
 
 export default function AuthPage() {
-  const { user, loginMutation, registerMutation } = useAuth();
+  const { user, loginMutation, registerMutation, signInWithGoogle } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const form = useForm<AuthForm>({
     resolver: zodResolver(authSchema),
@@ -34,34 +28,6 @@ export default function AuthPage() {
       password: "",
     },
   });
-
-  useEffect(() => {
-    console.log("Auth page loaded. Current URL:", window.location.href);
-    console.log("Checking for Google redirect result...");
-
-    handleGoogleRedirect()
-      .then((userData) => {
-        console.log("Redirect handler completed:", userData ? "Success" : "No result");
-        if (userData) {
-          console.log("User data received after redirect");
-          queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-        }
-      })
-      .catch((error) => {
-        console.error("Google redirect handling error:", error);
-        console.error("Full error details:", {
-          code: error instanceof Error ? (error as any).code : 'unknown',
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          location: window.location.href
-        });
-        toast({
-          variant: "destructive",
-          title: "Authentication Error",
-          description: error instanceof Error ? error.message : "Failed to complete authentication"
-        });
-      });
-  }, [toast, queryClient]);
 
   if (user) {
     console.log("User is authenticated, redirecting to home");
@@ -73,25 +39,6 @@ export default function AuthPage() {
       loginMutation.mutate(data);
     } else {
       registerMutation.mutate(data);
-    }
-  };
-
-  const signInWithGoogle = async () => {
-    try {
-      console.log("Starting Google sign-in process...");
-      await signInWithRedirect(auth, googleProvider);
-    } catch (error) {
-      console.error("Google sign-in error:", error);
-      console.error("Error details:", {
-        code: error instanceof Error ? (error as any).code : 'unknown',
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
-      });
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to start Google sign-in"
-      });
     }
   };
 
