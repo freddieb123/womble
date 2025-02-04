@@ -12,6 +12,7 @@ import { SiGoogle } from "react-icons/si";
 import { signInWithRedirect } from "firebase/auth";
 import { auth, googleProvider, handleGoogleRedirect } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 const authSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -24,6 +25,7 @@ export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const form = useForm<AuthForm>({
     resolver: zodResolver(authSchema),
@@ -34,18 +36,35 @@ export default function AuthPage() {
   });
 
   useEffect(() => {
+    console.log("Auth page loaded. Current URL:", window.location.href);
     console.log("Checking for Google redirect result...");
-    handleGoogleRedirect().catch((error) => {
-      console.error("Google redirect handling error:", error);
-      toast({
-        variant: "destructive",
-        title: "Authentication Error",
-        description: error.message
+
+    handleGoogleRedirect()
+      .then((userData) => {
+        console.log("Redirect handler completed:", userData ? "Success" : "No result");
+        if (userData) {
+          console.log("User data received after redirect");
+          queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+        }
+      })
+      .catch((error) => {
+        console.error("Google redirect handling error:", error);
+        console.error("Full error details:", {
+          code: error instanceof Error ? (error as any).code : 'unknown',
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          location: window.location.href
+        });
+        toast({
+          variant: "destructive",
+          title: "Authentication Error",
+          description: error instanceof Error ? error.message : "Failed to complete authentication"
+        });
       });
-    });
-  }, [toast]);
+  }, [toast, queryClient]);
 
   if (user) {
+    console.log("User is authenticated, redirecting to home");
     return <Redirect to="/" />;
   }
 
