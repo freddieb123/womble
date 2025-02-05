@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, log } from "./vite";
 import path from "path";
+import fs from "fs";
 
 const app = express();
 
@@ -58,9 +59,20 @@ app.use((req, res, next) => {
   } else {
     console.log("Starting server in production mode");
     try {
-      // Serve static files from the dist directory
-      const distPath = path.join(process.cwd(), "dist");
+      // In production, Replit sets REPL_SLUG which we can use to construct the correct path
+      const rootDir = process.env.REPL_SLUG ? `/home/runner/${process.env.REPL_SLUG}` : process.cwd();
+      const distPath = path.join(rootDir, "dist", "public");
       console.log("Serving static files from:", distPath);
+
+      // Verify dist directory exists
+      if (!fs.existsSync(distPath)) {
+        console.error(`Error: Build directory not found at ${distPath}`);
+        console.error('Current directory contents:', fs.readdirSync(rootDir));
+        throw new Error('Build directory not found');
+      }
+
+      // Log the contents of the dist directory
+      console.log('Dist directory contents:', fs.readdirSync(distPath));
 
       app.use(express.static(distPath, {
         index: false // Don't serve index.html for all routes
@@ -71,11 +83,30 @@ app.use((req, res, next) => {
         if (req.path.startsWith('/api')) {
           return next();
         }
+
+        const indexPath = path.join(distPath, 'index.html');
+        console.log(`Attempting to serve index.html from: ${indexPath}`);
+
+        if (!fs.existsSync(indexPath)) {
+          console.error(`Error: index.html not found at ${indexPath}`);
+          return res.status(404).send('index.html not found');
+        }
+
         console.log(`Serving index.html for path: ${req.path}`);
-        res.sendFile(path.join(distPath, 'index.html'));
+        res.sendFile(indexPath);
       });
     } catch (error) {
       console.error("Error setting up static file serving:", error);
+      console.error("Complete error details:", {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        cwd: process.cwd()
+      });
+      // Instead of crashing, send a 500 error
+      app.get('*', (req, res) => {
+        res.status(500).send('Server configuration error');
+      });
     }
   }
 
