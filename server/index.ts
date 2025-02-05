@@ -74,11 +74,9 @@ app.use((req, res, next) => {
       // Log the contents of the dist directory
       console.log('Dist directory contents:', fs.readdirSync(distPath));
 
-      app.use(express.static(distPath, {
-        index: false // Don't serve index.html for all routes
-      }));
+      app.use(express.static(distPath));
 
-      // Serve index.html for all routes (SPA fallback)
+      // Serve index.html for all non-API routes (SPA fallback)
       app.get('*', (req, res, next) => {
         if (req.path.startsWith('/api')) {
           return next();
