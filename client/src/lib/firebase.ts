@@ -37,6 +37,7 @@ const firebaseConfig = {
   measurementId: `G-${appId.split(':')[1]}`
 };
 
+// Log configuration and domain information for debugging
 console.log("Firebase Config:", {
   authDomain: firebaseConfig.authDomain,
   projectId: firebaseConfig.projectId,
@@ -44,9 +45,21 @@ console.log("Firebase Config:", {
   apiKeyPrefix: import.meta.env.VITE_FIREBASE_API_KEY?.substring(0, 6)
 });
 
-// Log current domain for authorized domains configuration
+// Log current domain information for authorized domains configuration
 console.log("Current application domain:", window.location.hostname);
 console.log("Full origin URL:", window.location.origin);
+
+// Production domain
+const PRODUCTION_DOMAIN = "practice-perfect.replit.app";
+
+// Verify if current domain is in the expected list
+const isValidDomain = window.location.hostname === PRODUCTION_DOMAIN || 
+                     window.location.hostname.endsWith('.replit.dev');
+
+if (!isValidDomain) {
+  console.warn('Warning: Current domain is not in the expected list of authorized domains.');
+  console.warn('Make sure to add this domain to Firebase Console -> Authentication -> Settings -> Authorized domains');
+}
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);

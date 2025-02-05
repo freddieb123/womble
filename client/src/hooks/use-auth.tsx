@@ -81,6 +81,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      try {
+        await signOut(auth);
+        const res = await fetch("/api/logout", { method: "POST" });
+        if (!res.ok) throw new Error("Logout failed");
+      } catch (error) {
+        console.error("Logout error:", error);
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.setQueryData(["/api/user"], null);
+      setLocation("/auth");
+      toast({
+        description: "Logged out successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Logout failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const registerMutation = useMutation({
     mutationFn: async (newUser: InsertUser) => {
       const res = await fetch("/api/register", {
@@ -110,33 +137,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      await signOut(auth);
-      const res = await fetch("/api/logout", { method: "POST" });
-      if (!res.ok) throw new Error("Logout failed");
-    },
-    onSuccess: () => {
-      queryClient.setQueryData(["/api/user"], null);
-      setLocation("/auth");
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Logout failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   const signInWithGoogle = async () => {
     try {
       console.log("Starting Google sign-in process...");
+
+      // Check if we're on an authorized domain
+      const currentDomain = window.location.hostname;
+      console.log("Current domain:", currentDomain);
+
       const result = await signInWithPopup(auth, googleProvider);
       console.log("Google sign-in successful, getting ID token...");
       const idToken = await result.user.getIdToken();
 
-      // Send the token to your backend
       console.log("Sending token to backend...");
       const res = await fetch("/api/auth/google", {
         method: "POST",
@@ -161,13 +173,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Google sign-in error:", {
         code: error instanceof Error ? (error as any).code : 'unknown',
         message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
+        domain: window.location.hostname
       });
-      toast({
-        title: "Google Sign-in failed",
-        description: error instanceof Error ? error.message : "An error occurred",
-        variant: "destructive",
-      });
+
+      // Check if it's a domain-related error
+      if ((error as any)?.code === 'auth/unauthorized-domain') {
+        toast({
+          title: "Domain Not Authorized",
+          description: "This domain is not authorized for Google Sign-in. Please contact the administrator.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Google Sign-in failed",
+          description: error instanceof Error ? error.message : "An error occurred",
+          variant: "destructive",
+        });
+      }
     }
   };
 
