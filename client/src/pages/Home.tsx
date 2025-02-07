@@ -350,8 +350,8 @@ export default function Home() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative size-8 rounded-full">
-                    <Avatar className="size-8">
-                      <AvatarFallback>
+                    <Avatar className="size-8 shadow-md">
+                      <AvatarFallback className="bg-blue-900 text-white">
                         {user?.firstName
                           ? user.firstName[0].toUpperCase()
                           : user?.email
