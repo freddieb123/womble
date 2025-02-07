@@ -20,6 +20,7 @@ export const chatConfigs = pgTable("chat_configs", {
   deleted: boolean("deleted").default(false).notNull(),
   deletedAt: timestamp("deleted_at"),
   isTemplate: boolean("is_template").default(false).notNull(),
+  templateDescription: text("template_description"),
 });
 
 // Conversations table - for chat messages
