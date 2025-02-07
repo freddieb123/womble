@@ -73,7 +73,7 @@ export default function TemplateGallery({ templates, onSelectTemplate, onStartFr
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground line-clamp-2">
-                  {template.templateDescription || template.systemPrompt.slice(0, 150) + "..."}
+                  {template.templateDescription || "No description available"}
                 </p>
                 <div className="mt-4 flex justify-between items-center">
                   <Button variant="ghost" size="sm">

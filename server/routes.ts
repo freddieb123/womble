@@ -709,12 +709,8 @@ Rules:
       }
 
       // Update the config to mark it as a template
-      const { templateDescription } = req.body;
       const updatedConfig = await db.update(chatConfigs)
-        .set({ 
-          isTemplate: true,
-          templateDescription: templateDescription || null
-        })
+        .set({ isTemplate: true })
         .where(eq(chatConfigs.id, configId))
         .returning();
 
