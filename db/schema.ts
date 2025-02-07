@@ -8,6 +8,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   firstName: text("first_name"),
   lastName: text("last_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const chatConfigs = pgTable("chat_configs", {

@@ -122,50 +122,62 @@ export function setupAuth(app: Express) {
       usernameField: 'email',
       passwordField: 'password'
     }, async (email, password, done) => {
-      const [user] = await getUserByEmail(email);
-      if (!user || !(await comparePasswords(password, user.password))) {
-        return done(null, false);
-      } else {
-        return done(null, user);
+      try {
+        const [user] = await getUserByEmail(email);
+        if (!user || !(await comparePasswords(password, user.password))) {
+          return done(null, false);
+        } else {
+          return done(null, user);
+        }
+      } catch (error) {
+        return done(error);
       }
     }),
   );
 
   passport.serializeUser((user, done) => done(null, user.id));
   passport.deserializeUser(async (id: number, done) => {
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, id))
-      .limit(1);
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, id))
+        .limit(1);
 
-    done(null, user);
+      done(null, user);
+    } catch (error) {
+      done(error);
+    }
   });
 
   app.post("/api/register", async (req, res, next) => {
-    const result = insertUserSchema.safeParse(req.body);
-    if (!result.success) {
-      const error = fromZodError(result.error);
-      return res.status(400).send(error.toString());
+    try {
+      const result = insertUserSchema.safeParse(req.body);
+      if (!result.success) {
+        const error = fromZodError(result.error);
+        return res.status(400).send(error.toString());
+      }
+
+      const [existingUser] = await getUserByEmail(result.data.email);
+      if (existingUser) {
+        return res.status(400).send("Email already exists");
+      }
+
+      const [user] = await db
+        .insert(users)
+        .values({
+          ...result.data,
+          password: await hashPassword(result.data.password),
+        })
+        .returning();
+
+      req.login(user, (err) => {
+        if (err) return next(err);
+        res.status(201).json(user);
+      });
+    } catch (error) {
+      next(error);
     }
-
-    const [existingUser] = await getUserByEmail(result.data.email);
-    if (existingUser) {
-      return res.status(400).send("Email already exists");
-    }
-
-    const [user] = await db
-      .insert(users)
-      .values({
-        ...result.data,
-        password: await hashPassword(result.data.password),
-      })
-      .returning();
-
-    req.login(user, (err) => {
-      if (err) return next(err);
-      res.status(201).json(user);
-    });
   });
 
   app.post("/api/auth/google", async (req, res) => {
@@ -200,18 +212,14 @@ export function setupAuth(app: Express) {
       let user;
       if (existingUser) {
         // Update existing user's name if provided
-        if (firstName || lastName) {
-          [user] = await db
-            .update(users)
-            .set({
-              firstName: firstName || existingUser.firstName,
-              lastName: lastName || existingUser.lastName,
-            })
-            .where(eq(users.id, existingUser.id))
-            .returning();
-        } else {
-          user = existingUser;
-        }
+        [user] = await db
+          .update(users)
+          .set({
+            firstName: firstName || existingUser.firstName,
+            lastName: lastName || existingUser.lastName,
+          })
+          .where(eq(users.id, existingUser.id))
+          .returning();
         console.log("Updated existing user account");
       } else {
         // Create new user
