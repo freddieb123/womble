@@ -65,17 +65,17 @@ export default function TemplateGallery({ templates, onSelectTemplate, onStartFr
                     
                   </div>
                   <div className="flex flex-col items-end gap-2">
-                    <Badge variant={template.type === 'chat' ? 'custom-green' : 'custom-purple'}>
+                    <Badge className={template.type === 'chat' ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-purple-100 text-purple-800 hover:bg-purple-200'}>
                       {template.type}
                     </Badge>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="flex flex-col h-[200px]">
-                <p className="text-sm text-muted-foreground line-clamp-2 flex-grow">
+              <CardContent className="flex flex-col h-[180px]">
+                <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
                   {template.templateDescription || template.systemPrompt.slice(0, 150) + "..."}
                 </p>
-                <div className="flex justify-between items-center pt-4 mt-auto">
+                <div className="flex justify-between items-center mt-auto">
                   <Button variant="ghost" size="sm">
                     Preview Template
                     <ArrowRight className="h-4 w-4 ml-2" />
