@@ -154,8 +154,10 @@ export function setupAuth(app: Express) {
     const [user] = await db
       .insert(users)
       .values({
-        ...result.data,
+        username: result.data.username,
         password: await hashPassword(result.data.password),
+        firstName: result.data.firstName || null,
+        lastName: result.data.lastName || null,
       })
       .returning();
 
@@ -169,14 +171,11 @@ export function setupAuth(app: Express) {
     try {
       const { idToken, firstName, lastName } = req.body;
       console.log("Processing Google auth with token:", idToken?.substring(0, 10) + "...");
+      console.log("Received name info:", { firstName, lastName });
 
       if (!idToken) {
         console.error("Google auth failed: No token provided");
         return res.status(400).json({ error: "No token provided" });
-      }
-
-      if (!firstName || !lastName) {
-        console.warn("Google auth: Name information missing");
       }
 
       // Verify the ID token using Firebase Admin SDK
@@ -199,13 +198,25 @@ export function setupAuth(app: Express) {
 
       let user;
       if (existingUser) {
-        user = existingUser;
-        console.log("Using existing user account");
+        // Update existing user's name if provided
+        if (firstName || lastName) {
+          [user] = await db
+            .update(users)
+            .set({
+              firstName: firstName || existingUser.firstName,
+              lastName: lastName || existingUser.lastName,
+            })
+            .where(eq(users.id, existingUser.id))
+            .returning();
+        } else {
+          user = existingUser;
+        }
+        console.log("Updated existing user account");
       } else {
         // Create new user
-        console.log("Creating new user account");
+        console.log("Creating new user account with name:", { firstName, lastName });
         const randomPassword = randomBytes(16).toString('hex');
-        const [newUser] = await db
+        [user] = await db
           .insert(users)
           .values({
             username: email,
@@ -214,7 +225,6 @@ export function setupAuth(app: Express) {
             lastName: lastName || null,
           })
           .returning();
-        user = newUser;
         console.log("New user created successfully");
       }
 

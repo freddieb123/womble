@@ -10,22 +10,29 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SiGoogle } from "react-icons/si";
 
-const authSchema = z.object({
+const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
-type AuthForm = z.infer<typeof authSchema>;
+const registerSchema = loginSchema.extend({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+});
+
+type LoginForm = z.infer<typeof loginSchema>;
+type RegisterForm = z.infer<typeof registerSchema>;
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation, signInWithGoogle } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
 
-  const form = useForm<AuthForm>({
-    resolver: zodResolver(authSchema),
+  const form = useForm<LoginForm | RegisterForm>({
+    resolver: zodResolver(isLogin ? loginSchema : registerSchema),
     defaultValues: {
       username: "",
       password: "",
+      ...(isLogin ? {} : { firstName: "", lastName: "" }),
     },
   });
 
@@ -34,11 +41,11 @@ export default function AuthPage() {
     return <Redirect to="/" />;
   }
 
-  const onSubmit = (data: AuthForm) => {
+  const onSubmit = (data: LoginForm | RegisterForm) => {
     if (isLogin) {
-      loginMutation.mutate(data);
+      loginMutation.mutate(data as LoginForm);
     } else {
-      registerMutation.mutate(data);
+      registerMutation.mutate(data as RegisterForm);
     }
   };
 
@@ -69,6 +76,36 @@ export default function AuthPage() {
                   </FormItem>
                 )}
               />
+              {!isLogin && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter your first name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter your last name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
               <FormField
                 control={form.control}
                 name="password"
@@ -117,7 +154,10 @@ export default function AuthPage() {
                   type="button"
                   variant="ghost"
                   className="w-full"
-                  onClick={() => setIsLogin(!isLogin)}
+                  onClick={() => {
+                    setIsLogin(!isLogin);
+                    form.reset();
+                  }}
                 >
                   {isLogin
                     ? "Don't have an account? Register"
