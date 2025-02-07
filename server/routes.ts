@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "@db";
 import { chatConfigs, conversations, uploads, type Message, type ConversationFeedback, type UploadFeedback } from "@db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, or, desc } from "drizzle-orm";
 import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
@@ -96,7 +96,13 @@ export function registerRoutes(app: Express): Server {
       }
 
       const config = await db.query.chatConfigs.findFirst({
-        where: eq(chatConfigs.id, configId),
+        where: and(
+          eq(chatConfigs.id, configId),
+          or(
+            eq(chatConfigs.isTemplate, true),
+            eq(chatConfigs.userId, req.user?.id)
+          )
+        ),
       });
 
       if (!config) {
