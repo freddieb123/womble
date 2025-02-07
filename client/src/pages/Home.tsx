@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Copy, ExternalLink, MoreVertical, BarChart2, Trash2, ArrowUpCircle } from "lucide-react";
+import { Plus, Pencil, Copy, ExternalLink, MoreVertical, BarChart2, Trash2, ArrowUpCircle, Flag } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
@@ -58,6 +58,7 @@ export default function Home() {
     temperature: 0.7,
     maxTokens: 1000
   });
+  const [savingAsTemplate, setSavingAsTemplate] = useState<ChatConfig | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -213,6 +214,35 @@ export default function Home() {
     },
   });
 
+  const saveAsTemplate = useMutation({
+    mutationFn: async (configToTemplate: ChatConfig) => {
+      const response = await fetch(`/api/chat-configs/${configToTemplate.id}/template`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to save as template");
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
+      setSavingAsTemplate(null);
+      toast({
+        description: "GPT saved as public template successfully!",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
   const handleCopyLink = async (configId: number) => {
     try {
       const url = `${window.location.origin}/chat?configId=${configId}`;
@@ -339,6 +369,10 @@ export default function Home() {
                               <DropdownMenuItem onClick={() => handleDuplicate(config)}>
                                 <Copy className="h-4 w-4 mr-2" />
                                 Duplicate
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setSavingAsTemplate(config)}>
+                                <Flag className="h-4 w-4 mr-2" />
+                                Save as Public Template
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="text-red-600"
@@ -468,6 +502,28 @@ export default function Home() {
               onClick={() => deletingConfig && deleteConfig.mutate(deletingConfig)}
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={savingAsTemplate !== null}
+        onOpenChange={(open) => !open && setSavingAsTemplate(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save as Public Template?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will make "{savingAsTemplate?.title}" available as a public template for other users.
+              Are you sure you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => savingAsTemplate && saveAsTemplate.mutate(savingAsTemplate)}
+            >
+              Confirm
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

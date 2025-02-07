@@ -586,7 +586,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-    app.get("/api/conversations/:configId", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/conversations/:configId", requireAuth, async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.configId);
 
@@ -640,43 +640,43 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/analyze-themes", requireAuth, async (req: Request, res: Response) => {
     try {
       const { feedbacks } = req.body;
-  
+
       if (!Array.isArray(feedbacks)) {
         return res.status(400).json({ error: "Feedbacks must be an array" });
       }
-  
+
       const allBullets = feedbacks
         .flatMap(feedback => feedback.bullets || [])
         .filter(bullet => bullet);
-  
+
       if (allBullets.length === 0) {
         return res.json({
           positive: "No positive themes identified yet",
           constructive: "No constructive feedback available yet"
         });
       }
-  
+
       const prompt = `Analyze these feedback points and identify two key themes:
-  
-  Feedback points:
-  ${allBullets.map(bullet => `- ${bullet}`).join('\n')}
-  
-  Please provide exactly two themes in JSON format:
-  1. One positive theme highlighting what's being done well
-  2. One constructive theme suggesting an area for improvement
-  
-  Response Format:
-  {
-    "positive": "A clear, concise positive theme",
-    "constructive": "A clear, concise constructive theme"
-  }
-  
-  Rules:
-  - Each theme should be 1-2 sentences
-  - Use third-person perspective (e.g., "learners" or "users", not "you")
-  - Be specific and actionable
-  - Base themes on patterns across multiple feedback points when possible`;
-  
+
+Feedback points:
+${allBullets.map(bullet => `- ${bullet}`).join('\n')}
+
+Please provide exactly two themes in JSON format:
+1. One positive theme highlighting what's being done well
+2. One constructive theme suggesting an area for improvement
+
+Response Format:
+{
+  "positive": "A clear, concise positive theme",
+  "constructive": "A clear, concise constructive theme"
+}
+
+Rules:
+- Each theme should be 1-2 sentences
+- Use third-person perspective (e.g., "learners" or "users", not "you")
+- Be specific and actionable
+- Base themes on patterns across multiple feedback points when possible`;
+
       const completion = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
@@ -691,7 +691,7 @@ export function registerRoutes(app: Express): Server {
         ],
         response_format: { type: "json_object" }
       });
-  
+
       const themes = JSON.parse(completion.choices[0].message.content);
       res.json(themes);
     } catch (error: any) {
@@ -699,6 +699,54 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: error.message });
     }
   });
+
+  app.post("/api/chat-configs/:id/template", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.id);
+
+      if (isNaN(configId)) {
+        return res.status(400).json({ error: "Invalid config ID" });
+      }
+
+      // Update the config to mark it as a template
+      const updatedConfig = await db.update(chatConfigs)
+        .set({ isTemplate: true })
+        .where(eq(chatConfigs.id, configId))
+        .returning();
+
+      if (!updatedConfig.length) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+
+      res.json(updatedConfig[0]);
+    } catch (error: any) {
+      console.error("Error saving config as template:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/templates", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const templates = await db.query.chatConfigs.findMany({
+        where: and(
+          eq(chatConfigs.isTemplate, true),
+          eq(chatConfigs.deleted, false)
+        ),
+        orderBy: [desc(chatConfigs.createdAt)],
+      });
+
+      const templatesWithoutPrivateData = templates.map(template => ({
+        ...template,
+        userId: undefined // Remove userId from public templates
+      }));
+
+      res.json(templatesWithoutPrivateData);
+    } catch (error: any) {
+      console.error("Error fetching templates:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
 
   const httpServer = createServer(app);
   return httpServer;

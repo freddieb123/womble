@@ -19,6 +19,7 @@ export const chatConfigs = pgTable("chat_configs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   deleted: boolean("deleted").default(false).notNull(),
   deletedAt: timestamp("deleted_at"),
+  isTemplate: boolean("is_template").default(false).notNull(),
 });
 
 // Conversations table - for chat messages
