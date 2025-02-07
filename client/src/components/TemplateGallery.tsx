@@ -71,11 +71,11 @@ export default function TemplateGallery({ templates, onSelectTemplate, onStartFr
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground line-clamp-2">
+              <CardContent className="flex flex-col h-[200px]">
+                <p className="text-sm text-muted-foreground line-clamp-2 flex-grow">
                   {template.templateDescription || template.systemPrompt.slice(0, 150) + "..."}
                 </p>
-                <div className="mt-4 flex justify-between items-center">
+                <div className="flex justify-between items-center pt-4 mt-auto">
                   <Button variant="ghost" size="sm">
                     Preview Template
                     <ArrowRight className="h-4 w-4 ml-2" />
