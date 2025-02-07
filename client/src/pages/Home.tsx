@@ -377,10 +377,12 @@ export default function Home() {
                                 <Copy className="h-4 w-4 mr-2" />
                                 Duplicate
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setSavingAsTemplate(config)}>
-                                <Flag className="h-4 w-4 mr-2" />
-                                Save as Public Template
-                              </DropdownMenuItem>
+                              {!config.isTemplate && (
+                                <DropdownMenuItem onClick={() => setSavingAsTemplate(config)}>
+                                  <Flag className="h-4 w-4 mr-2" />
+                                  Save as Public Template
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem
                                 className="text-red-600"
                                 onClick={() => setDeletingConfig(config)}
