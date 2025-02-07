@@ -1,9 +1,11 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowRight } from "lucide-react";
+import { Plus, ArrowRight, Search } from "lucide-react";
 import type { AdminConfig } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
 
 interface Template {
   id: number;
@@ -22,6 +24,13 @@ interface Props {
 }
 
 export default function TemplateGallery({ templates, onSelectTemplate, onStartFromScratch }: Props) {
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredTemplates = templates.filter(template => 
+    template.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    template.systemPrompt.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -35,9 +44,19 @@ export default function TemplateGallery({ templates, onSelectTemplate, onStartFr
         </Button>
       </div>
 
+      <div className="relative">
+        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search templates..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
       <ScrollArea className="h-[60vh]">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {templates.map((template) => (
+          {filteredTemplates.map((template) => (
             <Card
               key={template.id}
               className="cursor-pointer hover:border-blue-500 transition-colors"
