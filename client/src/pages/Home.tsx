@@ -42,6 +42,7 @@ type ChatConfig = {
   deleted?: boolean;
   deletedAt?: string;
   isTemplate?: boolean;
+  templateDescription?: string;
 };
 
 export default function Home() {
@@ -224,6 +225,8 @@ export default function Home() {
     mutationFn: async (configToTemplate: ChatConfig) => {
       const response = await fetch(`/api/chat-configs/${configToTemplate.id}/template`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateDescription: configToTemplate.templateDescription })
       });
 
       if (!response.ok) {
@@ -580,15 +583,31 @@ export default function Home() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Save as Public Template?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will make "{savingAsTemplate?.title}" available as a public template for other users.
-              Are you sure you want to continue?
+            <AlertDialogDescription className="space-y-4">
+              <p>This will make "{savingAsTemplate?.title}" available as a public template for other users.</p>
+              <div className="space-y-2">
+                <label htmlFor="templateDescription" className="text-sm font-medium">
+                  Template Description (Required)
+                </label>
+                <textarea
+                  id="templateDescription"
+                  className="w-full min-h-[100px] px-3 py-2 text-sm rounded-md border border-input bg-transparent"
+                  placeholder="Describe what this template is for and how it can be used..."
+                  value={savingAsTemplate?.templateDescription || ""}
+                  onChange={(e) =>
+                    setSavingAsTemplate(prev =>
+                      prev ? { ...prev, templateDescription: e.target.value } : null
+                    )
+                  }
+                />
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => savingAsTemplate && saveAsTemplate.mutate(savingAsTemplate)}
+              disabled={!savingAsTemplate?.templateDescription?.trim()}
             >
               Confirm
             </AlertDialogAction>

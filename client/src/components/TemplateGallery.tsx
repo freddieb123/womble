@@ -7,14 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 
-interface Template {
-  id: number;
-  title: string;
-  type: 'chat' | 'upload';
-  systemPrompt: string;
-  userInstructions: string | null;
-  feedbackCriteria: string | null;
+interface Template extends AdminConfig {
   usageCount?: number;
+  id: number;
+  isTemplate?: boolean;
 }
 
 interface Props {
@@ -28,7 +24,7 @@ export default function TemplateGallery({ templates, onSelectTemplate, onStartFr
 
   const filteredTemplates = templates.filter(template => 
     template.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    template.systemPrompt.toLowerCase().includes(searchQuery.toLowerCase())
+    (template.templateDescription || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -77,7 +73,7 @@ export default function TemplateGallery({ templates, onSelectTemplate, onStartFr
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground line-clamp-2">
-                  {template.systemPrompt}
+                  {template.templateDescription || "No description available"}
                 </p>
                 <div className="mt-4 flex justify-between items-center">
                   <Button variant="ghost" size="sm">

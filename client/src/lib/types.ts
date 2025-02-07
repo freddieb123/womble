@@ -26,6 +26,7 @@ export interface AdminConfig {
   feedbackCriteria: string;
   temperature: number;
   maxTokens: number;
+  templateDescription?: string;
 }
 
 export interface Feedback {
