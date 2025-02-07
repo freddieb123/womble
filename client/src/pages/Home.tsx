@@ -103,6 +103,7 @@ export default function Home() {
       queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
       setIsCreateOpen(false);
       setIsPreviewingTemplate(false);
+      setIsTemplateGalleryOpen(false);
       setConfig({
         title: "",
         type: "chat",
