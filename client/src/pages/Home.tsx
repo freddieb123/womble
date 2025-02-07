@@ -29,6 +29,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import TemplateGallery from "@/components/TemplateGallery";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"; // Added import
+import { LogOut } from "lucide-react"; // Added import
+
 
 type ChatConfig = {
   id: number;
@@ -46,7 +49,7 @@ type ChatConfig = {
 };
 
 export default function Home() {
-  const { logoutMutation } = useAuth();
+  const { logoutMutation, user } = useAuth(); // Accessing user from useAuth
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isTemplateGalleryOpen, setIsTemplateGalleryOpen] = useState(false);
   const [isPreviewingTemplate, setIsPreviewingTemplate] = useState(false);
@@ -344,12 +347,25 @@ export default function Home() {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-start mb-6">
           <div className="flex flex-col items-start gap-4">
-            <button
-              onClick={() => logoutMutation.mutate()}
-              className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
-            >
-              Logout
-            </button>
+            <div> {/* Replaced logout button with dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative size-8 rounded-full">
+                    <Avatar className="size-8">
+                      <AvatarFallback>
+                        {user?.firstName ? user.firstName[0].toUpperCase() : '✓'}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => logoutMutation.mutate()}>
+                    <LogOut className="mr-2 size-4" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             <h1 className="text-2xl font-bold text-blue-900">Create and manage your GPTs - Trainer view</h1>
           </div>
           <Dialog open={isTemplateGalleryOpen} onOpenChange={setIsTemplateGalleryOpen}>
