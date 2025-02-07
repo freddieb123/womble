@@ -64,14 +64,20 @@ export function registerRoutes(app: Express): Server {
       const configs = await db.query.chatConfigs.findMany({
         where: and(
           showDeleted ? undefined : eq(chatConfigs.deleted, false),
-          eq(chatConfigs.userId, userId)
+          // Only return configs that are either:
+          // 1. Owned by the current user OR
+          // 2. Are public templates
+          or(
+            eq(chatConfigs.userId, userId),
+            eq(chatConfigs.isTemplate, true)
+          )
         ),
         orderBy: [desc(chatConfigs.createdAt)],
         with: {
           conversations: true,
           uploads: true,
         }
-      }).then(configs => configs.filter(config => showDeleted || !config.deleted));
+      });
 
       const configsWithCount = configs.map(config => ({
         ...config,
@@ -717,7 +723,7 @@ Rules:
       // Update the config to mark it as a template
       const { templateDescription } = req.body;
       const updatedConfig = await db.update(chatConfigs)
-        .set({ 
+        .set({
           isTemplate: true,
           templateDescription: templateDescription || null
         })
