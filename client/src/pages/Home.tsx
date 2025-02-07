@@ -48,6 +48,7 @@ export default function Home() {
   const { logoutMutation } = useAuth();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isTemplateGalleryOpen, setIsTemplateGalleryOpen] = useState(false);
+  const [isPreviewingTemplate, setIsPreviewingTemplate] = useState(false);
   const [editingConfig, setEditingConfig] = useState<ChatConfig | null>(null);
   const [deletingConfig, setDeletingConfig] = useState<ChatConfig | null>(null);
   const [showDeleted, setShowDeleted] = useState(false);
@@ -289,8 +290,16 @@ export default function Home() {
       temperature: 0.7,
       maxTokens: 1000
     });
-    setIsTemplateGalleryOpen(false);
+    setIsPreviewingTemplate(true);
     setIsCreateOpen(true);
+  };
+
+  const handleCreateModalClose = (open: boolean) => {
+    setIsCreateOpen(open);
+    if (!open && isPreviewingTemplate) {
+      setIsPreviewingTemplate(false);
+      setIsTemplateGalleryOpen(true);
+    }
   };
 
   const handleStartFromScratch = () => {
@@ -344,9 +353,9 @@ export default function Home() {
               <TemplateGallery
                 templates={(configs?.filter(c => c.isTemplate) || []).map(template => ({
                   ...template,
-                  usageCount: configs?.filter(c => 
-                    !c.isTemplate && 
-                    c.systemPrompt === template.systemPrompt && 
+                  usageCount: configs?.filter(c =>
+                    !c.isTemplate &&
+                    c.systemPrompt === template.systemPrompt &&
                     c.type === template.type
                   ).length || 0
                 }))}
@@ -356,7 +365,7 @@ export default function Home() {
             </DialogContent>
           </Dialog>
 
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <Dialog open={isCreateOpen} onOpenChange={handleCreateModalClose}>
             <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
               <DialogHeader>
                 <DialogTitle>Create New GPT</DialogTitle>

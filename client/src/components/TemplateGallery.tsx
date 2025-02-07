@@ -53,11 +53,6 @@ export default function TemplateGallery({ templates, onSelectTemplate, onStartFr
                     <Badge variant={template.type === 'chat' ? 'custom-green' : 'custom-purple'}>
                       {template.type}
                     </Badge>
-                    {template.usageCount !== undefined && template.usageCount > 0 && (
-                      <span className="text-xs text-muted-foreground">
-                        {template.usageCount} {template.usageCount === 1 ? 'person is' : 'people are'} using this
-                      </span>
-                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -65,10 +60,17 @@ export default function TemplateGallery({ templates, onSelectTemplate, onStartFr
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {template.systemPrompt}
                 </p>
-                <Button variant="ghost" size="sm" className="mt-4">
-                  Use Template
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
+                <div className="mt-4 flex justify-between items-center">
+                  <Button variant="ghost" size="sm">
+                    Preview Template
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                  {template.usageCount !== undefined && template.usageCount > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      {template.usageCount} {template.usageCount === 1 ? 'person is' : 'people are'} using this
+                    </span>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}
