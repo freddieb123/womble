@@ -167,12 +167,16 @@ export function setupAuth(app: Express) {
 
   app.post("/api/auth/google", async (req, res) => {
     try {
-      const { idToken } = req.body;
+      const { idToken, firstName, lastName } = req.body;
       console.log("Processing Google auth with token:", idToken?.substring(0, 10) + "...");
 
       if (!idToken) {
         console.error("Google auth failed: No token provided");
         return res.status(400).json({ error: "No token provided" });
+      }
+
+      if (!firstName || !lastName) {
+        console.warn("Google auth: Name information missing");
       }
 
       // Verify the ID token using Firebase Admin SDK
@@ -206,6 +210,8 @@ export function setupAuth(app: Express) {
           .values({
             username: email,
             password: await hashPassword(randomPassword),
+            firstName: firstName || null,
+            lastName: lastName || null,
           })
           .returning();
         user = newUser;

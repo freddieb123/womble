@@ -149,11 +149,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log("Google sign-in successful, getting ID token...");
       const idToken = await result.user.getIdToken();
 
-      console.log("Sending token to backend...");
+      // Extract first name and last name from display name
+      const displayName = result.user.displayName || '';
+      const [firstName = '', lastName = ''] = displayName.split(' ');
+
+      console.log("Sending token and user info to backend...");
       const res = await fetch("/api/auth/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken }),
+        body: JSON.stringify({ idToken, firstName, lastName }),
       });
 
       if (!res.ok) {
