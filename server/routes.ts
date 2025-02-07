@@ -96,17 +96,22 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/chat-configs/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.id);
+      const userId = req.user?.id;
 
       if (isNaN(configId)) {
         return res.status(400).json({ error: "Invalid config ID" });
+      }
+
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
       }
 
       const config = await db.query.chatConfigs.findFirst({
         where: and(
           eq(chatConfigs.id, configId),
           or(
-            eq(chatConfigs.isTemplate, true),
-            eq(chatConfigs.userId, req.user?.id)
+            eq(chatConfigs.userId, userId),
+            eq(chatConfigs.isTemplate, true)
           )
         ),
       });
@@ -153,9 +158,26 @@ export function registerRoutes(app: Express): Server {
   app.put("/api/chat-configs/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.id);
+      const userId = req.user?.id;
 
       if (isNaN(configId)) {
         return res.status(400).json({ error: "Invalid config ID" });
+      }
+
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      // First check if the user owns this config
+      const existingConfig = await db.query.chatConfigs.findFirst({
+        where: and(
+          eq(chatConfigs.id, configId),
+          eq(chatConfigs.userId, userId)
+        ),
+      });
+
+      if (!existingConfig) {
+        return res.status(403).json({ error: "You don't have permission to modify this configuration" });
       }
 
       const { title, type, systemPrompt, userInstructions, feedbackCriteria } = chatConfigSchema.parse(req.body);
@@ -168,7 +190,10 @@ export function registerRoutes(app: Express): Server {
           userInstructions,
           feedbackCriteria,
         })
-        .where(eq(chatConfigs.id, configId))
+        .where(and(
+          eq(chatConfigs.id, configId),
+          eq(chatConfigs.userId, userId)
+        ))
         .returning();
 
       if (!updatedConfig.length) {
@@ -581,15 +606,35 @@ export function registerRoutes(app: Express): Server {
   app.delete("/api/chat-configs/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.id);
+      const userId = req.user?.id;
 
       if (isNaN(configId)) {
         return res.status(400).json({ error: "Invalid config ID" });
       }
 
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      // First check if the user owns this config
+      const existingConfig = await db.query.chatConfigs.findFirst({
+        where: and(
+          eq(chatConfigs.id, configId),
+          eq(chatConfigs.userId, userId)
+        ),
+      });
+
+      if (!existingConfig) {
+        return res.status(403).json({ error: "You don't have permission to delete this configuration" });
+      }
+
       await db
         .update(chatConfigs)
         .set({ deleted: true, deletedAt: new Date() })
-        .where(eq(chatConfigs.id, configId));
+        .where(and(
+          eq(chatConfigs.id, configId),
+          eq(chatConfigs.userId, userId)
+        ));
 
       res.json({ success: true });
     } catch (error: any) {
