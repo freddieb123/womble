@@ -64,14 +64,25 @@ export function registerRoutes(app: Express): Server {
       const configs = await db.query.chatConfigs.findMany({
         where: and(
           showDeleted ? undefined : eq(chatConfigs.deleted, false),
-          eq(chatConfigs.userId, userId)
+          or(
+            eq(chatConfigs.userId, userId),
+            and(
+              eq(chatConfigs.isTemplate, true),
+              eq(chatConfigs.deleted, false)
+            )
+          )
         ),
         orderBy: [desc(chatConfigs.createdAt)],
         with: {
           conversations: true,
           uploads: true,
         }
-      }).then(configs => configs.filter(config => showDeleted || !config.deleted));
+      }).then(configs => 
+        configs
+          .filter(config => showDeleted || !config.deleted)
+          // Only show templates in template gallery, not in main list
+          .filter(config => !config.isTemplate || req.query.templates === 'true')
+      );
 
       const configsWithCount = configs.map(config => ({
         ...config,
