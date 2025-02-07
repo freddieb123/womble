@@ -12,6 +12,7 @@ interface Template {
   systemPrompt: string;
   userInstructions: string | null;
   feedbackCriteria: string | null;
+  usageCount?: number;
 }
 
 interface Props {
@@ -33,7 +34,7 @@ export default function TemplateGallery({ templates, onSelectTemplate, onStartFr
           Start from Scratch
         </Button>
       </div>
-      
+
       <ScrollArea className="h-[60vh]">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {templates.map((template) => (
@@ -48,9 +49,16 @@ export default function TemplateGallery({ templates, onSelectTemplate, onStartFr
                     <CardTitle>{template.title}</CardTitle>
                     <CardDescription>Click to use this template</CardDescription>
                   </div>
-                  <Badge variant={template.type === 'chat' ? 'custom-green' : 'custom-purple'}>
-                    {template.type}
-                  </Badge>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge variant={template.type === 'chat' ? 'custom-green' : 'custom-purple'}>
+                      {template.type}
+                    </Badge>
+                    {template.usageCount !== undefined && template.usageCount > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        {template.usageCount} {template.usageCount === 1 ? 'person is' : 'people are'} using this
+                      </span>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>

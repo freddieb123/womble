@@ -342,7 +342,14 @@ export default function Home() {
             </DialogTrigger>
             <DialogContent className="max-w-4xl">
               <TemplateGallery
-                templates={configs?.filter(c => c.isTemplate) || []}
+                templates={(configs?.filter(c => c.isTemplate) || []).map(template => ({
+                  ...template,
+                  usageCount: configs?.filter(c => 
+                    !c.isTemplate && 
+                    c.systemPrompt === template.systemPrompt && 
+                    c.type === template.type
+                  ).length || 0
+                }))}
                 onSelectTemplate={handleTemplateSelect}
                 onStartFromScratch={handleStartFromScratch}
               />
