@@ -61,16 +61,12 @@ export function registerRoutes(app: Express): Server {
         return res.status(401).json({ error: "User not authenticated" });
       }
 
+      // Get user's own configs
       const configs = await db.query.chatConfigs.findMany({
         where: and(
           showDeleted ? undefined : eq(chatConfigs.deleted, false),
-          // Only return configs that are either:
-          // 1. Owned by the current user OR
-          // 2. Are public templates
-          or(
-            eq(chatConfigs.userId, userId),
-            eq(chatConfigs.isTemplate, true)
-          )
+          // Only return configs that are owned by the current user
+          eq(chatConfigs.userId, userId)
         ),
         orderBy: [desc(chatConfigs.createdAt)],
         with: {
@@ -79,7 +75,23 @@ export function registerRoutes(app: Express): Server {
         }
       });
 
-      const configsWithCount = configs.map(config => ({
+      // Get public templates separately
+      const templates = await db.query.chatConfigs.findMany({
+        where: and(
+          eq(chatConfigs.isTemplate, true),
+          showDeleted ? undefined : eq(chatConfigs.deleted, false)
+        ),
+        orderBy: [desc(chatConfigs.createdAt)],
+        with: {
+          conversations: true,
+          uploads: true,
+        }
+      });
+
+      // Combine user's configs and public templates
+      const allConfigs = [...configs, ...templates];
+
+      const configsWithCount = allConfigs.map(config => ({
         ...config,
         conversationCount: config.type === 'upload' ? config.uploads.length : config.conversations.length,
         conversations: undefined,
