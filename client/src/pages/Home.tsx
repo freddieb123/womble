@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import AdminPanel from "@/components/AdminPanel";
-import type { AdminConfig, Feedback } from "@/lib/types";
+import type { AdminConfig } from "@/lib/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -40,6 +40,7 @@ type ChatConfig = {
   conversationCount: number;
   deleted?: boolean;
   deletedAt?: string;
+  isTemplate?: boolean;
 };
 
 export default function Home() {
@@ -342,6 +343,12 @@ export default function Home() {
                         <Badge variant={config.type === 'chat' ? 'custom-green' : 'custom-purple'} className={config.type === 'chat' ? 'bg-green-100 text-green-800' : 'bg-purple-100 text-purple-800'}>
                           {config.type === 'chat' ? 'conversation' : 'upload'}
                         </Badge>
+                        {config.isTemplate && (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 flex items-center gap-1">
+                            <Flag className="h-3 w-3" />
+                            Public Template
+                          </Badge>
+                        )}
                       </div>
                       <CardDescription>
                         Created on: {new Date(config.createdAt).toLocaleDateString()}
