@@ -75,7 +75,9 @@ export default function Home() {
       if (!response.ok) {
         throw new Error('Failed to fetch GPT');
       }
-      return response.json();
+      const data = await response.json();
+      console.log('Fetched templates:', data.filter((c: ChatConfig) => c.isTemplate));
+      return data;
     }
   });
 
@@ -223,6 +225,7 @@ export default function Home() {
 
   const saveAsTemplate = useMutation({
     mutationFn: async (configToTemplate: ChatConfig) => {
+      console.log('Saving template with description:', configToTemplate.templateDescription);
       const response = await fetch(`/api/chat-configs/${configToTemplate.id}/template`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -234,7 +237,9 @@ export default function Home() {
         throw new Error(error.error || "Failed to save as template");
       }
 
-      return response.json();
+      const result = await response.json();
+      console.log('Template save response:', result);
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
