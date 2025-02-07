@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import TemplateGallery from "@/components/TemplateGallery";
+import { Input } from "@/components/ui/input";
 
 type ChatConfig = {
   id: number;
@@ -42,6 +43,7 @@ type ChatConfig = {
   deleted?: boolean;
   deletedAt?: string;
   isTemplate?: boolean;
+  description?: string; // Added description field
 };
 
 export default function Home() {
@@ -224,6 +226,12 @@ export default function Home() {
     mutationFn: async (configToTemplate: ChatConfig) => {
       const response = await fetch(`/api/chat-configs/${configToTemplate.id}/template`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          description: configToTemplate.description
+        })
       });
 
       if (!response.ok) {
@@ -582,9 +590,19 @@ export default function Home() {
             <AlertDialogTitle>Save as Public Template?</AlertDialogTitle>
             <AlertDialogDescription>
               This will make "{savingAsTemplate?.title}" available as a public template for other users.
-              Are you sure you want to continue?
+              Please provide a description that will help others understand the purpose and use of this template.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="py-4">
+            <Input
+              placeholder="Enter a description for your template..."
+              value={savingAsTemplate?.description || ''}
+              onChange={(e) => setSavingAsTemplate(prev =>
+                prev ? { ...prev, description: e.target.value } : null
+              )}
+              className="w-full"
+            />
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction

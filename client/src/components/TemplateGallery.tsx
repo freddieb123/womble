@@ -11,6 +11,7 @@ interface Template {
   id: number;
   title: string;
   type: 'chat' | 'upload';
+  description: string | null;
   systemPrompt: string;
   userInstructions: string | null;
   feedbackCriteria: string | null;
@@ -26,9 +27,9 @@ interface Props {
 export default function TemplateGallery({ templates, onSelectTemplate, onStartFromScratch }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredTemplates = templates.filter(template => 
+  const filteredTemplates = templates.filter(template =>
     template.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    template.systemPrompt.toLowerCase().includes(searchQuery.toLowerCase())
+    (template.description?.toLowerCase() || "").includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -77,7 +78,7 @@ export default function TemplateGallery({ templates, onSelectTemplate, onStartFr
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground line-clamp-2">
-                  {template.systemPrompt}
+                  {template.description || "No description provided"}
                 </p>
                 <div className="mt-4 flex justify-between items-center">
                   <Button variant="ghost" size="sm">
