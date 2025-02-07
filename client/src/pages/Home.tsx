@@ -29,9 +29,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import TemplateGallery from "@/components/TemplateGallery";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"; // Added import
-import { LogOut } from "lucide-react"; // Added import
-
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { LogOut } from "lucide-react";
 
 type ChatConfig = {
   id: number;
@@ -49,7 +48,7 @@ type ChatConfig = {
 };
 
 export default function Home() {
-  const { logoutMutation, user } = useAuth(); // Accessing user from useAuth
+  const { logoutMutation, user } = useAuth();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isTemplateGalleryOpen, setIsTemplateGalleryOpen] = useState(false);
   const [isPreviewingTemplate, setIsPreviewingTemplate] = useState(false);
@@ -347,13 +346,17 @@ export default function Home() {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-start mb-6">
           <div className="flex flex-col items-start gap-4">
-            <div> {/* Replaced logout button with dropdown */}
+            <div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative size-8 rounded-full">
                     <Avatar className="size-8">
                       <AvatarFallback>
-                        {user?.firstName ? user.firstName[0].toUpperCase() : '✓'}
+                        {user?.firstName
+                          ? user.firstName[0].toUpperCase()
+                          : user?.email
+                            ? user.email[0].toUpperCase()
+                            : '✓'}
                       </AvatarFallback>
                     </Avatar>
                   </Button>

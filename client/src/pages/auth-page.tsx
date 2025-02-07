@@ -11,7 +11,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { SiGoogle } from "react-icons/si";
 
 const authSchema = z.object({
-  username: z.string().min(1, "Username is required"),
+  email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
@@ -24,7 +24,7 @@ export default function AuthPage() {
   const form = useForm<AuthForm>({
     resolver: zodResolver(authSchema),
     defaultValues: {
-      username: "",
+      email: "",
       password: "",
     },
   });
@@ -58,12 +58,12 @@ export default function AuthPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="username"
+                name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Username</FormLabel>
+                    <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter your username" {...field} />
+                      <Input type="email" placeholder="Enter your email" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

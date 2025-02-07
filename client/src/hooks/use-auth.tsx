@@ -22,7 +22,7 @@ type AuthContextType = {
   signInWithGoogle: () => Promise<void>;
 };
 
-type LoginData = Pick<InsertUser, "username" | "password">;
+type LoginData = Pick<InsertUser, "email" | "password">;
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -153,7 +153,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const displayName = result.user.displayName || '';
       const [firstName = '', lastName = ''] = displayName.split(' ');
 
+      console.log("Extracted name information:", { firstName, lastName });
       console.log("Sending token and user info to backend...");
+
       const res = await fetch("/api/auth/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -181,7 +183,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         domain: window.location.hostname
       });
 
-      // Check if it's a domain-related error
       if ((error as any)?.code === 'auth/unauthorized-domain') {
         toast({
           title: "Domain Not Authorized",
