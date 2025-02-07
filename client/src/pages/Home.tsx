@@ -28,6 +28,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
+import TemplateGallery from "@/components/TemplateGallery";
 
 type ChatConfig = {
   id: number;
@@ -46,6 +47,7 @@ type ChatConfig = {
 export default function Home() {
   const { logoutMutation } = useAuth();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isTemplateGalleryOpen, setIsTemplateGalleryOpen] = useState(false);
   const [editingConfig, setEditingConfig] = useState<ChatConfig | null>(null);
   const [deletingConfig, setDeletingConfig] = useState<ChatConfig | null>(null);
   const [showDeleted, setShowDeleted] = useState(false);
@@ -277,6 +279,34 @@ export default function Home() {
     setIsCreateOpen(true);
   };
 
+  const handleTemplateSelect = (template: ChatConfig) => {
+    setConfig({
+      title: `${template.title} (Copy)`,
+      type: template.type,
+      systemPrompt: template.systemPrompt,
+      userInstructions: template.userInstructions || "",
+      feedbackCriteria: template.feedbackCriteria || "",
+      temperature: 0.7,
+      maxTokens: 1000
+    });
+    setIsTemplateGalleryOpen(false);
+    setIsCreateOpen(true);
+  };
+
+  const handleStartFromScratch = () => {
+    setConfig({
+      title: "",
+      type: "chat",
+      systemPrompt: "You are a helpful AI assistant.",
+      userInstructions: "",
+      feedbackCriteria: "",
+      temperature: 0.7,
+      maxTokens: 1000
+    });
+    setIsTemplateGalleryOpen(false);
+    setIsCreateOpen(true);
+  };
+
 
   if (isLoading) {
     return (
@@ -303,13 +333,23 @@ export default function Home() {
             </button>
             <h1 className="text-2xl font-bold text-blue-900">Create and manage your GPTs - Trainer view</h1>
           </div>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <Dialog open={isTemplateGalleryOpen} onOpenChange={setIsTemplateGalleryOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
                 New GPT
               </Button>
             </DialogTrigger>
+            <DialogContent className="max-w-4xl">
+              <TemplateGallery
+                templates={configs?.filter(c => c.isTemplate) || []}
+                onSelectTemplate={handleTemplateSelect}
+                onStartFromScratch={handleStartFromScratch}
+              />
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
               <DialogHeader>
                 <DialogTitle>Create New GPT</DialogTitle>
