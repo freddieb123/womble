@@ -20,7 +20,6 @@ const uploadFeedbackSchema = z.object({
 const chatConfigSchema = z.object({
   title: z.string().min(1, "Title is required"),
   type: z.enum(['chat', 'upload']).default('chat'),
-  description: z.string().nullable(),
   systemPrompt: z.string().min(1, "System prompt is required"),
   userInstructions: z.string().nullable(),
   feedbackCriteria: z.string().nullable(),
@@ -113,7 +112,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/chat-configs", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { title, type, systemPrompt, userInstructions, feedbackCriteria, description } = chatConfigSchema.parse(req.body);
+      const { title, type, systemPrompt, userInstructions, feedbackCriteria } = chatConfigSchema.parse(req.body);
 
       // Get the user ID from the authenticated request
       const userId = req.user?.id;
@@ -127,7 +126,6 @@ export function registerRoutes(app: Express): Server {
         systemPrompt,
         userInstructions,
         feedbackCriteria,
-        description,
         userId, // Add the user ID here
         deleted: false,
         createdAt: new Date()
@@ -148,7 +146,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Invalid config ID" });
       }
 
-      const { title, type, systemPrompt, userInstructions, feedbackCriteria, description } = chatConfigSchema.parse(req.body);
+      const { title, type, systemPrompt, userInstructions, feedbackCriteria } = chatConfigSchema.parse(req.body);
 
       const updatedConfig = await db.update(chatConfigs)
         .set({
@@ -157,7 +155,6 @@ export function registerRoutes(app: Express): Server {
           systemPrompt,
           userInstructions,
           feedbackCriteria,
-          description
         })
         .where(eq(chatConfigs.id, configId))
         .returning();
@@ -706,17 +703,14 @@ Rules:
   app.post("/api/chat-configs/:id/template", requireAuth, async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.id);
-      const { description } = req.body;
 
       if (isNaN(configId)) {
         return res.status(400).json({ error: "Invalid config ID" });
       }
 
+      // Update the config to mark it as a template
       const updatedConfig = await db.update(chatConfigs)
-        .set({ 
-          isTemplate: true,
-          description: description || null
-        })
+        .set({ isTemplate: true })
         .where(eq(chatConfigs.id, configId))
         .returning();
 

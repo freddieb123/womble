@@ -13,7 +13,6 @@ export const chatConfigs = pgTable("chat_configs", {
   userId: integer("user_id").notNull().references(() => users.id),
   type: text("type", { enum: ['chat', 'upload'] }).default('chat').notNull(),
   title: text("title").notNull(),
-  description: text("description"),
   systemPrompt: text("system_prompt").notNull(),
   userInstructions: text("user_instructions"),
   feedbackCriteria: text("feedback_criteria"),
