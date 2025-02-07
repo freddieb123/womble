@@ -110,8 +110,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
           </p>
         </div>
 
-        {(config.type === 'chat' || !config.type) && (
-          <div className="space-y-2">
+        <div className="space-y-2">
             <Label htmlFor="system-prompt">System Prompt</Label>
             <Textarea
               id="system-prompt"
@@ -128,7 +127,6 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               Customize how the AI assistant behaves by providing specific instructions.
             </p>
           </div>
-        )}
 
         <div className="space-y-2">
           <Label htmlFor="user-instructions">User Instructions</Label>
