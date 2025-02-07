@@ -62,7 +62,7 @@ export default function TemplateGallery({ templates, onSelectTemplate, onStartFr
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <CardTitle>{template.title}</CardTitle>
-                    <CardDescription>Click to use this template</CardDescription>
+                    
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <Badge variant={template.type === 'chat' ? 'custom-green' : 'custom-purple'}>
