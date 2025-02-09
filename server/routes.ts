@@ -3,11 +3,12 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "@db";
 import { chatConfigs, conversations, uploads, type Message, type ConversationFeedback, type UploadFeedback } from "@db/schema";
-import { eq, and, or, desc } from "drizzle-orm";
+import { eq, and, or, desc, asc } from "drizzle-orm";
 import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam } from 'openai/resources';
+import { quizQuestions, type QuizQuestion } from "@db/schema";
 
 const uploadFeedbackSchema = z.object({
   configId: z.number(),
@@ -76,6 +77,7 @@ export function registerRoutes(app: Express): Server {
         with: {
           conversations: true,
           uploads: true,
+          quizQuestions: true
         }
       });
 
@@ -89,6 +91,7 @@ export function registerRoutes(app: Express): Server {
         with: {
           conversations: true,
           uploads: true,
+          quizQuestions: true
         }
       });
 
@@ -99,7 +102,11 @@ export function registerRoutes(app: Express): Server {
         ...config,
         conversationCount: config.type === 'upload' ? config.uploads.length : config.conversations.length,
         conversations: undefined,
-        uploads: undefined
+        uploads: undefined,
+        quizQuestions: config.quizQuestions.map(q => ({
+          question: q.question,
+          recommendedAnswer: q.recommendedAnswer
+        }))
       }));
 
       res.json(configsWithCount);
@@ -130,13 +137,27 @@ export function registerRoutes(app: Express): Server {
             eq(chatConfigs.isTemplate, true)
           )
         ),
+        with: {
+          quizQuestions: {
+            orderBy: [asc(quizQuestions.order)]
+          }
+        }
       });
 
       if (!config) {
         return res.status(404).json({ error: "Configuration not found" });
       }
 
-      res.json(config);
+      // Transform the response to match the expected format
+      const responseConfig = {
+        ...config,
+        questions: config.quizQuestions?.map(q => ({
+          question: q.question,
+          recommendedAnswer: q.recommendedAnswer
+        }))
+      };
+
+      res.json(responseConfig);
     } catch (error: any) {
       console.error("Error fetching chat config:", error);
       res.status(500).json({ error: error.message });
@@ -153,19 +174,55 @@ export function registerRoutes(app: Express): Server {
         return res.status(401).json({ error: "User not authenticated" });
       }
 
-      const newConfig = await db.insert(chatConfigs).values({
-        title,
-        type,
-        systemPrompt,
-        userInstructions,
-        feedbackCriteria,
-        questions,
-        userId, // Add the user ID here
-        deleted: false,
-        createdAt: new Date()
-      }).returning();
+      // Begin a transaction
+      const newConfig = await db.transaction(async (tx) => {
+        // First create the chat config
+        const [config] = await tx.insert(chatConfigs).values({
+          title,
+          type,
+          systemPrompt,
+          userInstructions,
+          feedbackCriteria,
+          userId,
+          deleted: false,
+          createdAt: new Date()
+        }).returning();
 
-      res.json(newConfig[0]);
+        // If this is a quiz type and questions were provided, insert them
+        if (type === 'quiz' && questions?.length) {
+          await tx.insert(quizQuestions).values(
+            questions.map((q, index) => ({
+              configId: config.id,
+              question: q.question,
+              recommendedAnswer: q.recommendedAnswer,
+              order: index
+            }))
+          );
+        }
+
+        return config;
+      });
+
+      // Fetch the complete config with questions
+      const completeConfig = await db.query.chatConfigs.findFirst({
+        where: eq(chatConfigs.id, newConfig.id),
+        with: {
+          quizQuestions: {
+            orderBy: [asc(quizQuestions.order)]
+          }
+        }
+      });
+
+      // Transform the response to match the expected format
+      const responseConfig = {
+        ...completeConfig,
+        questions: completeConfig?.quizQuestions?.map(q => ({
+          question: q.question,
+          recommendedAnswer: q.recommendedAnswer
+        }))
+      };
+
+      res.json(responseConfig);
     } catch (error: any) {
       console.error("Error creating chat config:", error);
       res.status(400).json({ error: error.message });
@@ -199,26 +256,65 @@ export function registerRoutes(app: Express): Server {
 
       const { title, type, systemPrompt, userInstructions, feedbackCriteria, questions } = chatConfigSchema.parse(req.body);
 
-      const updatedConfig = await db.update(chatConfigs)
-        .set({
-          title,
-          type,
-          systemPrompt,
-          userInstructions,
-          feedbackCriteria,
-          questions
-        })
-        .where(and(
-          eq(chatConfigs.id, configId),
-          eq(chatConfigs.userId, userId)
-        ))
-        .returning();
+      // Begin a transaction
+      const updatedConfig = await db.transaction(async (tx) => {
+        // First update the chat config
+        const [config] = await tx.update(chatConfigs)
+          .set({
+            title,
+            type,
+            systemPrompt,
+            userInstructions,
+            feedbackCriteria,
+          })
+          .where(and(
+            eq(chatConfigs.id, configId),
+            eq(chatConfigs.userId, userId)
+          ))
+          .returning();
 
-      if (!updatedConfig.length) {
-        return res.status(404).json({ error: "Configuration not found" });
-      }
+        // If this is a quiz type, update the questions
+        if (type === 'quiz') {
+          // Delete existing questions
+          await tx.delete(quizQuestions)
+            .where(eq(quizQuestions.configId, configId));
 
-      res.json(updatedConfig[0]);
+          // Insert new questions if provided
+          if (questions?.length) {
+            await tx.insert(quizQuestions).values(
+              questions.map((q, index) => ({
+                configId,
+                question: q.question,
+                recommendedAnswer: q.recommendedAnswer,
+                order: index
+              }))
+            );
+          }
+        }
+
+        return config;
+      });
+
+      // Fetch the complete config with questions
+      const completeConfig = await db.query.chatConfigs.findFirst({
+        where: eq(chatConfigs.id, updatedConfig.id),
+        with: {
+          quizQuestions: {
+            orderBy: [asc(quizQuestions.order)]
+          }
+        }
+      });
+
+      // Transform the response to match the expected format
+      const responseConfig = {
+        ...completeConfig,
+        questions: completeConfig?.quizQuestions?.map(q => ({
+          question: q.question,
+          recommendedAnswer: q.recommendedAnswer
+        }))
+      };
+
+      res.json(responseConfig);
     } catch (error: any) {
       console.error("Error updating chat config:", error);
       res.status(400).json({ error: error.message });
