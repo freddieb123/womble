@@ -19,10 +19,14 @@ const uploadFeedbackSchema = z.object({
 
 const chatConfigSchema = z.object({
   title: z.string().min(1, "Title is required"),
-  type: z.enum(['chat', 'upload']).default('chat'),
+  type: z.enum(['chat', 'upload', 'quiz']).default('chat'),
   systemPrompt: z.string().min(1, "System prompt is required"),
   userInstructions: z.string().nullable(),
   feedbackCriteria: z.string().nullable(),
+  questions: z.array(z.object({
+    question: z.string(),
+    recommendedAnswer: z.string()
+  })).optional(),
 });
 
 const configSchema = z.object({
@@ -141,7 +145,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/chat-configs", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { title, type, systemPrompt, userInstructions, feedbackCriteria } = chatConfigSchema.parse(req.body);
+      const { title, type, systemPrompt, userInstructions, feedbackCriteria, questions } = chatConfigSchema.parse(req.body);
 
       // Get the user ID from the authenticated request
       const userId = req.user?.id;
@@ -155,6 +159,7 @@ export function registerRoutes(app: Express): Server {
         systemPrompt,
         userInstructions,
         feedbackCriteria,
+        questions,
         userId, // Add the user ID here
         deleted: false,
         createdAt: new Date()
@@ -192,7 +197,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ error: "You don't have permission to modify this configuration" });
       }
 
-      const { title, type, systemPrompt, userInstructions, feedbackCriteria } = chatConfigSchema.parse(req.body);
+      const { title, type, systemPrompt, userInstructions, feedbackCriteria, questions } = chatConfigSchema.parse(req.body);
 
       const updatedConfig = await db.update(chatConfigs)
         .set({
@@ -201,6 +206,7 @@ export function registerRoutes(app: Express): Server {
           systemPrompt,
           userInstructions,
           feedbackCriteria,
+          questions
         })
         .where(and(
           eq(chatConfigs.id, configId),
