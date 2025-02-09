@@ -47,6 +47,7 @@ export const quizResponses = pgTable("quiz_responses", {
   userAnswer: text("user_answer").notNull(),
   isCorrect: boolean("is_correct").notNull(),
   partiallyCorrect: boolean("partially_correct").default(false),
+  explanation: text("explanation"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

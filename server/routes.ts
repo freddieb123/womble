@@ -8,6 +8,9 @@ import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam } from 'openai/resources';
+import { compareQuizAnswer } from "./openai"; // Import the new function
+import { quizResponses } from "@db/schema"; //Import quizResponses schema
+
 
 const uploadFeedbackSchema = z.object({
   configId: z.number(),
@@ -820,6 +823,82 @@ Rules:
     }
   });
 
+
+  app.post("/api/quiz-responses/:configId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { sessionId, userName, answers } = req.body;
+      const configId = parseInt(req.params.configId);
+
+      if (!Array.isArray(answers)) {
+        return res.status(400).json({ error: "Answers must be an array" });
+      }
+
+      const config = await db.query.chatConfigs.findFirst({
+        where: eq(chatConfigs.id, configId),
+        with: {
+          quizQuestions: true
+        }
+      });
+
+      if (!config) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+
+      const responses = [];
+      let totalScore = 0;
+
+      for (const answer of answers) {
+        const question = config.quizQuestions?.find(q => q.id === answer.questionId);
+
+        if (!question) {
+          continue;
+        }
+
+        const comparison = await compareQuizAnswer(
+          question.correctAnswer,
+          answer.answer,
+          question.question
+        );
+
+        const response = await db
+          .insert(quizResponses)
+          .values({
+            configId,
+            questionId: answer.questionId,
+            sessionId,
+            userName,
+            userAnswer: answer.answer,
+            isCorrect: comparison.isCorrect,
+            partiallyCorrect: comparison.partiallyCorrect,
+            explanation: comparison.explanation
+          })
+          .returning();
+
+        responses.push({
+          questionId: answer.questionId,
+          isCorrect: comparison.isCorrect,
+          partiallyCorrect: comparison.partiallyCorrect,
+          explanation: comparison.explanation
+        });
+
+        if (comparison.isCorrect) {
+          totalScore += 1;
+        } else if (comparison.partiallyCorrect) {
+          totalScore += 0.5;
+        }
+      }
+
+      const overallScore = Math.round((totalScore / answers.length) * 100);
+
+      res.json({
+        responses,
+        overallScore
+      });
+    } catch (error: any) {
+      console.error("Error processing quiz responses:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

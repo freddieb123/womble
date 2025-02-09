@@ -18,9 +18,10 @@ export interface ChatState {
 }
 
 export interface QuizQuestion {
+  id: number;
   question: string;
   correctAnswer: string;
-  options: string[];
+  options?: string[];
   explanation?: string;
 }
 
