@@ -70,14 +70,15 @@ export function registerRoutes(app: Express): Server {
       const configs = await db.query.chatConfigs.findMany({
         where: and(
           showDeleted ? undefined : eq(chatConfigs.deleted, false),
-          // Only return configs that are owned by the current user
           eq(chatConfigs.userId, userId)
         ),
         orderBy: [desc(chatConfigs.createdAt)],
         with: {
           conversations: true,
           uploads: true,
-          quizQuestions: true
+          quizQuestions: {
+            orderBy: [asc(quizQuestions.order)]
+          }
         }
       });
 
@@ -91,7 +92,9 @@ export function registerRoutes(app: Express): Server {
         with: {
           conversations: true,
           uploads: true,
-          quizQuestions: true
+          quizQuestions: {
+            orderBy: [asc(quizQuestions.order)]
+          }
         }
       });
 
@@ -103,10 +106,13 @@ export function registerRoutes(app: Express): Server {
         conversationCount: config.type === 'upload' ? config.uploads.length : config.conversations.length,
         conversations: undefined,
         uploads: undefined,
-        quizQuestions: config.quizQuestions.map(q => ({
-          question: q.question,
-          recommendedAnswer: q.recommendedAnswer
-        }))
+        // Only include questions if it's a quiz type
+        questions: config.type === 'quiz' ? 
+          config.quizQuestions?.map(q => ({
+            question: q.question,
+            recommendedAnswer: q.recommendedAnswer
+          })) || [] 
+          : undefined
       }));
 
       res.json(configsWithCount);
