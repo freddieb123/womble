@@ -2,7 +2,6 @@ import { useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import ChatInterface from "@/components/ChatInterface";
 import UploadInterface from "@/components/UploadInterface";
-import QuizInterface from "@/components/QuizInterface";
 import { AdminConfig } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle } from "lucide-react";
@@ -101,13 +100,6 @@ export default function UserView() {
         <Card className="p-6">
           {config.type === 'upload' ? (
             <UploadInterface
-              config={config}
-              sessionId={sessionId}
-              userName={userName}
-              onUserNameSubmit={updateUrlWithUserName}
-            />
-          ) : config.type === 'quiz' ? (
-            <QuizInterface
               config={config}
               sessionId={sessionId}
               userName={userName}

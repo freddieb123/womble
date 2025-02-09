@@ -14,7 +14,7 @@ export const users = pgTable("users", {
 export const chatConfigs = pgTable("chat_configs", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
-  type: text("type", { enum: ['chat', 'upload', 'quiz'] }).default('chat').notNull(),
+  type: text("type", { enum: ['chat', 'upload'] }).default('chat').notNull(),
   title: text("title").notNull(),
   systemPrompt: text("system_prompt").notNull(),
   userInstructions: text("user_instructions"),
@@ -24,31 +24,6 @@ export const chatConfigs = pgTable("chat_configs", {
   deletedAt: timestamp("deleted_at"),
   isTemplate: boolean("is_template").default(false).notNull(),
   templateDescription: text("template_description"),
-});
-
-// Quiz questions table
-export const quizQuestions = pgTable("quiz_questions", {
-  id: serial("id").primaryKey(),
-  configId: integer("config_id").notNull().references(() => chatConfigs.id),
-  question: text("question").notNull(),
-  correctAnswer: text("correct_answer").notNull(),
-  options: jsonb("options").$type<string[]>().notNull(),
-  explanation: text("explanation"),
-  orderIndex: integer("order_index").notNull(),
-});
-
-// Quiz responses table
-export const quizResponses = pgTable("quiz_responses", {
-  id: serial("id").primaryKey(),
-  configId: integer("config_id").notNull().references(() => chatConfigs.id),
-  questionId: integer("question_id").notNull().references(() => quizQuestions.id),
-  sessionId: text("session_id").notNull(),
-  userName: text("user_name"),
-  userAnswer: text("user_answer").notNull(),
-  isCorrect: boolean("is_correct").notNull(),
-  partiallyCorrect: boolean("partially_correct").default(false),
-  explanation: text("explanation"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Conversations table - for chat messages
@@ -111,8 +86,6 @@ export const chatConfigsRelations = relations(chatConfigs, ({ one, many }) => ({
   }),
   conversations: many(conversations),
   uploads: many(uploads),
-  quizQuestions: many(quizQuestions),
-  quizResponses: many(quizResponses),
 }));
 
 export const conversationsRelations = relations(conversations, ({ one }) => ({
@@ -129,25 +102,6 @@ export const uploadsRelations = relations(uploads, ({ one }) => ({
   }),
 }));
 
-export const quizQuestionsRelations = relations(quizQuestions, ({ one, many }) => ({
-  config: one(chatConfigs, {
-    fields: [quizQuestions.configId],
-    references: [chatConfigs.id],
-  }),
-  responses: many(quizResponses),
-}));
-
-export const quizResponsesRelations = relations(quizResponses, ({ one }) => ({
-  config: one(chatConfigs, {
-    fields: [quizResponses.configId],
-    references: [chatConfigs.id],
-  }),
-  question: one(quizQuestions, {
-    fields: [quizResponses.questionId],
-    references: [quizQuestions.id],
-  }),
-}));
-
 // Schemas
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
@@ -157,10 +111,6 @@ export const insertConversationSchema = createInsertSchema(conversations);
 export const selectConversationSchema = createSelectSchema(conversations);
 export const insertUploadSchema = createInsertSchema(uploads);
 export const selectUploadSchema = createSelectSchema(uploads);
-export const insertQuizQuestionSchema = createInsertSchema(quizQuestions);
-export const selectQuizQuestionSchema = createSelectSchema(quizQuestions);
-export const insertQuizResponseSchema = createInsertSchema(quizResponses);
-export const selectQuizResponseSchema = createSelectSchema(quizResponses);
 
 // Types
 export type InsertUser = typeof users.$inferInsert;
@@ -171,7 +121,3 @@ export type InsertConversation = typeof conversations.$inferInsert;
 export type SelectConversation = typeof conversations.$inferSelect;
 export type InsertUpload = typeof uploads.$inferInsert;
 export type SelectUpload = typeof uploads.$inferSelect;
-export type InsertQuizQuestion = typeof quizQuestions.$inferInsert;
-export type SelectQuizQuestion = typeof quizQuestions.$inferSelect;
-export type InsertQuizResponse = typeof quizResponses.$inferInsert;
-export type SelectQuizResponse = typeof quizResponses.$inferSelect;
