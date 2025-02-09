@@ -3,12 +3,11 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "@db";
 import { chatConfigs, conversations, uploads, type Message, type ConversationFeedback, type UploadFeedback } from "@db/schema";
-import { eq, and, or, desc, asc } from "drizzle-orm";
+import { eq, and, or, desc } from "drizzle-orm";
 import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam } from 'openai/resources';
-import { quizQuestions, type QuizQuestion } from "@db/schema";
 
 const uploadFeedbackSchema = z.object({
   configId: z.number(),
@@ -20,14 +19,10 @@ const uploadFeedbackSchema = z.object({
 
 const chatConfigSchema = z.object({
   title: z.string().min(1, "Title is required"),
-  type: z.enum(['chat', 'upload', 'quiz']).default('chat'),
+  type: z.enum(['chat', 'upload']).default('chat'),
   systemPrompt: z.string().min(1, "System prompt is required"),
   userInstructions: z.string().nullable(),
   feedbackCriteria: z.string().nullable(),
-  questions: z.array(z.object({
-    question: z.string(),
-    recommendedAnswer: z.string()
-  })).optional(),
 });
 
 const configSchema = z.object({
@@ -70,15 +65,13 @@ export function registerRoutes(app: Express): Server {
       const configs = await db.query.chatConfigs.findMany({
         where: and(
           showDeleted ? undefined : eq(chatConfigs.deleted, false),
+          // Only return configs that are owned by the current user
           eq(chatConfigs.userId, userId)
         ),
         orderBy: [desc(chatConfigs.createdAt)],
         with: {
           conversations: true,
           uploads: true,
-          quizQuestions: {
-            orderBy: [asc(quizQuestions.order)]
-          }
         }
       });
 
@@ -92,9 +85,6 @@ export function registerRoutes(app: Express): Server {
         with: {
           conversations: true,
           uploads: true,
-          quizQuestions: {
-            orderBy: [asc(quizQuestions.order)]
-          }
         }
       });
 
@@ -105,14 +95,7 @@ export function registerRoutes(app: Express): Server {
         ...config,
         conversationCount: config.type === 'upload' ? config.uploads.length : config.conversations.length,
         conversations: undefined,
-        uploads: undefined,
-        // Only include questions if it's a quiz type
-        questions: config.type === 'quiz' ? 
-          config.quizQuestions?.map(q => ({
-            question: q.question,
-            recommendedAnswer: q.recommendedAnswer
-          })) || [] 
-          : undefined
+        uploads: undefined
       }));
 
       res.json(configsWithCount);
@@ -143,27 +126,13 @@ export function registerRoutes(app: Express): Server {
             eq(chatConfigs.isTemplate, true)
           )
         ),
-        with: {
-          quizQuestions: {
-            orderBy: [asc(quizQuestions.order)]
-          }
-        }
       });
 
       if (!config) {
         return res.status(404).json({ error: "Configuration not found" });
       }
 
-      // Transform the response to match the expected format
-      const responseConfig = {
-        ...config,
-        questions: config.quizQuestions?.map(q => ({
-          question: q.question,
-          recommendedAnswer: q.recommendedAnswer
-        }))
-      };
-
-      res.json(responseConfig);
+      res.json(config);
     } catch (error: any) {
       console.error("Error fetching chat config:", error);
       res.status(500).json({ error: error.message });
@@ -172,7 +141,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/chat-configs", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { title, type, systemPrompt, userInstructions, feedbackCriteria, questions } = chatConfigSchema.parse(req.body);
+      const { title, type, systemPrompt, userInstructions, feedbackCriteria } = chatConfigSchema.parse(req.body);
 
       // Get the user ID from the authenticated request
       const userId = req.user?.id;
@@ -180,55 +149,18 @@ export function registerRoutes(app: Express): Server {
         return res.status(401).json({ error: "User not authenticated" });
       }
 
-      // Begin a transaction
-      const newConfig = await db.transaction(async (tx) => {
-        // First create the chat config
-        const [config] = await tx.insert(chatConfigs).values({
-          title,
-          type,
-          systemPrompt,
-          userInstructions,
-          feedbackCriteria,
-          userId,
-          deleted: false,
-          createdAt: new Date()
-        }).returning();
+      const newConfig = await db.insert(chatConfigs).values({
+        title,
+        type,
+        systemPrompt,
+        userInstructions,
+        feedbackCriteria,
+        userId, // Add the user ID here
+        deleted: false,
+        createdAt: new Date()
+      }).returning();
 
-        // If this is a quiz type and questions were provided, insert them
-        if (type === 'quiz' && questions?.length) {
-          await tx.insert(quizQuestions).values(
-            questions.map((q, index) => ({
-              configId: config.id,
-              question: q.question,
-              recommendedAnswer: q.recommendedAnswer,
-              order: index
-            }))
-          );
-        }
-
-        return config;
-      });
-
-      // Fetch the complete config with questions
-      const completeConfig = await db.query.chatConfigs.findFirst({
-        where: eq(chatConfigs.id, newConfig.id),
-        with: {
-          quizQuestions: {
-            orderBy: [asc(quizQuestions.order)]
-          }
-        }
-      });
-
-      // Transform the response to match the expected format
-      const responseConfig = {
-        ...completeConfig,
-        questions: completeConfig?.quizQuestions?.map(q => ({
-          question: q.question,
-          recommendedAnswer: q.recommendedAnswer
-        }))
-      };
-
-      res.json(responseConfig);
+      res.json(newConfig[0]);
     } catch (error: any) {
       console.error("Error creating chat config:", error);
       res.status(400).json({ error: error.message });
@@ -260,67 +192,27 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ error: "You don't have permission to modify this configuration" });
       }
 
-      const { title, type, systemPrompt, userInstructions, feedbackCriteria, questions } = chatConfigSchema.parse(req.body);
+      const { title, type, systemPrompt, userInstructions, feedbackCriteria } = chatConfigSchema.parse(req.body);
 
-      // Begin a transaction
-      const updatedConfig = await db.transaction(async (tx) => {
-        // First update the chat config
-        const [config] = await tx.update(chatConfigs)
-          .set({
-            title,
-            type,
-            systemPrompt,
-            userInstructions,
-            feedbackCriteria,
-          })
-          .where(and(
-            eq(chatConfigs.id, configId),
-            eq(chatConfigs.userId, userId)
-          ))
-          .returning();
+      const updatedConfig = await db.update(chatConfigs)
+        .set({
+          title,
+          type,
+          systemPrompt,
+          userInstructions,
+          feedbackCriteria,
+        })
+        .where(and(
+          eq(chatConfigs.id, configId),
+          eq(chatConfigs.userId, userId)
+        ))
+        .returning();
 
-        // If this is a quiz type, update the questions
-        if (type === 'quiz') {
-          // Delete existing questions
-          await tx.delete(quizQuestions)
-            .where(eq(quizQuestions.configId, configId));
+      if (!updatedConfig.length) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
 
-          // Insert new questions if provided
-          if (questions?.length) {
-            await tx.insert(quizQuestions).values(
-              questions.map((q, index) => ({
-                configId,
-                question: q.question,
-                recommendedAnswer: q.recommendedAnswer,
-                order: index
-              }))
-            );
-          }
-        }
-
-        return config;
-      });
-
-      // Fetch the complete config with questions
-      const completeConfig = await db.query.chatConfigs.findFirst({
-        where: eq(chatConfigs.id, updatedConfig.id),
-        with: {
-          quizQuestions: {
-            orderBy: [asc(quizQuestions.order)]
-          }
-        }
-      });
-
-      // Transform the response to match the expected format
-      const responseConfig = {
-        ...completeConfig,
-        questions: completeConfig?.quizQuestions?.map(q => ({
-          question: q.question,
-          recommendedAnswer: q.recommendedAnswer
-        }))
-      };
-
-      res.json(responseConfig);
+      res.json(updatedConfig[0]);
     } catch (error: any) {
       console.error("Error updating chat config:", error);
       res.status(400).json({ error: error.message });

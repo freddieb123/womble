@@ -7,7 +7,6 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { AdminConfig } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import QuizQuestionsEditor from "./QuizQuestionsEditor";
 
 interface Props {
   config: AdminConfig;
@@ -89,11 +88,11 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
           <Select
             value={config.type || "chat"}
             onValueChange={(value) => {
-              const newType = value as 'chat' | 'upload' | 'quiz';
+              const newType = value as 'chat' | 'upload';
+              console.log('Type changed to:', newType);
               onConfigChange({
                 ...config,
-                type: newType,
-                questions: newType === 'quiz' ? [] : undefined
+                type: newType
               });
             }}
             disabled={isEditMode}
@@ -104,85 +103,67 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
             <SelectContent>
               <SelectItem value="chat">Chat</SelectItem>
               <SelectItem value="upload">Upload</SelectItem>
-              <SelectItem value="quiz">Quiz</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-sm text-muted-foreground">
-            Choose between a chat-based, upload-based, or quiz-based interface.
+            Choose between a chat-based or upload-based interface.
           </p>
         </div>
 
-        {config.type === 'quiz' ? (
-          <div className="space-y-2">
-            <Label>Quiz Questions</Label>
-            <QuizQuestionsEditor
-              questions={config.questions || []}
-              onChange={(questions) => onConfigChange({
+        <div className="space-y-2">
+            <Label htmlFor="system-prompt">System Prompt</Label>
+            <Textarea
+              id="system-prompt"
+              value={config.systemPrompt}
+              onChange={(e) => onConfigChange({
                 ...config,
-                questions
+                systemPrompt: e.target.value
               })}
+              placeholder="Enter system prompt..."
+              className="resize-none"
+              rows={6}
             />
             <p className="text-sm text-muted-foreground">
-              Add questions and their recommended answers for the quiz.
+              Customize how the AI assistant behaves by providing specific instructions.
             </p>
           </div>
-        ) : (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="system-prompt">System Prompt</Label>
-              <Textarea
-                id="system-prompt"
-                value={config.systemPrompt}
-                onChange={(e) => onConfigChange({
-                  ...config,
-                  systemPrompt: e.target.value
-                })}
-                placeholder="Enter system prompt..."
-                className="resize-none"
-                rows={6}
-              />
-              <p className="text-sm text-muted-foreground">
-                Customize how the AI assistant behaves by providing specific instructions.
-              </p>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="user-instructions">User Instructions</Label>
-              <Textarea
-                id="user-instructions"
-                value={config.userInstructions}
-                onChange={(e) => onConfigChange({
-                  ...config,
-                  userInstructions: e.target.value
-                })}
-                placeholder="Enter instructions for users..."
-                className="resize-none"
-                rows={4}
-              />
-              <p className="text-sm text-muted-foreground">
-                Add helpful instructions or context that will be shown to users of this {config.type || 'chat'}.
-              </p>
-            </div>
+        <div className="space-y-2">
+          <Label htmlFor="user-instructions">User Instructions</Label>
+          <Textarea
+            id="user-instructions"
+            value={config.userInstructions}
+            onChange={(e) => onConfigChange({
+              ...config,
+              userInstructions: e.target.value
+            })}
+            placeholder="Enter instructions for users..."
+            className="resize-none"
+            rows={4}
+          />
+          <p className="text-sm text-muted-foreground">
+            Add helpful instructions or context that will be shown to users of this {config.type || 'chat'}.
+          </p>
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="feedback-criteria">Feedback Criteria</Label>
-              <Textarea
-                id="feedback-criteria"
-                value={config.feedbackCriteria}
-                onChange={(e) => onConfigChange({
-                  ...config,
-                  feedbackCriteria: e.target.value
-                })}
-                placeholder="Enter criteria for providing feedback to users..."
-                className="resize-none"
-                rows={4}
-              />
-              <p className="text-sm text-muted-foreground">
-                Specify criteria that will be used to assess and provide feedback on {config.type === 'upload' ? 'uploads' : 'user interactions'}.
-              </p>
-            </div>
-          </>
-        )}
+        <div className="space-y-2">
+          <Label htmlFor="feedback-criteria">Feedback Criteria</Label>
+          <Textarea
+            id="feedback-criteria"
+            value={config.feedbackCriteria}
+            onChange={(e) => onConfigChange({
+              ...config,
+              feedbackCriteria: e.target.value
+            })}
+            placeholder="Enter criteria for providing feedback to users..."
+            className="resize-none"
+            rows={4}
+          />
+          <p className="text-sm text-muted-foreground">
+            Specify criteria that will be used to assess and provide feedback on {config.type === 'upload' ? 'uploads' : 'user interactions'}.
+          </p>
+          
+        </div>
       </div>
     </div>
   );

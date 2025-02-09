@@ -17,22 +17,16 @@ export interface ChatState {
   error: string | null;
 }
 
-export interface QuizQuestion {
-  question: string;
-  recommendedAnswer: string;
-}
-
 export interface AdminConfig {
   id?: number;
   title: string;
-  type: 'chat' | 'upload' | 'quiz';
+  type: 'chat' | 'upload';
   systemPrompt: string;
   userInstructions: string;
   feedbackCriteria: string;
   temperature: number;
   maxTokens: number;
   templateDescription?: string;
-  questions?: QuizQuestion[];
 }
 
 export interface Feedback {
@@ -47,18 +41,4 @@ export interface UploadState {
   isLoading: boolean;
   error: string | null;
   feedback: Feedback | null;
-}
-
-export interface Template {
-  id?: number;
-  title: string;
-  type: 'chat' | 'upload' | 'quiz';
-  systemPrompt: string;
-  userInstructions: string;
-  feedbackCriteria: string;
-  temperature: number;
-  maxTokens: number;
-  templateDescription?: string;
-  questions?: QuizQuestion[];
-  usageCount?: number;
 }
