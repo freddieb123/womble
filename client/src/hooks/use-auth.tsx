@@ -161,9 +161,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const user = await res.json();
       console.log("Backend authentication successful");
       queryClient.setQueryData(["/api/user"], user);
-      toast({
-        description: "Signed in with Google successfully",
-      });
       setLocation("/");
     } catch (error) {
       console.error("Google sign-in error:", {
