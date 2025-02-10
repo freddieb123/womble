@@ -67,17 +67,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/user"], user);
-      toast({
-        description: "Logged in successfully",
-      });
+      // Toast removed for successful login
       setLocation("/");
     },
     onError: (error: Error) => {
-      toast({
-        title: "Login failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      // Toast removed for login/logout errors
+      console.error(error);
     },
   });
 
@@ -95,16 +90,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
       setLocation("/auth");
-      toast({
-        description: "Logged out successfully",
-      });
+      // Toast removed for successful logout
     },
     onError: (error: Error) => {
-      toast({
-        title: "Logout failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      // Toast removed for login/logout errors
+      console.error(error);
     },
   });
 
