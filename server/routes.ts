@@ -17,17 +17,19 @@ const uploadFeedbackSchema = z.object({
   userName: z.string().nullable(),
 });
 
-// Update the chatConfigSchema to properly handle quiz questions
+// Update the quiz question schema for better validation
+const quizQuestionSchema = z.object({
+  question: z.string().min(1, "Question is required"),
+  expectedAnswer: z.string().min(1, "Expected answer is required")
+});
+
 const chatConfigSchema = z.object({
   title: z.string().min(1, "Title is required"),
   type: z.enum(['chat', 'upload', 'quiz']).default('chat'),
   systemPrompt: z.string().min(1, "System prompt is required"),
   userInstructions: z.string().nullable(),
   feedbackCriteria: z.string().nullable(),
-  questions: z.array(z.object({
-    question: z.string(),
-    expectedAnswer: z.string()
-  })).optional(),
+  questions: z.array(quizQuestionSchema).optional()
 });
 
 const configSchema = z.object({
@@ -154,6 +156,11 @@ export function registerRoutes(app: Express): Server {
         return res.status(401).json({ error: "User not authenticated" });
       }
 
+      // Validate quiz type has questions
+      if (type === 'quiz' && (!questions || questions.length === 0)) {
+        return res.status(400).json({ error: "Quiz type requires at least one question" });
+      }
+
       const newConfig = await db.insert(chatConfigs).values({
         title,
         type,
@@ -166,12 +173,11 @@ export function registerRoutes(app: Express): Server {
       }).returning();
 
       // If this is a quiz type and questions were provided, save them
-      // In the POST route for creating chat configs, update the quiz question insertion
       if (type === 'quiz' && questions && questions.length > 0) {
-        const questionsToInsert = questions.map((question, index) => ({
+        const questionsToInsert = questions.map((q, index) => ({
           configId: newConfig[0].id,
-          question: question.question,
-          expectedAnswer: question.expectedAnswer,
+          question: q.question,
+          expectedAnswer: q.expectedAnswer,
           orderIndex: index,
           createdAt: new Date(),
           deleted: false
