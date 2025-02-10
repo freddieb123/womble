@@ -14,11 +14,12 @@ export const users = pgTable("users", {
 export const chatConfigs = pgTable("chat_configs", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
-  type: text("type", { enum: ['chat', 'upload'] }).default('chat').notNull(),
+  type: text("type", { enum: ['chat', 'upload', 'quiz'] }).default('chat').notNull(),
   title: text("title").notNull(),
   systemPrompt: text("system_prompt").notNull(),
   userInstructions: text("user_instructions"),
   feedbackCriteria: text("feedback_criteria"),
+  quizQuestions: jsonb("quiz_questions").$type<QuizQuestion[]>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   deleted: boolean("deleted").default(false).notNull(),
   deletedAt: timestamp("deleted_at"),
@@ -26,7 +27,18 @@ export const chatConfigs = pgTable("chat_configs", {
   templateDescription: text("template_description"),
 });
 
-// Conversations table - for chat messages
+export const quizResponses = pgTable("quiz_responses", {
+  id: serial("id").primaryKey(),
+  configId: integer("config_id").notNull().references(() => chatConfigs.id),
+  userId: integer("user_id").references(() => users.id),
+  userName: text("user_name"),
+  answers: jsonb("answers").$type<QuizAnswer[]>().notNull(),
+  score: integer("score").notNull(),
+  feedback: jsonb("feedback").$type<QuizFeedback>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Rest of the existing tables...
 export const conversations = pgTable("conversations", {
   configId: integer("config_id").notNull().references(() => chatConfigs.id),
   sessionId: text("session_id").notNull(),
@@ -38,7 +50,6 @@ export const conversations = pgTable("conversations", {
   pk: primaryKey({ columns: [table.configId, table.sessionId] })
 }));
 
-// Separate uploads table for file uploads
 export const uploads = pgTable("uploads", {
   configId: integer("config_id").notNull().references(() => chatConfigs.id),
   sessionId: text("session_id").notNull(),
@@ -50,7 +61,32 @@ export const uploads = pgTable("uploads", {
   pk: primaryKey({ columns: [table.configId, table.sessionId] })
 }));
 
-// Types for JSON columns
+// New Types for Quiz functionality
+export interface QuizQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctAnswer: string;
+  explanation?: string;
+}
+
+export interface QuizAnswer {
+  questionId: string;
+  selectedAnswer: string;
+  isCorrect: boolean;
+  grade: 'correct' | 'wrong' | 'almost';
+}
+
+export interface QuizFeedback {
+  score: number;
+  totalQuestions: number;
+  correctAnswers: number;
+  almostCorrect: number;
+  wrongAnswers: number;
+  feedback: string;
+}
+
+// Existing types...
 export interface Message {
   role: 'user' | 'assistant';
   content: string | {
@@ -77,6 +113,7 @@ export interface UploadFeedback {
 // Relations
 export const userRelations = relations(users, ({ many }) => ({
   chatConfigs: many(chatConfigs),
+  quizResponses: many(quizResponses),
 }));
 
 export const chatConfigsRelations = relations(chatConfigs, ({ one, many }) => ({
@@ -86,8 +123,10 @@ export const chatConfigsRelations = relations(chatConfigs, ({ one, many }) => ({
   }),
   conversations: many(conversations),
   uploads: many(uploads),
+  quizResponses: many(quizResponses),
 }));
 
+// Existing relations...
 export const conversationsRelations = relations(conversations, ({ one }) => ({
   config: one(chatConfigs, {
     fields: [conversations.configId],
@@ -102,6 +141,17 @@ export const uploadsRelations = relations(uploads, ({ one }) => ({
   }),
 }));
 
+export const quizResponsesRelations = relations(quizResponses, ({ one }) => ({
+  config: one(chatConfigs, {
+    fields: [quizResponses.configId],
+    references: [chatConfigs.id],
+  }),
+  user: one(users, {
+    fields: [quizResponses.userId],
+    references: [users.id],
+  }),
+}));
+
 // Schemas
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
@@ -111,6 +161,8 @@ export const insertConversationSchema = createInsertSchema(conversations);
 export const selectConversationSchema = createSelectSchema(conversations);
 export const insertUploadSchema = createInsertSchema(uploads);
 export const selectUploadSchema = createSelectSchema(uploads);
+export const insertQuizResponseSchema = createInsertSchema(quizResponses);
+export const selectQuizResponseSchema = createSelectSchema(quizResponses);
 
 // Types
 export type InsertUser = typeof users.$inferInsert;
@@ -121,3 +173,5 @@ export type InsertConversation = typeof conversations.$inferInsert;
 export type SelectConversation = typeof conversations.$inferSelect;
 export type InsertUpload = typeof uploads.$inferInsert;
 export type SelectUpload = typeof uploads.$inferSelect;
+export type InsertQuizResponse = typeof quizResponses.$inferInsert;
+export type SelectQuizResponse = typeof quizResponses.$inferSelect;
