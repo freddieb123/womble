@@ -35,7 +35,7 @@ import { LogOut } from "lucide-react";
 type ChatConfig = {
   id: number;
   title: string;
-  type: 'chat' | 'upload';
+  type: 'chat' | 'upload' | 'quiz';
   systemPrompt: string;
   userInstructions: string | null;
   feedbackCriteria: string | null;
@@ -45,6 +45,10 @@ type ChatConfig = {
   deletedAt?: string;
   isTemplate?: boolean;
   templateDescription?: string;
+  questions?: Array<{
+    questionText: string;
+    idealAnswer: string;
+  }>;
 };
 
 export default function Home() {
@@ -63,7 +67,8 @@ export default function Home() {
     userInstructions: "",
     feedbackCriteria: "",
     temperature: 0.7,
-    maxTokens: 1000
+    maxTokens: 1000,
+    questions: []
   });
   const [savingAsTemplate, setSavingAsTemplate] = useState<ChatConfig | null>(null);
 
@@ -91,9 +96,10 @@ export default function Home() {
         body: JSON.stringify({
           title: config.title,
           type: config.type,
-          systemPrompt: config.systemPrompt,
-          userInstructions: config.userInstructions || "",
-          feedbackCriteria: config.feedbackCriteria || "",
+          systemPrompt: config.type === 'quiz' ? "Quiz Configuration" : config.systemPrompt,
+          userInstructions: config.type === 'quiz' ? "" : config.userInstructions || "",
+          feedbackCriteria: config.type === 'quiz' ? "" : config.feedbackCriteria || "",
+          questions: config.type === 'quiz' ? config.questions : undefined,
         }),
       });
 
@@ -116,7 +122,8 @@ export default function Home() {
         userInstructions: "",
         feedbackCriteria: "",
         temperature: 0.7,
-        maxTokens: 1000
+        maxTokens: 1000,
+        questions: []
       });
       toast({
         description: "GPT saved successfully!",

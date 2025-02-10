@@ -14,7 +14,7 @@ export const users = pgTable("users", {
 export const chatConfigs = pgTable("chat_configs", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
-  type: text("type", { enum: ['chat', 'upload'] }).default('chat').notNull(),
+  type: text("type", { enum: ['chat', 'upload', 'quiz'] }).default('chat').notNull(),
   title: text("title").notNull(),
   systemPrompt: text("system_prompt").notNull(),
   userInstructions: text("user_instructions"),
@@ -26,7 +26,17 @@ export const chatConfigs = pgTable("chat_configs", {
   templateDescription: text("template_description"),
 });
 
-// Conversations table - for chat messages
+export const quizQuestions = pgTable("quiz_questions", {
+  id: serial("id").primaryKey(),
+  configId: integer("config_id").notNull().references(() => chatConfigs.id),
+  questionText: text("question_text").notNull(),
+  idealAnswer: text("ideal_answer").notNull(),
+  orderIndex: integer("order_index").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  deleted: boolean("deleted").default(false).notNull(),
+  deletedAt: timestamp("deleted_at"),
+});
+
 export const conversations = pgTable("conversations", {
   configId: integer("config_id").notNull().references(() => chatConfigs.id),
   sessionId: text("session_id").notNull(),
@@ -38,7 +48,6 @@ export const conversations = pgTable("conversations", {
   pk: primaryKey({ columns: [table.configId, table.sessionId] })
 }));
 
-// Separate uploads table for file uploads
 export const uploads = pgTable("uploads", {
   configId: integer("config_id").notNull().references(() => chatConfigs.id),
   sessionId: text("session_id").notNull(),
@@ -50,7 +59,6 @@ export const uploads = pgTable("uploads", {
   pk: primaryKey({ columns: [table.configId, table.sessionId] })
 }));
 
-// Types for JSON columns
 export interface Message {
   role: 'user' | 'assistant';
   content: string | {
@@ -74,7 +82,6 @@ export interface UploadFeedback {
   summary: string | null;
 }
 
-// Relations
 export const userRelations = relations(users, ({ many }) => ({
   chatConfigs: many(chatConfigs),
 }));
@@ -86,6 +93,14 @@ export const chatConfigsRelations = relations(chatConfigs, ({ one, many }) => ({
   }),
   conversations: many(conversations),
   uploads: many(uploads),
+  quizQuestions: many(quizQuestions),
+}));
+
+export const quizQuestionsRelations = relations(quizQuestions, ({ one }) => ({
+  config: one(chatConfigs, {
+    fields: [quizQuestions.configId],
+    references: [chatConfigs.id],
+  }),
 }));
 
 export const conversationsRelations = relations(conversations, ({ one }) => ({
@@ -102,21 +117,23 @@ export const uploadsRelations = relations(uploads, ({ one }) => ({
   }),
 }));
 
-// Schemas
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
 export const insertChatConfigSchema = createInsertSchema(chatConfigs);
 export const selectChatConfigSchema = createSelectSchema(chatConfigs);
+export const insertQuizQuestionSchema = createInsertSchema(quizQuestions);
+export const selectQuizQuestionSchema = createSelectSchema(quizQuestions);
 export const insertConversationSchema = createInsertSchema(conversations);
 export const selectConversationSchema = createSelectSchema(conversations);
 export const insertUploadSchema = createInsertSchema(uploads);
 export const selectUploadSchema = createSelectSchema(uploads);
 
-// Types
 export type InsertUser = typeof users.$inferInsert;
 export type SelectUser = typeof users.$inferSelect;
 export type InsertChatConfig = typeof chatConfigs.$inferInsert;
 export type SelectChatConfig = typeof chatConfigs.$inferSelect;
+export type InsertQuizQuestion = typeof quizQuestions.$inferInsert;
+export type SelectQuizQuestion = typeof quizQuestions.$inferSelect;
 export type InsertConversation = typeof conversations.$inferInsert;
 export type SelectConversation = typeof conversations.$inferSelect;
 export type InsertUpload = typeof uploads.$inferInsert;

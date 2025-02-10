@@ -2,7 +2,7 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Wand2 } from "lucide-react";
+import { Wand2, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { AdminConfig } from "@/lib/types";
@@ -14,10 +14,38 @@ interface Props {
   isEditMode?: boolean;
 }
 
+interface QuizQuestion {
+  questionText: string;
+  idealAnswer: string;
+}
+
 export default function AdminPanel({ config, onConfigChange, isEditMode = false }: Props) {
-  const [isImproving, setIsImproving] = useState(false);
-  const [hasImproved, setHasImproved] = useState(false);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([{ questionText: "", idealAnswer: "" }]);
   const { toast } = useToast();
+
+  const addQuestion = () => {
+    setQuestions([...questions, { questionText: "", idealAnswer: "" }]);
+  };
+
+  const removeQuestion = (index: number) => {
+    if (questions.length > 1) {
+      const newQuestions = [...questions];
+      newQuestions.splice(index, 1);
+      setQuestions(newQuestions);
+    }
+  };
+
+  const updateQuestion = (index: number, field: keyof QuizQuestion, value: string) => {
+    const newQuestions = [...questions];
+    newQuestions[index] = { ...newQuestions[index], [field]: value };
+    setQuestions(newQuestions);
+
+    // Update the main config to include questions
+    onConfigChange({
+      ...config,
+      questions: newQuestions
+    });
+  };
 
   const improveCriteria = async () => {
     if (!config.feedbackCriteria) {
@@ -61,6 +89,8 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
       setIsImproving(false);
     }
   };
+  const [isImproving, setIsImproving] = useState(false);
+  const [hasImproved, setHasImproved] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -88,7 +118,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
           <Select
             value={config.type || "chat"}
             onValueChange={(value) => {
-              const newType = value as 'chat' | 'upload';
+              const newType = value as 'chat' | 'upload' | 'quiz';
               console.log('Type changed to:', newType);
               onConfigChange({
                 ...config,
@@ -103,67 +133,125 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
             <SelectContent>
               <SelectItem value="chat">Chat</SelectItem>
               <SelectItem value="upload">Upload</SelectItem>
+              <SelectItem value="quiz">Quiz</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-sm text-muted-foreground">
-            Choose between a chat-based or upload-based interface.
+            Choose between a chat-based, upload-based, or quiz-based interface.
           </p>
         </div>
 
-        <div className="space-y-2">
-            <Label htmlFor="system-prompt">System Prompt</Label>
-            <Textarea
-              id="system-prompt"
-              value={config.systemPrompt}
-              onChange={(e) => onConfigChange({
-                ...config,
-                systemPrompt: e.target.value
-              })}
-              placeholder="Enter system prompt..."
-              className="resize-none"
-              rows={6}
-            />
-            <p className="text-sm text-muted-foreground">
-              Customize how the AI assistant behaves by providing specific instructions.
-            </p>
+        {config.type !== 'quiz' ? (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="system-prompt">System Prompt</Label>
+              <Textarea
+                id="system-prompt"
+                value={config.systemPrompt}
+                onChange={(e) => onConfigChange({
+                  ...config,
+                  systemPrompt: e.target.value
+                })}
+                placeholder="Enter system prompt..."
+                className="resize-none"
+                rows={6}
+              />
+              <p className="text-sm text-muted-foreground">
+                Customize how the AI assistant behaves by providing specific instructions.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="user-instructions">User Instructions</Label>
+              <Textarea
+                id="user-instructions"
+                value={config.userInstructions}
+                onChange={(e) => onConfigChange({
+                  ...config,
+                  userInstructions: e.target.value
+                })}
+                placeholder="Enter instructions for users..."
+                className="resize-none"
+                rows={4}
+              />
+              <p className="text-sm text-muted-foreground">
+                Add helpful instructions or context that will be shown to users of this {config.type || 'chat'}.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="feedback-criteria">Feedback Criteria</Label>
+              <Textarea
+                id="feedback-criteria"
+                value={config.feedbackCriteria}
+                onChange={(e) => onConfigChange({
+                  ...config,
+                  feedbackCriteria: e.target.value
+                })}
+                placeholder="Enter criteria for providing feedback to users..."
+                className="resize-none"
+                rows={4}
+              />
+              <p className="text-sm text-muted-foreground">
+                Specify criteria that will be used to assess and provide feedback on {config.type === 'upload' ? 'uploads' : 'user interactions'}.
+              </p>
+            </div>
+          </>
+        ) : (
+          <div className="space-y-4">
+            <div className="border rounded-lg p-4">
+              <h3 className="text-lg font-semibold mb-4">Quiz Questions</h3>
+              {questions.map((question, index) => (
+                <div key={index} className="space-y-4 mb-6 pb-6 border-b last:border-b-0">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-medium">Question {index + 1}</h4>
+                    {questions.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeQuestion(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`question-${index}`}>Question Text</Label>
+                    <Textarea
+                      id={`question-${index}`}
+                      value={question.questionText}
+                      onChange={(e) => updateQuestion(index, 'questionText', e.target.value)}
+                      placeholder="Enter your question..."
+                      rows={2}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`answer-${index}`}>Ideal Answer</Label>
+                    <Textarea
+                      id={`answer-${index}`}
+                      value={question.idealAnswer}
+                      onChange={(e) => updateQuestion(index, 'idealAnswer', e.target.value)}
+                      placeholder="Enter the ideal answer..."
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full mt-4"
+                onClick={addQuestion}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Question
+              </Button>
+            </div>
           </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="user-instructions">User Instructions</Label>
-          <Textarea
-            id="user-instructions"
-            value={config.userInstructions}
-            onChange={(e) => onConfigChange({
-              ...config,
-              userInstructions: e.target.value
-            })}
-            placeholder="Enter instructions for users..."
-            className="resize-none"
-            rows={4}
-          />
-          <p className="text-sm text-muted-foreground">
-            Add helpful instructions or context that will be shown to users of this {config.type || 'chat'}.
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="feedback-criteria">Feedback Criteria</Label>
-          <Textarea
-            id="feedback-criteria"
-            value={config.feedbackCriteria}
-            onChange={(e) => onConfigChange({
-              ...config,
-              feedbackCriteria: e.target.value
-            })}
-            placeholder="Enter criteria for providing feedback to users..."
-            className="resize-none"
-            rows={4}
-          />
-          <p className="text-sm text-muted-foreground">
-            Specify criteria that will be used to assess and provide feedback on {config.type === 'upload' ? 'uploads' : 'user interactions'}.
-          </p>
-          
-        </div>
+        )}
       </div>
     </div>
   );
