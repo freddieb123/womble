@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { chatConfigs, conversations, uploads, type Message, type ConversationFeedback, type UploadFeedback } from "@db/schema";
+import { chatConfigs, conversations, uploads, quizQuestions, type Message, type ConversationFeedback, type UploadFeedback } from "@db/schema";
 import { eq, and, or, desc } from "drizzle-orm";
 import { z } from "zod";
 import crypto from 'crypto';
