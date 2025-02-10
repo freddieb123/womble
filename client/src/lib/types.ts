@@ -18,8 +18,8 @@ export interface ChatState {
 }
 
 export interface QuizQuestion {
-  questionText: string;
-  idealAnswer: string;
+  question: string;
+  expectedAnswer: string;
 }
 
 export interface AdminConfig {
