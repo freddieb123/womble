@@ -15,16 +15,16 @@ interface Props {
 }
 
 interface QuizQuestion {
-  questionText: string;
-  idealAnswer: string;
+  question: string;
+  expectedAnswer: string;
 }
 
 export default function AdminPanel({ config, onConfigChange, isEditMode = false }: Props) {
-  const [questions, setQuestions] = useState<QuizQuestion[]>([{ questionText: "", idealAnswer: "" }]);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([{ question: "", expectedAnswer: "" }]);
   const { toast } = useToast();
 
   const addQuestion = () => {
-    setQuestions([...questions, { questionText: "", idealAnswer: "" }]);
+    setQuestions([...questions, { question: "", expectedAnswer: "" }]);
   };
 
   const removeQuestion = (index: number) => {
@@ -40,7 +40,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
     newQuestions[index] = { ...newQuestions[index], [field]: value };
     setQuestions(newQuestions);
 
-    // Update the main config to include questions
+    // Update the main config with the new questions
     onConfigChange({
       ...config,
       questions: newQuestions
@@ -122,8 +122,12 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               console.log('Type changed to:', newType);
               onConfigChange({
                 ...config,
-                type: newType
+                type: newType,
+                questions: newType === 'quiz' ? [{ question: "", expectedAnswer: "" }] : undefined
               });
+              if (newType === 'quiz') {
+                setQuestions([{ question: "", expectedAnswer: "" }]);
+              }
             }}
             disabled={isEditMode}
           >
@@ -201,7 +205,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
           <div className="space-y-4">
             <div className="border rounded-lg p-4">
               <h3 className="text-lg font-semibold mb-4">Quiz Questions</h3>
-              {questions.map((question, index) => (
+              {questions.map((q, index) => (
                 <div key={index} className="space-y-4 mb-6 pb-6 border-b last:border-b-0">
                   <div className="flex justify-between items-center">
                     <h4 className="font-medium">Question {index + 1}</h4>
@@ -220,20 +224,20 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                     <Label htmlFor={`question-${index}`}>Question Text</Label>
                     <Textarea
                       id={`question-${index}`}
-                      value={question.questionText}
-                      onChange={(e) => updateQuestion(index, 'questionText', e.target.value)}
+                      value={q.question}
+                      onChange={(e) => updateQuestion(index, 'question', e.target.value)}
                       placeholder="Enter your question..."
                       rows={2}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor={`answer-${index}`}>Ideal Answer</Label>
+                    <Label htmlFor={`answer-${index}`}>Expected Answer</Label>
                     <Textarea
                       id={`answer-${index}`}
-                      value={question.idealAnswer}
-                      onChange={(e) => updateQuestion(index, 'idealAnswer', e.target.value)}
-                      placeholder="Enter the ideal answer..."
+                      value={q.expectedAnswer}
+                      onChange={(e) => updateQuestion(index, 'expectedAnswer', e.target.value)}
+                      placeholder="Enter the expected answer..."
                       rows={3}
                     />
                   </div>
