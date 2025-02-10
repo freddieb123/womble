@@ -29,8 +29,8 @@ export const chatConfigs = pgTable("chat_configs", {
 export const quizQuestions = pgTable("quiz_questions", {
   id: serial("id").primaryKey(),
   configId: integer("config_id").notNull().references(() => chatConfigs.id),
-  questionText: text("question_text").notNull(),
-  idealAnswer: text("ideal_answer").notNull(),
+  question: text("question").notNull(),
+  expectedAnswer: text("expected_answer").notNull(),
   orderIndex: integer("order_index").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   deleted: boolean("deleted").default(false).notNull(),

@@ -17,6 +17,7 @@ const uploadFeedbackSchema = z.object({
   userName: z.string().nullable(),
 });
 
+// Update the chatConfigSchema to properly handle quiz questions
 const chatConfigSchema = z.object({
   title: z.string().min(1, "Title is required"),
   type: z.enum(['chat', 'upload', 'quiz']).default('chat'),
@@ -24,8 +25,8 @@ const chatConfigSchema = z.object({
   userInstructions: z.string().nullable(),
   feedbackCriteria: z.string().nullable(),
   questions: z.array(z.object({
-    questionText: z.string(),
-    idealAnswer: z.string()
+    question: z.string(),
+    expectedAnswer: z.string()
   })).optional(),
 });
 
@@ -165,11 +166,12 @@ export function registerRoutes(app: Express): Server {
       }).returning();
 
       // If this is a quiz type and questions were provided, save them
+      // In the POST route for creating chat configs, update the quiz question insertion
       if (type === 'quiz' && questions && questions.length > 0) {
         const questionsToInsert = questions.map((question, index) => ({
           configId: newConfig[0].id,
-          questionText: question.questionText,
-          idealAnswer: question.idealAnswer,
+          question: question.question,
+          expectedAnswer: question.expectedAnswer,
           orderIndex: index,
           createdAt: new Date(),
           deleted: false
