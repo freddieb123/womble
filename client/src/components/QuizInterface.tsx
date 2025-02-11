@@ -49,6 +49,18 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
 
     setIsSubmitting(true);
     try {
+      console.log("Submitting quiz with data:", {
+        configId: config.id,
+        sessionId,
+        userName,
+        questions,
+        answers: Object.entries(answers).map(([index, answer]) => ({
+          questionIndex: parseInt(index),
+          answer,
+          expectedAnswer: questions[parseInt(index)].expectedAnswer
+        }))
+      });
+
       const response = await fetch("/api/quiz-feedback", {
         method: "POST",
         headers: {
@@ -67,17 +79,19 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
         }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error("Failed to submit quiz");
+        throw new Error(data.error || data.details || "Failed to submit quiz");
       }
 
-      const feedbackData = await response.json();
-      setFeedback(feedbackData);
+      setFeedback(data);
     } catch (error) {
+      console.error("Quiz submission error:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to submit quiz",
+        description: error instanceof Error ? error.message : "Failed to submit quiz. Please try again.",
       });
     } finally {
       setIsSubmitting(false);

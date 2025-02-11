@@ -679,37 +679,58 @@ export function registerRoutes(app: Express): Server {
     try {
       const { configId, sessionId, userName, questions, answers } = quizSubmissionSchema.parse(req.body);
 
+      // Log the request body for debugging
+      console.log("Quiz submission request:", {
+        configId,
+        sessionId,
+        userName,
+        questionsCount: questions?.length,
+        answersCount: answers?.length
+      });
+
       const feedbackPromises = answers.map(async ({ questionIndex, answer, expectedAnswer }) => {
         const prompt = `Compare the following answer to the expected answer and categorize it as either 'correct' (if it matches closely), 'almost' (if it's on the right track but not quite there), or 'incorrect' (if it's way off).
-        
+
         Question: ${questions[questionIndex].question}
         Expected Answer: ${expectedAnswer}
         User's Answer: ${answer}
-        
+
         Respond in exactly this JSON format:
         {
           "status": "correct|almost|incorrect",
           "feedback": "Brief, constructive feedback explaining why"
         }`;
 
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4",
-          messages: [
-            {
-              role: "system",
-              content: "You are an expert at evaluating quiz answers. Be fair but strict in your evaluations. Provide constructive feedback that helps the user understand why their answer was correct or what they could improve."
-            },
-            {
-              role: "user",
-              content: prompt
-            }
-          ],
-          temperature: 0.3,
-          response_format: { type: "json_object" }
-        });
+        try {
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4",
+            messages: [
+              {
+                role: "system",
+                content: "You are an expert at evaluating quiz answers. Be fair but strict in your evaluations. Provide constructive feedback that helps the user understand why their answer was correct or what they could improve."
+              },
+              {
+                role: "user",
+                content: prompt
+              }
+            ],
+            temperature: 0.3,
+            response_format: { type: "json_object" }
+          });
 
-        const response = JSON.parse(completion.choices[0].message.content);
-        return response;
+          if (!completion.choices[0]?.message?.content) {
+            throw new Error("No response from OpenAI");
+          }
+
+          const response = JSON.parse(completion.choices[0].message.content);
+          return response;
+        } catch (error) {
+          console.error("Error processing answer feedback:", error);
+          return {
+            status: "error",
+            feedback: "Failed to evaluate answer. Please try again."
+          };
+        }
       });
 
       const feedbackResults = await Promise.all(feedbackPromises);
@@ -722,7 +743,10 @@ export function registerRoutes(app: Express): Server {
       res.json(feedbackMap);
     } catch (error: any) {
       console.error("Error processing quiz feedback:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ 
+        error: error.message || "Failed to process quiz submission",
+        details: error.errors || error.stack
+      });
     }
   });
 
@@ -910,7 +934,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/templates", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/templates", requireAuth, async (req:Request, res: Response) => {
     try {
       const templates = await db.query.chatConfigs.findMany({
         where: and(
