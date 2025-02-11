@@ -59,11 +59,14 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
   });
 
   const handleSubmit = async () => {
-    if (!questions || !userName) return;
+    if (!questions || !userName) {
+      console.log("Missing required data:", { questions, userName });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      console.log("Submitting quiz with data:", {
+      const submissionData = {
         configId: config.id,
         sessionId,
         userName,
@@ -73,33 +76,32 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
           answer,
           expectedAnswer: questions[parseInt(index)].expectedAnswer
         }))
-      });
+      };
+
+      console.log("Submitting quiz with data:", submissionData);
 
       const response = await fetch("/api/quiz-feedback", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          configId: config.id,
-          sessionId,
-          userName,
-          questions,
-          answers: Object.entries(answers).map(([index, answer]) => ({
-            questionIndex: parseInt(index),
-            answer,
-            expectedAnswer: questions[parseInt(index)].expectedAnswer
-          }))
-        }),
+        body: JSON.stringify(submissionData),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || data.details || "Failed to submit quiz");
+        const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
+        console.error("Server error response:", errorData);
+        throw new Error(errorData.error || errorData.details || `Server error: ${response.status}`);
       }
 
+      const data = await response.json();
+      console.log("Received feedback:", data);
       setFeedback(data);
+
+      toast({
+        title: "Quiz Submitted",
+        description: "Your answers have been submitted successfully!",
+      });
     } catch (error) {
       console.error("Quiz submission error:", error);
       toast({
