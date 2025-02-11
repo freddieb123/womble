@@ -48,3 +48,8 @@ export interface UploadState {
   error: string | null;
   feedback: Feedback | null;
 }
+
+export interface QuizFeedback {
+  status: 'correct' | 'almost' | 'incorrect';
+  feedback: string;
+}

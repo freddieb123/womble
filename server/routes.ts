@@ -38,6 +38,22 @@ const configSchema = z.object({
   maxTokens: z.number().min(100).max(4000).default(1000)
 });
 
+// Add this near other schema definitions
+const quizSubmissionSchema = z.object({
+  configId: z.number(),
+  sessionId: z.string(),
+  userName: z.string(),
+  questions: z.array(z.object({
+    question: z.string(),
+    expectedAnswer: z.string()
+  })),
+  answers: z.array(z.object({
+    questionIndex: z.number(),
+    answer: z.string(),
+    expectedAnswer: z.string()
+  }))
+});
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
   dangerouslyAllowBrowser: false
@@ -641,6 +657,59 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: error.message });
     }
   });
+
+  // Add this route with the other API endpoints
+  app.post("/api/quiz-feedback", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { configId, sessionId, userName, questions, answers } = quizSubmissionSchema.parse(req.body);
+
+      const feedbackPromises = answers.map(async ({ questionIndex, answer, expectedAnswer }) => {
+        const prompt = `Compare the following answer to the expected answer and categorize it as either 'correct' (if it matches closely), 'almost' (if it's on the right track but not quite there), or 'incorrect' (if it's way off).
+
+Question: ${questions[questionIndex].question}
+Expected Answer: ${expectedAnswer}
+User's Answer: ${answer}
+
+Respond in exactly this JSON format:
+{
+  "status": "correct|almost|incorrect",
+  "feedback": "Brief, constructive feedback explaining why"
+}`;
+
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4",
+          messages: [
+            {
+              role: "system",
+              content: "You are an expert at evaluating quiz answers. Be fair but strict in your evaluations. Provide constructive feedback that helps the user understand why their answer was correct or what they could improve."
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          temperature: 0.3,
+          response_format: { type: "json_object" }
+        });
+
+        const response = JSON.parse(completion.choices[0].message.content);
+        return response;
+      });
+
+      const feedbackResults = await Promise.all(feedbackPromises);
+      const feedbackMap: Record<number, typeof feedbackResults[0]> = {};
+
+      answers.forEach(({ questionIndex }, index) => {
+        feedbackMap[questionIndex] = feedbackResults[index];
+      });
+
+      res.json(feedbackMap);
+    } catch (error: any) {
+      console.error("Error processing quiz feedback:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
 
   app.delete("/api/chat-configs/:id", requireAuth, async (req: Request, res: Response) => {
     try {
