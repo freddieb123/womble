@@ -63,11 +63,13 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
         configId: config.id,
         sessionId,
         userName: localUserName,
-        questions: questions.map((q, index) => ({
-          question: q.question,
-          expectedAnswer: q.expectedAnswer,
-          userAnswer: answers[index]
-        }))
+        questions: [
+          ...questions.map((q, index) => ({
+            question: q.question,
+            expectedAnswer: q.expectedAnswer,
+            userAnswer: answers[index]
+          }))
+        ]
       };
 
       console.log("Prepared submission data:", submissionData);
