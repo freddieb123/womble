@@ -58,7 +58,10 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
     feedback
   });
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault(); // Prevent any default form submission
+    console.log("Submit button clicked!");
+
     if (!questions || !userName) {
       console.log("Missing required data:", { questions, userName });
       return;
@@ -179,6 +182,7 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || feedback !== null || !areAllQuestionsAnswered || !localUserName}
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg"
           >
             {isSubmitting ? "Submitting..." : areAllQuestionsAnswered ? "Submit Quiz" : "Answer all questions to submit"}
           </Button>
