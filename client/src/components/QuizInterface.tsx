@@ -107,6 +107,8 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to submit quiz. Please try again.",
       });
+      // Reset feedback state on error
+      setFeedback(null);
     } finally {
       setIsSubmitting(false);
     }
