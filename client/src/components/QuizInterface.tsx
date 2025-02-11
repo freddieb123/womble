@@ -39,15 +39,18 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
     }));
   };
 
-  const questions = config.questions as QuizQuestion[] | undefined;
+  const questions = config.questions || [];
 
   // Check if all questions have been answered
-  const areAllQuestionsAnswered = questions &&
-    questions.every((_, index) => answers[index]?.trim().length > 0);
+  const areAllQuestionsAnswered = questions.length > 0 && questions.every((_, index) => {
+    const hasAnswer = answers[index]?.trim().length > 0;
+    console.log(`Question ${index} has answer: ${hasAnswer}, answer: "${answers[index]}"`);
+    return hasAnswer;
+  });
 
   console.log('Current state:', {
-    answers,
-    questionsCount: questions?.length,
+    answersCount: Object.keys(answers).length,
+    questionsCount: questions.length,
     areAllQuestionsAnswered,
     userName,
     isSubmitting,
@@ -108,7 +111,7 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
     }
   };
 
-  if (!questions) {
+  if (!questions || questions.length === 0) {
     return (
       <div className="p-6 text-center text-red-600">
         No questions available for this quiz
