@@ -60,12 +60,20 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
 
   const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault(); // Prevent any default form submission
-    console.log("Submit button clicked!");
+    console.log("Submit button clicked!", { e });
 
     if (!questions || !userName) {
       console.log("Missing required data:", { questions, userName });
       return;
     }
+
+    console.log("Starting submission process with state:", {
+      isSubmitting,
+      feedback,
+      areAllQuestionsAnswered,
+      localUserName,
+      answers
+    });
 
     setIsSubmitting(true);
     try {
@@ -81,7 +89,7 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
         }))
       };
 
-      console.log("Submitting quiz with data:", submissionData);
+      console.log("Prepared submission data:", submissionData);
 
       const response = await fetch("/api/quiz-feedback", {
         method: "POST",
@@ -91,6 +99,12 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
         body: JSON.stringify(submissionData),
       });
 
+      console.log("Received response:", {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
         console.error("Server error response:", errorData);
@@ -98,7 +112,7 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
       }
 
       const data = await response.json();
-      console.log("Received feedback:", data);
+      console.log("Received feedback data:", data);
       setFeedback(data);
 
       toast({
@@ -180,7 +194,10 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
       {!isViewOnly && (
         <div className="flex justify-end">
           <Button
-            onClick={handleSubmit}
+            onClick={(e) => {
+              console.log("Button clicked, about to call handleSubmit");
+              handleSubmit(e);
+            }}
             disabled={isSubmitting || feedback !== null || !areAllQuestionsAnswered || !localUserName}
             className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg"
           >
