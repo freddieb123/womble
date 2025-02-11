@@ -49,30 +49,36 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
   });
 
   const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault(); // Prevent any default form submission
+    e.preventDefault();
     console.log("Submit button clicked!");
 
-    if (!questions || !localUserName) {
-      console.log("Missing required data:", { questions, userName: localUserName });
+    // Validate required data
+    if (!Array.isArray(questions) || questions.length === 0) {
+      console.error("Questions must be a non-empty array");
+      return;
+    }
+
+    if (!localUserName) {
+      console.error("Username is required");
       return;
     }
 
     setIsSubmitting(true);
     try {
+      const formattedQuestions = questions.map((q, index) => ({
+        question: q.question,
+        expectedAnswer: q.expectedAnswer,
+        userAnswer: answers[index] || ''
+      }));
+
       const submissionData = {
         configId: config.id,
         sessionId,
         userName: localUserName,
-        questions: [
-          ...questions.map((q, index) => ({
-            question: q.question,
-            expectedAnswer: q.expectedAnswer,
-            userAnswer: answers[index]
-          }))
-        ]
+        questions: formattedQuestions
       };
 
-      console.log("Prepared submission data:", submissionData);
+      console.log("Prepared submission data:", JSON.stringify(submissionData, null, 2));
 
       const response = await fetch("/api/quiz-feedback", {
         method: "POST",
@@ -109,7 +115,6 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to submit quiz. Please try again.",
       });
-      // Reset feedback state on error
       setFeedback(null);
     } finally {
       setIsSubmitting(false);
