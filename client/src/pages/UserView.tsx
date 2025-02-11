@@ -16,7 +16,7 @@ export default function UserView() {
   const userName = searchParams.get('userName');
   const isViewOnly = searchParams.get('viewOnly') === 'true';
 
-  const { data: savedConfig, isLoading, error } = useQuery<SelectChatConfig>({
+  const { data: savedConfig, isLoading, error } = useQuery<SelectChatConfig & { questions?: Array<{ question: string; expectedAnswer: string }> }>({
     queryKey: [`/api/chat-configs/${configId}`],
     enabled: !!configId,
     retry: 1,
@@ -34,7 +34,6 @@ export default function UserView() {
     }
     const newUrl = `${window.location.pathname}?${newParams.toString()}`;
     window.history.replaceState({}, '', newUrl);
-    window.location.reload();
     return newUrl;
   };
 
@@ -84,6 +83,8 @@ export default function UserView() {
     );
   }
 
+  console.log('Saved config:', savedConfig);
+
   const config: AdminConfig = {
     id: savedConfig.id,
     type: savedConfig.type || 'chat',
@@ -92,8 +93,11 @@ export default function UserView() {
     temperature: 0.7,
     maxTokens: 1000,
     userInstructions: savedConfig.userInstructions || "",
-    feedbackCriteria: savedConfig.feedbackCriteria || ""
+    feedbackCriteria: savedConfig.feedbackCriteria || "",
+    questions: savedConfig.questions || []
   };
+
+  console.log('Transformed config:', config);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
