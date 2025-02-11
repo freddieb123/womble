@@ -456,7 +456,7 @@ export function registerRoutes(app: Express): Server {
 
       try {
         const stream = await openai.chat.completions.create({
-          model: "gpt-4o",
+          model: "gpt-4",
           messages: apiMessages,
           temperature: parsedConfig.temperature,
           max_tokens: parsedConfig.maxTokens,
@@ -523,7 +523,7 @@ export function registerRoutes(app: Express): Server {
       const prompt = `Context:\n${config.systemPrompt}\n\nAnalyze the uploaded screenshot based on these criteria:\n${config.feedbackCriteria}\n\nAddress the user as 'you' in your response (and do not just say 'the user').\n\nPlease provide your analysis in exactly this format, ensuring you are evaluating the user's side of the conversation (i.e. the person who first types, NOT the GPT (which is you as the bot):\n\n• [3 bullet points focusing on how well the screenshot meets the criteria. Keep each bullet to 1 sentence]\n\nScore: [1-10]\n[Brief one-line summary of overall quality]`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4",
         messages: [
           {
             role: "system",
@@ -619,7 +619,7 @@ export function registerRoutes(app: Express): Server {
       ).join('\n');
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4",
         messages: [
           {
             role: "system",
@@ -883,7 +883,7 @@ export function registerRoutes(app: Express): Server {
       - Base themes on patterns across multiple feedback points when possible`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4",
         messages: [
           {
             role: "system",
