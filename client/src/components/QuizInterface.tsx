@@ -28,7 +28,8 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showNameModal, setShowNameModal] = useState(!isViewOnly && !userName);
+  const [localUserName, setLocalUserName] = useState(userName);
+  const [showNameModal, setShowNameModal] = useState(!isViewOnly && !localUserName);
   const { toast } = useToast();
 
   const handleAnswerChange = (index: number, value: string) => {
@@ -126,6 +127,7 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
           open={showNameModal}
           onSubmit={(name) => {
             onUserNameSubmit(name);
+            setLocalUserName(name);
             setShowNameModal(false);
           }}
         />
@@ -172,7 +174,7 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
         <div className="flex justify-end">
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting || feedback !== null || !areAllQuestionsAnswered || !userName}
+            disabled={isSubmitting || feedback !== null || !areAllQuestionsAnswered || !localUserName}
           >
             {isSubmitting ? "Submitting..." : areAllQuestionsAnswered ? "Submit Quiz" : "Answer all questions to submit"}
           </Button>
