@@ -149,13 +149,29 @@ export function registerRoutes(app: Express): Server {
             eq(chatConfigs.isTemplate, true)
           )
         ),
+        with: {
+          quizQuestions: {
+            where: eq(quizQuestions.deleted, false),
+            orderBy: [quizQuestions.orderIndex],
+          }
+        }
       });
 
       if (!config) {
         return res.status(404).json({ error: "Configuration not found" });
       }
 
-      res.json(config);
+      // Transform the response to match the expected format
+      const responseConfig = {
+        ...config,
+        questions: config.type === 'quiz' ? config.quizQuestions.map(q => ({
+          question: q.question,
+          expectedAnswer: q.expectedAnswer
+        })) : undefined,
+        quizQuestions: undefined // Remove the original quizQuestions field
+      };
+
+      res.json(responseConfig);
     } catch (error: any) {
       console.error("Error fetching chat config:", error);
       res.status(500).json({ error: error.message });
@@ -665,16 +681,16 @@ export function registerRoutes(app: Express): Server {
 
       const feedbackPromises = answers.map(async ({ questionIndex, answer, expectedAnswer }) => {
         const prompt = `Compare the following answer to the expected answer and categorize it as either 'correct' (if it matches closely), 'almost' (if it's on the right track but not quite there), or 'incorrect' (if it's way off).
-
-Question: ${questions[questionIndex].question}
-Expected Answer: ${expectedAnswer}
-User's Answer: ${answer}
-
-Respond in exactly this JSON format:
-{
-  "status": "correct|almost|incorrect",
-  "feedback": "Brief, constructive feedback explaining why"
-}`;
+        
+        Question: ${questions[questionIndex].question}
+        Expected Answer: ${expectedAnswer}
+        User's Answer: ${answer}
+        
+        Respond in exactly this JSON format:
+        {
+          "status": "correct|almost|incorrect",
+          "feedback": "Brief, constructive feedback explaining why"
+        }`;
 
         const completion = await openai.chat.completions.create({
           model: "gpt-4",
@@ -822,25 +838,25 @@ Respond in exactly this JSON format:
       }
 
       const prompt = `Analyze these feedback points and identify two key themes:
-
-Feedback points:
-${allBullets.map(bullet => `- ${bullet}`).join('\n')}
-
-Please provide exactly two themes in JSON format:
-1. One positive theme highlighting what's being done well
-2. One constructive theme suggesting an area for improvement
-
-Response Format:
-{
-  "positive": "A clear, concise positive theme",
-  "constructive": "A clear, concise constructive theme"
-}
-
-Rules:
-- Each theme should be 1-2 sentences
-- Use third-person perspective (e.g., "learners" or "users", not "you")
-- Be specific and actionable
-- Base themes on patterns across multiple feedback points when possible`;
+      
+      Feedback points:
+      ${allBullets.map(bullet => `- ${bullet}`).join('\n')}
+      
+      Please provide exactly two themes in JSON format:
+      1. One positive theme highlighting what's being done well
+      2. One constructive theme suggesting an area for improvement
+      
+      Response Format:
+      {
+        "positive": "A clear, concise positive theme",
+        "constructive": "A clear, concise constructive theme"
+      }
+      
+      Rules:
+      - Each theme should be 1-2 sentences
+      - Use third-person perspective (e.g., "learners" or "users", not "you")
+      - Be specific and actionable
+      - Base themes on patterns across multiple feedback points when possible`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o",
@@ -915,7 +931,6 @@ Rules:
       res.status(500).json({ error: error.message });
     }
   });
-
 
   const httpServer = createServer(app);
   return httpServer;
