@@ -44,13 +44,11 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
   // Check if all questions have been answered
   const areAllQuestionsAnswered = questions.length > 0 && questions.every((_, index) => {
     const hasAnswer = answers[index]?.trim().length > 0;
-    console.log(`Question ${index} has answer: ${hasAnswer}, answer: "${answers[index]}"`);
     return hasAnswer;
   });
 
   const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    console.log("Submit button clicked!");
 
     // Validate required data
     if (!Array.isArray(questions) || questions.length === 0) {
@@ -65,17 +63,17 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
 
     setIsSubmitting(true);
     try {
-      const formattedQuestions = questions.map((q, index) => ({
-        question: q.question,
-        expectedAnswer: q.expectedAnswer,
-        userAnswer: answers[index] || ''
-      }));
-
+      // Format the submission data to match the server's expected schema
       const submissionData = {
         configId: config.id,
         sessionId,
         userName: localUserName,
-        questions: formattedQuestions
+        questions: questions,
+        answers: questions.map((q, index) => ({
+          questionIndex: index,
+          answer: answers[index] || '',
+          expectedAnswer: q.expectedAnswer
+        }))
       };
 
       console.log("Prepared submission data:", JSON.stringify(submissionData, null, 2));
@@ -86,12 +84,6 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(submissionData),
-      });
-
-      console.log("Received response:", {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries())
       });
 
       if (!response.ok) {
