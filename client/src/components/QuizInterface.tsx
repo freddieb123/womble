@@ -33,7 +33,6 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
   const { toast } = useToast();
 
   const handleAnswerChange = (index: number, value: string) => {
-    console.log('Answer changed for index:', index, 'value:', value);
     setAnswers(prev => ({
       ...prev,
       [index]: value
@@ -49,21 +48,12 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
     return hasAnswer;
   });
 
-  console.log('Current state:', {
-    answersCount: Object.keys(answers).length,
-    questionsCount: questions.length,
-    areAllQuestionsAnswered,
-    userName,
-    isSubmitting,
-    feedback
-  });
-
   const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault(); // Prevent any default form submission
-    console.log("Submit button clicked!", { e });
+    console.log("Button clicked, about to call handleSubmit");
 
-    if (!questions || !userName) {
-      console.log("Missing required data:", { questions, userName });
+    if (!questions || !localUserName) {
+      console.log("Missing required data:", { questions, localUserName });
       return;
     }
 
@@ -80,7 +70,7 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
       const submissionData = {
         configId: config.id,
         sessionId,
-        userName,
+        userName: localUserName,
         questions,
         answers: Object.entries(answers).map(([index, answer]) => ({
           questionIndex: parseInt(index),
@@ -194,10 +184,7 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
       {!isViewOnly && (
         <div className="flex justify-end">
           <Button
-            onClick={(e) => {
-              console.log("Button clicked, about to call handleSubmit");
-              handleSubmit(e);
-            }}
+            onClick={handleSubmit}
             disabled={isSubmitting || feedback !== null || !areAllQuestionsAnswered || !localUserName}
             className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg"
           >
