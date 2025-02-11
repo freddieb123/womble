@@ -695,7 +695,7 @@ export function registerRoutes(app: Express): Server {
         Expected Answer: ${expectedAnswer}
         User's Answer: ${answer}
 
-        Respond in exactly this JSON format:
+        Respond in exactly this format:
         {
           "status": "correct|almost|incorrect",
           "feedback": "Brief, constructive feedback explaining why"
@@ -714,16 +714,22 @@ export function registerRoutes(app: Express): Server {
                 content: prompt
               }
             ],
-            temperature: 0.3,
-            response_format: { type: "json_object" }
+            temperature: 0.3
           });
 
           if (!completion.choices[0]?.message?.content) {
             throw new Error("No response from OpenAI");
           }
 
-          const response = JSON.parse(completion.choices[0].message.content);
-          return response;
+          try {
+            return JSON.parse(completion.choices[0].message.content);
+          } catch (parseError) {
+            console.error("Error parsing OpenAI response:", parseError);
+            return {
+              status: "error",
+              feedback: "Failed to evaluate answer. Please try again."
+            };
+          }
         } catch (error) {
           console.error("Error processing answer feedback:", error);
           return {
