@@ -50,20 +50,12 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
 
   const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault(); // Prevent any default form submission
-    console.log("Button clicked, about to call handleSubmit");
+    console.log("Submit button clicked!");
 
     if (!questions || !localUserName) {
-      console.log("Missing required data:", { questions, localUserName });
+      console.log("Missing required data:", { questions, userName: localUserName });
       return;
     }
-
-    console.log("Starting submission process with state:", {
-      isSubmitting,
-      feedback,
-      areAllQuestionsAnswered,
-      localUserName,
-      answers
-    });
 
     setIsSubmitting(true);
     try {
@@ -71,11 +63,10 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
         configId: config.id,
         sessionId,
         userName: localUserName,
-        questions,
-        answers: Object.entries(answers).map(([index, answer]) => ({
-          questionIndex: parseInt(index),
-          answer,
-          expectedAnswer: questions[parseInt(index)].expectedAnswer
+        questions: questions.map((q, index) => ({
+          question: q.question,
+          expectedAnswer: q.expectedAnswer,
+          userAnswer: answers[index]
         }))
       };
 
