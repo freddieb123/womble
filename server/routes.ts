@@ -666,25 +666,19 @@ export function registerRoutes(app: Express): Server {
 
       // Save the quiz response to the database
       try {
-        const result = await db.insert(conversations).values({
-          config_id: configId,  // Changed from configId to config_id to match schema
-          session_id: sessionId, // Changed from sessionId to session_id to match schema
-          user_name: userName,  // Changed from userName to user_name to match schema
-          messages: [],
+        await db.insert(conversations).values({
+          configId, // Use camelCase as defined in the schema
+          sessionId,
+          userName: userName || null,
+          messages: [], // Empty array for quiz responses
           feedback: feedbackMap,
-          created_at: new Date() // Added created_at
-        }).onConflictDoUpdate({
-          target: [conversations.configId, conversations.sessionId],
-          set: {
-            feedback: feedbackMap,
-            user_name: userName // Added user_name update
-          }
+          createdAt: new Date()
         });
 
-        console.log("Quiz response saved successfully:", result);
+        console.log("Quiz response saved successfully");
       } catch (dbError) {
         console.error("Error saving quiz response to database:", dbError);
-        throw new Error("Failed to save quiz response");
+        throw dbError;
       }
 
       res.json(feedbackMap);
@@ -696,8 +690,6 @@ export function registerRoutes(app: Express): Server {
       });
     }
   });
-
-
 
   app.post("/api/chat-feedback", requireAuth, async (req: Request, res: Response) => {
     try {
