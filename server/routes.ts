@@ -666,16 +666,31 @@ export function registerRoutes(app: Express): Server {
 
       // Save the quiz response to the database
       try {
-        await db.insert(conversations).values({
-          configId, // Use camelCase as defined in the schema
+        const insertData = {
+          configId,
           sessionId,
           userName: userName || null,
           messages: [], // Empty array for quiz responses
           feedback: feedbackMap,
           createdAt: new Date()
+        };
+
+        console.log("Attempting to insert quiz response with data:", insertData);
+
+        const result = await db.insert(conversations).values(insertData).returning();
+
+        console.log("Quiz response saved successfully. Result:", result);
+
+        // Get the saved record to verify
+        const savedRecord = await db.query.conversations.findFirst({
+          where: and(
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId)
+          ),
         });
 
-        console.log("Quiz response saved successfully");
+        console.log("Verified saved record:", savedRecord);
+
       } catch (dbError) {
         console.error("Error saving quiz response to database:", dbError);
         throw dbError;
