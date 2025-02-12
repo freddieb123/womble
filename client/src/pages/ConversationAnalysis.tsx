@@ -122,9 +122,11 @@ export default function ConversationAnalysis() {
         }
 
         setConversations(conversationsData);
-        const summaryData = await generateSummary(conversationsData);
-        setSummary(summaryData);
 
+        if (config.type !== 'quiz') {
+          const summaryData = await generateSummary(conversationsData);
+          setSummary(summaryData);
+        }
 
         if (config.type === 'upload') {
           const existingFeedbacks = conversationsData
@@ -167,62 +169,62 @@ export default function ConversationAnalysis() {
         <div className="sticky top-0 z-10 p-4 md:p-8 pb-4">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-blue-900">
-              {config?.type === 'upload' ? 'Upload Analysis' : 'Conversation Analysis'}
+              {config?.type === 'upload' ? 'Upload Analysis' : config?.type === 'quiz' ? 'Quiz Analysis' : 'Conversation Analysis'}
             </h1>
           </div>
 
-          {summary && (
-                <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-                  <Card className="mb-2 bg-white">
-                    <CardHeader className="pb-4">
-                      <CollapsibleTrigger className="flex items-center justify-between w-full">
-                        <div className="flex items-center gap-2">
-                          <TrendingUp className="h-5 w-5 text-blue-600" />
-                          <h2 className="text-xl font-semibold">Analysis Summary</h2>
+          {summary && config?.type !== 'quiz' && (
+            <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+              <Card className="mb-2 bg-white">
+                <CardHeader className="pb-4">
+                  <CollapsibleTrigger className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-blue-600" />
+                      <h2 className="text-xl font-semibold">Analysis Summary</h2>
+                    </div>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'transform rotate-180' : ''}`} />
+                  </CollapsibleTrigger>
+                </CardHeader>
+                <CollapsibleContent>
+                  <CardContent>
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <h3 className="text-sm font-medium text-gray-500">Feedback Coverage</h3>
+                          <p className="text-2xl font-bold text-blue-900">{summary.feedbackCount}/{summary.totalCount}</p>
+                          <p className="text-sm text-gray-600">conversations with feedback</p>
                         </div>
-                        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'transform rotate-180' : ''}`} />
-                      </CollapsibleTrigger>
-                    </CardHeader>
-                    <CollapsibleContent>
-                      <CardContent>
-                        <div className="space-y-6">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                              <h3 className="text-sm font-medium text-gray-500">Feedback Coverage</h3>
-                              <p className="text-2xl font-bold text-blue-900">{summary.feedbackCount}/{summary.totalCount}</p>
-                              <p className="text-sm text-gray-600">conversations with feedback</p>
-                            </div>
-                            <div className="space-y-2">
-                              <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
-                              <p className="text-2xl font-bold text-blue-900">
-                                {summary.averageScore.toFixed(1)}/10
-                              </p>
-                              <p className="text-sm text-gray-600">across all feedback</p>
+                        <div className="space-y-2">
+                          <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
+                          <p className="text-2xl font-bold text-blue-900">
+                            {summary.averageScore.toFixed(1)}/10
+                          </p>
+                          <p className="text-sm text-gray-600">across all feedback</p>
+                        </div>
+                      </div>
+                      <div className="border-t pt-4">
+                        <h3 className="text-sm font-medium text-gray-500 mb-3">Key Themes</h3>
+                        <div className="space-y-3">
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-medium text-green-600">Positive theme:</h4>
+                            <div className="text-sm text-gray-900">
+                              {summary.keyThemes.positive}
                             </div>
                           </div>
-                          <div className="border-t pt-4">
-                            <h3 className="text-sm font-medium text-gray-500 mb-3">Key Themes</h3>
-                            <div className="space-y-3">
-                              <div className="space-y-1">
-                                <h4 className="text-sm font-medium text-green-600">Positive theme:</h4>
-                                <div className="text-sm text-gray-900">
-                                  {summary.keyThemes.positive}
-                                </div>
-                              </div>
-                              <div className="space-y-1">
-                                <h4 className="text-sm font-medium text-amber-600">Constructive theme:</h4>
-                                <div className="text-sm text-gray-900">
-                                  {summary.keyThemes.constructive}
-                                </div>
-                              </div>
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-medium text-amber-600">Constructive theme:</h4>
+                            <div className="text-sm text-gray-900">
+                              {summary.keyThemes.constructive}
                             </div>
                           </div>
                         </div>
-                      </CardContent>
-                    </CollapsibleContent>
-                  </Card>
-                </Collapsible>
-              )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+          )}
         </div>
 
         <div className="px-4 md:px-8 pb-8">
@@ -230,7 +232,7 @@ export default function ConversationAnalysis() {
             <Card>
               <CardContent className="p-6">
                 <div className="animate-pulse text-center">
-                  {config?.type === 'upload' ? 'Analyzing uploads...' : 'Analyzing conversations...'}
+                  {config?.type === 'upload' ? 'Analyzing uploads...' : config?.type === 'quiz' ? 'Loading quiz responses...' : 'Analyzing conversations...'}
                 </div>
               </CardContent>
             </Card>
@@ -251,11 +253,11 @@ export default function ConversationAnalysis() {
                           size="sm"
                           className="flex items-center gap-2"
                           onClick={() => {
-                            window.open(`/conversation?configId=${configId}&sessionId=${conversation.sessionId}`, '_blank');
+                            window.open(`/conversation?configId=${configId}&sessionId=${conversation.sessionId}&viewOnly=true`, '_blank');
                           }}
                         >
                           <MessageSquare className="h-4 w-4" />
-                          Open Conversation
+                          View Current Feedback
                         </Button>
                       )}
                     </CardHeader>
@@ -295,7 +297,7 @@ export default function ConversationAnalysis() {
                           </div>
                         ) : (
                           <p className="text-muted-foreground">
-                            No feedback available for this {config?.type === 'upload' ? 'upload' : 'conversation'}.
+                            No feedback available for this {config?.type === 'quiz' ? 'quiz attempt' : config?.type === 'upload' ? 'upload' : 'conversation'}.
                           </p>
                         )
                       )}
