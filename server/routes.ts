@@ -592,6 +592,111 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Update the quiz feedback endpoint to save responses
+  app.post("/api/quiz-feedback", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { configId, sessionId, userName, questions, answers } = quizSubmissionSchema.parse(req.body);
+
+      // Log the request body for debugging
+      console.log("Quiz submission request:", {
+        configId,
+        sessionId,
+        userName,
+        questionsCount: questions?.length,
+        answersCount: answers?.length
+      });
+
+      const feedbackPromises = answers.map(async ({ questionIndex, answer, expectedAnswer }) => {
+        const prompt = `Compare the following answer to the expected answer and categorize it as either 'correct' (if it matches closely), 'almost' (if it's on the right track but not quite there), or 'incorrect' (if it's way off).
+
+        Question: ${questions[questionIndex].question}
+        Expected Answer: ${expectedAnswer}
+        User's Answer: ${answer}
+
+        Respond in exactly this format:
+        {
+          "status": "correct|almost|incorrect",
+          "feedback": "Brief, constructive feedback explaining why"
+        }`;
+
+        try {
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4",
+            messages: [
+              {
+                role: "system",
+                content: "You are an expert at evaluating quiz answers. Be fair but strict in your evaluations. Provide constructive feedback that helps the user understand why their answer was correct or what they could improve."
+              },
+              {
+                role: "user",
+                content: prompt
+              }
+            ],
+            temperature: 0.3
+          });
+
+          if (!completion.choices[0]?.message?.content) {
+            throw new Error("No response from OpenAI");
+          }
+
+          try {
+            return JSON.parse(completion.choices[0].message.content);
+          } catch (parseError) {
+            console.error("Error parsing OpenAI response:", parseError);
+            return {
+              status: "error",
+              feedback: "Failed to evaluate answer. Please try again."
+            };
+          }
+        } catch (error) {
+          console.error("Error processing answer feedback:", error);
+          return {
+            status: "error",
+            feedback: "Failed to evaluate answer. Please try again."
+          };
+        }
+      });
+
+      const feedbackResults = await Promise.all(feedbackPromises);
+      const feedbackMap: Record<number, typeof feedbackResults[0]> = {};
+
+      answers.forEach(({ questionIndex }, index) => {
+        feedbackMap[questionIndex] = feedbackResults[index];
+      });
+
+      // Save the quiz response to the database
+      try {
+        await db
+          .insert(conversations)
+          .values({
+            configId,
+            sessionId,
+            userName,
+            messages: [], // Quiz responses don't have messages
+            feedback: feedbackMap
+          })
+          .onConflictDoUpdate({
+            target: [conversations.configId, conversations.sessionId],
+            set: {
+              feedback: feedbackMap
+            }
+          });
+      } catch (dbError) {
+        console.error("Error saving quiz response to database:", dbError);
+        throw new Error("Failed to save quiz response");
+      }
+
+      res.json(feedbackMap);
+    } catch (error: any) {
+      console.error("Error processing quiz feedback:", error);
+      res.status(500).json({ 
+        error: error.message || "Failed to process quiz submission",
+        details: error.errors || error.stack
+      });
+    }
+  });
+
+
   app.post("/api/chat-feedback", requireAuth, async (req: Request, res: Response) => {
     try {
       const { configId, sessionId, messages } = req.body;
@@ -673,89 +778,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: error.message });
     }
   });
-
-  // Add this route with the other API endpoints
-  app.post("/api/quiz-feedback", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const { configId, sessionId, userName, questions, answers } = quizSubmissionSchema.parse(req.body);
-
-      // Log the request body for debugging
-      console.log("Quiz submission request:", {
-        configId,
-        sessionId,
-        userName,
-        questionsCount: questions?.length,
-        answersCount: answers?.length
-      });
-
-      const feedbackPromises = answers.map(async ({ questionIndex, answer, expectedAnswer }) => {
-        const prompt = `Compare the following answer to the expected answer and categorize it as either 'correct' (if it matches closely), 'almost' (if it's on the right track but not quite there), or 'incorrect' (if it's way off).
-
-        Question: ${questions[questionIndex].question}
-        Expected Answer: ${expectedAnswer}
-        User's Answer: ${answer}
-
-        Respond in exactly this format:
-        {
-          "status": "correct|almost|incorrect",
-          "feedback": "Brief, constructive feedback explaining why"
-        }`;
-
-        try {
-          const completion = await openai.chat.completions.create({
-            model: "gpt-4",
-            messages: [
-              {
-                role: "system",
-                content: "You are an expert at evaluating quiz answers. Be fair but strict in your evaluations. Provide constructive feedback that helps the user understand why their answer was correct or what they could improve."
-              },
-              {
-                role: "user",
-                content: prompt
-              }
-            ],
-            temperature: 0.3
-          });
-
-          if (!completion.choices[0]?.message?.content) {
-            throw new Error("No response from OpenAI");
-          }
-
-          try {
-            return JSON.parse(completion.choices[0].message.content);
-          } catch (parseError) {
-            console.error("Error parsing OpenAI response:", parseError);
-            return {
-              status: "error",
-              feedback: "Failed to evaluate answer. Please try again."
-            };
-          }
-        } catch (error) {
-          console.error("Error processing answer feedback:", error);
-          return {
-            status: "error",
-            feedback: "Failed to evaluate answer. Please try again."
-          };
-        }
-      });
-
-      const feedbackResults = await Promise.all(feedbackPromises);
-      const feedbackMap: Record<number, typeof feedbackResults[0]> = {};
-
-      answers.forEach(({ questionIndex }, index) => {
-        feedbackMap[questionIndex] = feedbackResults[index];
-      });
-
-      res.json(feedbackMap);
-    } catch (error: any) {
-      console.error("Error processing quiz feedback:", error);
-      res.status(500).json({ 
-        error: error.message || "Failed to process quiz submission",
-        details: error.errors || error.stack
-      });
-    }
-  });
-
 
   app.delete("/api/chat-configs/:id", requireAuth, async (req: Request, res: Response) => {
     try {
