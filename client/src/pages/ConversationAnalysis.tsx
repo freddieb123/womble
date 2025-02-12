@@ -19,15 +19,21 @@ interface ConversationFeedback {
   summary: string | null;
 }
 
-interface ConversationData {
-  messages: Message[];
-  userName: string;
+interface QuizResponse {
   sessionId: string;
-  feedback: ConversationFeedback | Record<number, {
+  userName: string;
+  answers: Record<number, {
     status: "correct" | "almost" | "incorrect";
     feedback: string;
     answer: string;
   }>;
+}
+
+interface ConversationData {
+  messages: Message[];
+  userName: string;
+  sessionId: string;
+  feedback: ConversationFeedback;
 }
 
 interface FeedbackSummary {
@@ -42,7 +48,7 @@ interface FeedbackSummary {
 
 export default function ConversationAnalysis() {
   const [conversations, setConversations] = useState<ConversationData[]>([]);
-  const [feedbacks, setFeedbacks] = useState<ConversationFeedback[]>([]);
+  const [quizResponses, setQuizResponses] = useState<QuizResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [summary, setSummary] = useState<FeedbackSummary | null>(null);
   const [isOpen, setIsOpen] = useState(true);
@@ -61,13 +67,7 @@ export default function ConversationAnalysis() {
     const feedbackCount = withFeedback.length;
     const totalCount = conversationsData.length;
 
-    const totalScore = withFeedback.reduce((sum, conv) => {
-      if (typeof conv.feedback === 'object' && 'score' in conv.feedback) {
-        return sum + (conv.feedback.score || 0);
-      }
-      return sum;
-    }, 0);
-
+    const totalScore = withFeedback.reduce((sum, conv) => sum + (conv.feedback?.score || 0), 0);
     const averageScore = feedbackCount > 0 ? totalScore / feedbackCount : 0;
 
     let themes = {
@@ -77,27 +77,21 @@ export default function ConversationAnalysis() {
 
     if (withFeedback.length > 0) {
       try {
-        const chatFeedbacks = withFeedback.filter(conv => 
-          typeof conv.feedback === 'object' && 'bullets' in conv.feedback
-        );
+        const response = await fetch('/api/analyze-themes', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            feedbacks: withFeedback.map(conv => conv.feedback)
+          }),
+        });
 
-        if (chatFeedbacks.length > 0) {
-          const response = await fetch('/api/analyze-themes', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              feedbacks: chatFeedbacks.map(conv => conv.feedback)
-            }),
-          });
-
-          if (!response.ok) {
-            throw new Error(`Failed to analyze themes: ${response.statusText}`);
-          }
-
-          themes = await response.json();
+        if (!response.ok) {
+          throw new Error(`Failed to analyze themes: ${response.statusText}`);
         }
+
+        themes = await response.json();
       } catch (error) {
         console.error('Error analyzing themes:', error);
         toast({
@@ -112,37 +106,40 @@ export default function ConversationAnalysis() {
       feedbackCount,
       totalCount,
       averageScore,
-      keyThemes: {
-        positive: themes.positive,
-        constructive: themes.constructive
-      }
+      keyThemes: themes
     };
   };
 
   useEffect(() => {
-    const fetchAndAnalyze = async () => {
-      if (!configId) return;
+    const fetchData = async () => {
+      if (!configId || !config) return;
 
       try {
         setIsLoading(true);
 
-        const conversationsResponse = await fetch(`/api/conversations/${configId}`);
-        if (!conversationsResponse.ok) {
-          throw new Error(`Failed to fetch conversations: ${await conversationsResponse.text()}`);
-        }
-        const conversationsData = await conversationsResponse.json();
+        if (config.type === 'quiz') {
+          const quizResponse = await fetch(`/api/quiz-responses/${configId}`);
+          if (!quizResponse.ok) {
+            throw new Error(`Failed to fetch quiz responses: ${await quizResponse.text()}`);
+          }
+          const quizData = await quizResponse.json();
+          setQuizResponses(quizData);
+        } else {
+          const conversationsResponse = await fetch(`/api/conversations/${configId}`);
+          if (!conversationsResponse.ok) {
+            throw new Error(`Failed to fetch conversations: ${await conversationsResponse.text()}`);
+          }
+          const conversationsData = await conversationsResponse.json();
 
-        if (!Array.isArray(conversationsData) || conversationsData.length === 0) {
-          throw new Error("No conversations found");
-        }
+          if (!Array.isArray(conversationsData) || conversationsData.length === 0) {
+            throw new Error("No conversations found");
+          }
 
-        setConversations(conversationsData);
+          setConversations(conversationsData);
 
-        if (config?.type !== 'quiz') {
           const summaryData = await generateSummary(conversationsData);
           setSummary(summaryData);
         }
-
       } catch (error) {
         toast({
           variant: "destructive",
@@ -154,7 +151,7 @@ export default function ConversationAnalysis() {
       }
     };
 
-    fetchAndAnalyze();
+    fetchData();
   }, [configId, config, toast]);
 
   if (!configId) {
@@ -247,71 +244,65 @@ export default function ConversationAnalysis() {
           ) : (
             <ScrollArea className="h-[calc(100vh-16rem)]">
               <div className="space-y-4">
-                {conversations.map((conversation, index) => (
-                  <Card key={conversation.sessionId || index}>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <h2 className="text-lg font-semibold">
-                        {conversation.userName ? 
-                          `${conversation.userName}'s ${config?.type === 'quiz' ? 'Quiz' : config?.type === 'upload' ? 'Upload' : 'Conversation'}` : 
-                          `Anonymous ${config?.type === 'quiz' ? 'Quiz' : config?.type === 'upload' ? 'Upload' : 'Conversation'} ${index + 1}`}
-                      </h2>
-                      {config?.type === 'chat' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center gap-2"
-                          onClick={() => {
-                            window.open(`/conversation?configId=${configId}&sessionId=${conversation.sessionId}&viewOnly=true`, '_blank');
-                          }}
-                        >
-                          <MessageSquare className="h-4 w-4" />
-                          View Conversation
-                        </Button>
-                      )}
-                    </CardHeader>
-                    <CardContent>
-                      {config?.type === 'quiz' ? (
-                        <QuizResponseView
-                          config={config}
-                          responses={[{
-                            sessionId: conversation.sessionId,
-                            userName: conversation.userName || 'Anonymous',
-                            answers: conversation.feedback as Record<number, {
-                              status: "correct" | "almost" | "incorrect";
-                              feedback: string;
-                              answer: string;
-                            }>
-                          }]}
-                        />
-                      ) : (
-                        conversation.feedback && typeof conversation.feedback === 'object' && 'bullets' in conversation.feedback && (
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              {conversation.feedback.bullets.map((bullet, bulletIndex) => (
-                                <div key={bulletIndex} className="flex items-start gap-2 text-sm">
-                                  <span>•</span>
-                                  <span>{bullet}</span>
-                                </div>
-                              ))}
-                            </div>
-                            <div className="border-t pt-4">
-                              <div className="flex flex-col gap-2 bg-blue-50 p-4 rounded-lg">
-                                <span className="text-2xl font-bold text-blue-900">
-                                  {conversation.feedback.score}/10
-                                </span>
-                                {conversation.feedback.summary && (
-                                  <p className="text-sm text-blue-700">
-                                    {conversation.feedback.summary}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      )}
+                {config?.type === 'quiz' ? (
+                  <Card>
+                    <CardContent className="p-6">
+                      <QuizResponseView
+                        config={config}
+                        responses={quizResponses}
+                      />
                     </CardContent>
                   </Card>
-                ))}
+                ) : (
+                  conversations.map((conversation, index) => (
+                    <Card key={conversation.sessionId || index}>
+                      <CardHeader className="flex flex-row items-center justify-between">
+                        <h2 className="text-lg font-semibold">
+                          {conversation.userName ? 
+                            `${conversation.userName}'s ${config?.type === 'upload' ? 'Upload' : 'Conversation'}` : 
+                            `Anonymous ${config?.type === 'upload' ? 'Upload' : 'Conversation'} ${index + 1}`}
+                        </h2>
+                        {config?.type === 'chat' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center gap-2"
+                            onClick={() => {
+                              window.open(`/conversation?configId=${configId}&sessionId=${conversation.sessionId}&viewOnly=true`, '_blank');
+                            }}
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                            View Conversation
+                          </Button>
+                        )}
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            {conversation.feedback.bullets.map((bullet, bulletIndex) => (
+                              <div key={bulletIndex} className="flex items-start gap-2 text-sm">
+                                <span>•</span>
+                                <span>{bullet}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="border-t pt-4">
+                            <div className="flex flex-col gap-2 bg-blue-50 p-4 rounded-lg">
+                              <span className="text-2xl font-bold text-blue-900">
+                                {conversation.feedback.score}/10
+                              </span>
+                              {conversation.feedback.summary && (
+                                <p className="text-sm text-blue-700">
+                                  {conversation.feedback.summary}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
               </div>
             </ScrollArea>
           )}
