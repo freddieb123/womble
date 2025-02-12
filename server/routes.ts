@@ -666,21 +666,22 @@ export function registerRoutes(app: Express): Server {
 
       // Save the quiz response to the database
       try {
-        await db
-          .insert(conversations)
-          .values({
-            configId,
-            sessionId,
-            userName,
-            messages: [], // Quiz responses don't have messages
-            feedback: feedbackMap
-          })
-          .onConflictDoUpdate({
-            target: [conversations.configId, conversations.sessionId],
-            set: {
-              feedback: feedbackMap
-            }
-          });
+        const result = await db.insert(conversations).values({
+          config_id: configId,  // Changed from configId to config_id to match schema
+          session_id: sessionId, // Changed from sessionId to session_id to match schema
+          user_name: userName,  // Changed from userName to user_name to match schema
+          messages: [],
+          feedback: feedbackMap,
+          created_at: new Date() // Added created_at
+        }).onConflictDoUpdate({
+          target: [conversations.configId, conversations.sessionId],
+          set: {
+            feedback: feedbackMap,
+            user_name: userName // Added user_name update
+          }
+        });
+
+        console.log("Quiz response saved successfully:", result);
       } catch (dbError) {
         console.error("Error saving quiz response to database:", dbError);
         throw new Error("Failed to save quiz response");
@@ -695,6 +696,7 @@ export function registerRoutes(app: Express): Server {
       });
     }
   });
+
 
 
   app.post("/api/chat-feedback", requireAuth, async (req: Request, res: Response) => {
