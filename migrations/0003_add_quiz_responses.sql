@@ -1,3 +1,6 @@
+-- Drop existing table if it exists
+DROP TABLE IF EXISTS quiz_responses;
+
 -- Create quiz_responses table
 CREATE TABLE IF NOT EXISTS quiz_responses (
   config_id integer NOT NULL REFERENCES chat_configs(id),
