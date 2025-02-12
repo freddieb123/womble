@@ -255,18 +255,17 @@ export default function ConversationAnalysis() {
                           `${conversation.userName}'s ${config?.type === 'quiz' ? 'Quiz' : config?.type === 'upload' ? 'Upload' : 'Conversation'}` : 
                           `Anonymous ${config?.type === 'quiz' ? 'Quiz' : config?.type === 'upload' ? 'Upload' : 'Conversation'} ${index + 1}`}
                       </h2>
-                      {(config?.type === 'chat' || config?.type === 'quiz') && (
+                      {config?.type === 'chat' && (
                         <Button
                           variant="outline"
                           size="sm"
                           className="flex items-center gap-2"
                           onClick={() => {
-                            const baseUrl = config?.type === 'quiz' ? '/quiz' : '/conversation';
-                            window.open(`${baseUrl}?configId=${configId}&sessionId=${conversation.sessionId}&viewOnly=true`, '_blank');
+                            window.open(`/conversation?configId=${configId}&sessionId=${conversation.sessionId}&viewOnly=true`, '_blank');
                           }}
                         >
                           <MessageSquare className="h-4 w-4" />
-                          {config?.type === 'quiz' ? 'View Quiz Response' : 'View Conversation'}
+                          View Conversation
                         </Button>
                       )}
                     </CardHeader>
