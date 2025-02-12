@@ -11,6 +11,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import QuizResponseView from "@/components/QuizResponseView";
 
 interface ConversationFeedback {
   bullets: string[];
@@ -241,8 +242,8 @@ export default function ConversationAnalysis() {
                     <CardHeader className="flex flex-row items-center justify-between">
                       <h2 className="text-lg font-semibold">
                         {conversation.userName ? 
-                          `${conversation.userName}'s ${config?.type === 'upload' ? 'Upload' : 'Conversation'}` : 
-                          `Anonymous ${config?.type === 'upload' ? 'Upload' : 'Conversation'} ${index + 1}`}
+                          `${conversation.userName}'s ${config?.type === 'quiz' ? 'Quiz' : config?.type === 'upload' ? 'Upload' : 'Conversation'}` : 
+                          `Anonymous ${config?.type === 'quiz' ? 'Quiz' : config?.type === 'upload' ? 'Upload' : 'Conversation'} ${index + 1}`}
                       </h2>
                       {config?.type === 'chat' && (
                         <Button
@@ -259,31 +260,44 @@ export default function ConversationAnalysis() {
                       )}
                     </CardHeader>
                     <CardContent>
-                      {conversation.feedback ? (
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            {conversation.feedback.bullets.map((bullet, bulletIndex) => (
-                              <div key={bulletIndex} className="flex items-start gap-2 text-sm">
-                                <span>•</span>
-                                <span>{bullet}</span>
+                      {config?.type === 'quiz' ? (
+                        <QuizResponseView
+                          config={config}
+                          responses={[{
+                            sessionId: conversation.sessionId,
+                            userName: conversation.userName || 'Anonymous',
+                            answers: conversation.feedback || {}
+                          }]}
+                        />
+                      ) : (
+                        conversation.feedback ? (
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              {conversation.feedback.bullets.map((bullet, bulletIndex) => (
+                                <div key={bulletIndex} className="flex items-start gap-2 text-sm">
+                                  <span>•</span>
+                                  <span>{bullet}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="border-t pt-4">
+                              <div className="flex flex-col gap-2 bg-blue-50 p-4 rounded-lg">
+                                <span className="text-2xl font-bold text-blue-900">
+                                  {conversation.feedback.score}/10
+                                </span>
+                                {conversation.feedback.summary && (
+                                  <p className="text-sm text-blue-700">
+                                    {conversation.feedback.summary}
+                                  </p>
+                                )}
                               </div>
-                            ))}
-                          </div>
-                          <div className="border-t pt-4">
-                            <div className="flex flex-col gap-2 bg-blue-50 p-4 rounded-lg">
-                              <span className="text-2xl font-bold text-blue-900">
-                                {conversation.feedback.score}/10
-                              </span>
-                              {conversation.feedback.summary && (
-                                <p className="text-sm text-blue-700">
-                                  {conversation.feedback.summary}
-                                </p>
-                              )}
                             </div>
                           </div>
-                        </div>
-                      ) : (
-                        <p className="text-muted-foreground">No feedback available for this {config?.type === 'upload' ? 'upload' : 'conversation'}.</p>
+                        ) : (
+                          <p className="text-muted-foreground">
+                            No feedback available for this {config?.type === 'upload' ? 'upload' : 'conversation'}.
+                          </p>
+                        )
                       )}
                     </CardContent>
                   </Card>
