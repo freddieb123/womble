@@ -523,7 +523,7 @@ export function registerRoutes(app: Express): Server {
       const prompt = `Context:\n${config.systemPrompt}\n\nAnalyze the uploaded screenshot based on these criteria:\n${config.feedbackCriteria}\n\nAddress the user as 'you' in your response (and do not just say 'the user').\n\nPlease provide your analysis in exactly this format, ensuring you are evaluating the user's side of the conversation (i.e. the person who first types, NOT the GPT (which is you as the bot):\n\n• [3 bullet points focusing on how well the screenshot meets the criteria. Keep each bullet to 1 sentence]\n\nScore: [1-10]\n[Brief one-line summary of overall quality]`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-4-vision-preview",
         messages: [
           {
             role: "system",
@@ -896,20 +896,20 @@ export function registerRoutes(app: Express): Server {
       }
 
       const prompt = `Analyze these feedback points and identify two key themes:
-      
+
       Feedback points:
       ${allBullets.map(bullet => `- ${bullet}`).join('\n')}
-      
+
       Please provide exactly two themes in JSON format:
       1. One positive theme highlighting what's being done well
       2. One constructive theme suggesting an area for improvement
-      
+
       Response Format:
       {
         "positive": "A clear, concise positive theme",
         "constructive": "A clear, concise constructive theme"
       }
-      
+
       Rules:
       - Each theme should be 1-2 sentences
       - Use third-person perspective (e.g., "learners" or "users", not "you")
@@ -944,7 +944,7 @@ app.post("/api/chat-configs/:id/template", requireAuth, async (req: Request, res
       const configId = parseInt(req.params.id);
 
       if (isNaN(configId)) {
-        return res.status(400).json({ error: "Invalid config ID" });
+        return res.status0).json({ error: "Invalid config ID" });
       }
 
       // Update the config to mark it as a template
