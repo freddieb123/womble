@@ -944,7 +944,7 @@ app.post("/api/chat-configs/:id/template", requireAuth, async (req: Request, res
       const configId = parseInt(req.params.id);
 
       if (isNaN(configId)) {
-        return res.status0).json({ error: "Invalid config ID" });
+        return res.status(400).json({ error: "Invalid config ID" });
       }
 
       // Update the config to mark it as a template
