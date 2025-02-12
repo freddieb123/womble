@@ -23,7 +23,11 @@ interface ConversationData {
   messages: Message[];
   userName: string;
   sessionId: string;
-  feedback: ConversationFeedback | null;
+  feedback: ConversationFeedback | Record<number, {
+    status: "correct" | "almost" | "incorrect";
+    feedback: string;
+    answer: string;
+  }>;
 }
 
 interface FeedbackSummary {
@@ -57,8 +61,13 @@ export default function ConversationAnalysis() {
     const feedbackCount = withFeedback.length;
     const totalCount = conversationsData.length;
 
-    const totalScore = withFeedback.reduce((sum, conv) => 
-      sum + (conv.feedback?.score || 0), 0);
+    const totalScore = withFeedback.reduce((sum, conv) => {
+      if (typeof conv.feedback === 'object' && 'score' in conv.feedback) {
+        return sum + (conv.feedback.score || 0);
+      }
+      return sum;
+    }, 0);
+
     const averageScore = feedbackCount > 0 ? totalScore / feedbackCount : 0;
 
     let themes = {
@@ -68,21 +77,27 @@ export default function ConversationAnalysis() {
 
     if (withFeedback.length > 0) {
       try {
-        const response = await fetch('/api/analyze-themes', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            feedbacks: withFeedback.map(conv => conv.feedback)
-          }),
-        });
+        const chatFeedbacks = withFeedback.filter(conv => 
+          typeof conv.feedback === 'object' && 'bullets' in conv.feedback
+        );
 
-        if (!response.ok) {
-          throw new Error(`Failed to analyze themes: ${response.statusText}`);
+        if (chatFeedbacks.length > 0) {
+          const response = await fetch('/api/analyze-themes', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              feedbacks: chatFeedbacks.map(conv => conv.feedback)
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to analyze themes: ${response.statusText}`);
+          }
+
+          themes = await response.json();
         }
-
-        themes = await response.json();
       } catch (error) {
         console.error('Error analyzing themes:', error);
         toast({
@@ -106,7 +121,7 @@ export default function ConversationAnalysis() {
 
   useEffect(() => {
     const fetchAndAnalyze = async () => {
-      if (!configId || !config?.feedbackCriteria) return;
+      if (!configId) return;
 
       try {
         setIsLoading(true);
@@ -123,16 +138,9 @@ export default function ConversationAnalysis() {
 
         setConversations(conversationsData);
 
-        if (config.type !== 'quiz') {
+        if (config?.type !== 'quiz') {
           const summaryData = await generateSummary(conversationsData);
           setSummary(summaryData);
-        }
-
-        if (config.type === 'upload') {
-          const existingFeedbacks = conversationsData
-            .map(conv => conv.feedback)
-            .filter(f => f !== null);
-          setFeedbacks(existingFeedbacks);
         }
 
       } catch (error) {
@@ -269,11 +277,15 @@ export default function ConversationAnalysis() {
                           responses={[{
                             sessionId: conversation.sessionId,
                             userName: conversation.userName || 'Anonymous',
-                            answers: conversation.feedback || {}
+                            answers: conversation.feedback as Record<number, {
+                              status: "correct" | "almost" | "incorrect";
+                              feedback: string;
+                              answer: string;
+                            }>
                           }]}
                         />
                       ) : (
-                        conversation.feedback ? (
+                        conversation.feedback && typeof conversation.feedback === 'object' && 'bullets' in conversation.feedback && (
                           <div className="space-y-4">
                             <div className="space-y-2">
                               {conversation.feedback.bullets.map((bullet, bulletIndex) => (
@@ -296,10 +308,6 @@ export default function ConversationAnalysis() {
                               </div>
                             </div>
                           </div>
-                        ) : (
-                          <p className="text-muted-foreground">
-                            No feedback available for this {config?.type === 'quiz' ? 'quiz attempt' : config?.type === 'upload' ? 'upload' : 'conversation'}.
-                          </p>
                         )
                       )}
                     </CardContent>
