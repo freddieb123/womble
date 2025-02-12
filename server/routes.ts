@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { chatConfigs, conversations, uploads, quizQuestions, type Message, type ConversationFeedback, type UploadFeedback } from "@db/schema";
+import { chatConfigs, conversations, uploads, quizQuestions, quizResponses, type Message, type ConversationFeedback, type UploadFeedback } from "@db/schema";
 import { eq, and, or, desc } from "drizzle-orm";
 import { z } from "zod";
 import crypto from 'crypto';
@@ -592,7 +592,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Update the quiz feedback endpoint to save responses
+  // Update the quiz feedback endpoint to use quiz_responses table
   app.post("/api/quiz-feedback", requireAuth, async (req: Request, res: Response) => {
     try {
       const { configId, sessionId, userName, questions, answers } = quizSubmissionSchema.parse(req.body);
@@ -664,32 +664,29 @@ export function registerRoutes(app: Express): Server {
         feedbackMap[questionIndex] = feedbackResults[index];
       });
 
-      // Save the quiz response to the database
+      // Save the quiz response to the database using the new quizResponses table
       try {
         const insertData = {
           configId,
           sessionId,
           userName: userName || null,
-          messages: [], // Empty array for quiz responses
           feedback: feedbackMap,
           createdAt: new Date()
         };
 
         console.log("Attempting to insert quiz response with data:", insertData);
 
-        const result = await db.insert(conversations).values(insertData).returning();
+        const result = await db.insert(quizResponses).values(insertData)
+          .onConflictDoUpdate({
+            target: [quizResponses.configId, quizResponses.sessionId],
+            set: {
+              feedback: feedbackMap,
+              userName: userName || null
+            }
+          })
+          .returning();
 
         console.log("Quiz response saved successfully. Result:", result);
-
-        // Get the saved record to verify
-        const savedRecord = await db.query.conversations.findFirst({
-          where: and(
-            eq(conversations.configId, configId),
-            eq(conversations.sessionId, sessionId)
-          ),
-        });
-
-        console.log("Verified saved record:", savedRecord);
 
       } catch (dbError) {
         console.error("Error saving quiz response to database:", dbError);
@@ -942,7 +939,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/chat-configs/:id/template", requireAuth, async (req: Request, res: Response) => {
+app.post("/api/chat-configs/:id/template", requireAuth, async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.id);
 

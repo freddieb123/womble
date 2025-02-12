@@ -59,6 +59,19 @@ export const uploads = pgTable("uploads", {
   pk: primaryKey({ columns: [table.configId, table.sessionId] })
 }));
 
+export const quizResponses = pgTable("quiz_responses", {
+  configId: integer("config_id").notNull().references(() => chatConfigs.id),
+  sessionId: text("session_id").notNull(),
+  userName: text("user_name"),
+  feedback: jsonb("feedback").$type<Record<number, {
+    status: 'correct' | 'almost' | 'incorrect';
+    feedback: string;
+  }>>().notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.configId, table.sessionId] })
+}));
+
 export interface Message {
   role: 'user' | 'assistant';
   content: string | {
@@ -94,6 +107,7 @@ export const chatConfigsRelations = relations(chatConfigs, ({ one, many }) => ({
   conversations: many(conversations),
   uploads: many(uploads),
   quizQuestions: many(quizQuestions),
+  quizResponses: many(quizResponses),
 }));
 
 export const quizQuestionsRelations = relations(quizQuestions, ({ one }) => ({
@@ -117,6 +131,13 @@ export const uploadsRelations = relations(uploads, ({ one }) => ({
   }),
 }));
 
+export const quizResponsesRelations = relations(quizResponses, ({ one }) => ({
+  config: one(chatConfigs, {
+    fields: [quizResponses.configId],
+    references: [chatConfigs.id],
+  }),
+}));
+
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
 export const insertChatConfigSchema = createInsertSchema(chatConfigs);
@@ -127,6 +148,8 @@ export const insertConversationSchema = createInsertSchema(conversations);
 export const selectConversationSchema = createSelectSchema(conversations);
 export const insertUploadSchema = createInsertSchema(uploads);
 export const selectUploadSchema = createSelectSchema(uploads);
+export const insertQuizResponseSchema = createInsertSchema(quizResponses);
+export const selectQuizResponseSchema = createSelectSchema(quizResponses);
 
 export type InsertUser = typeof users.$inferInsert;
 export type SelectUser = typeof users.$inferSelect;
@@ -138,3 +161,5 @@ export type InsertConversation = typeof conversations.$inferInsert;
 export type SelectConversation = typeof conversations.$inferSelect;
 export type InsertUpload = typeof uploads.$inferInsert;
 export type SelectUpload = typeof uploads.$inferSelect;
+export type InsertQuizResponse = typeof quizResponses.$inferInsert;
+export type SelectQuizResponse = typeof quizResponses.$inferSelect;
