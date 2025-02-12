@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/button";
 import { MessageSquare, TrendingUp, ChevronDown } from "lucide-react";
 import type { Message, AdminConfig } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
+import QuizResponseView from "@/components/QuizResponseView";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import QuizResponseView from "@/components/QuizResponseView";
 
 interface ConversationFeedback {
   bullets: string[];
@@ -119,10 +119,27 @@ export default function ConversationAnalysis() {
 
         if (config.type === 'quiz') {
           const quizResponse = await fetch(`/api/quiz-responses/${configId}`);
+
+          // Check if the response is JSON
+          const contentType = quizResponse.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+            throw new Error("Invalid response format from quiz responses endpoint");
+          }
+
           if (!quizResponse.ok) {
+            if (quizResponse.status === 404) {
+              setQuizResponses([]);
+              return;
+            }
             throw new Error(`Failed to fetch quiz responses: ${await quizResponse.text()}`);
           }
+
           const quizData = await quizResponse.json();
+
+          if (!Array.isArray(quizData)) {
+            throw new Error("Invalid quiz response data format");
+          }
+
           setQuizResponses(quizData);
         } else {
           const conversationsResponse = await fetch(`/api/conversations/${configId}`);
@@ -131,8 +148,8 @@ export default function ConversationAnalysis() {
           }
           const conversationsData = await conversationsResponse.json();
 
-          if (!Array.isArray(conversationsData) || conversationsData.length === 0) {
-            throw new Error("No conversations found");
+          if (!Array.isArray(conversationsData)) {
+            throw new Error("Invalid conversations data format");
           }
 
           setConversations(conversationsData);
@@ -141,10 +158,11 @@ export default function ConversationAnalysis() {
           setSummary(summaryData);
         }
       } catch (error) {
+        console.error('Fetch error:', error);
         toast({
           variant: "destructive",
           title: "Error",
-          description: error instanceof Error ? error.message : "Failed to analyze conversations",
+          description: error instanceof Error ? error.message : "Failed to load data",
         });
       } finally {
         setIsLoading(false);
@@ -247,10 +265,16 @@ export default function ConversationAnalysis() {
                 {config?.type === 'quiz' ? (
                   <Card>
                     <CardContent className="p-6">
-                      <QuizResponseView
-                        config={config}
-                        responses={quizResponses}
-                      />
+                      {quizResponses.length > 0 ? (
+                        <QuizResponseView
+                          config={config}
+                          responses={quizResponses}
+                        />
+                      ) : (
+                        <div className="text-center text-muted-foreground">
+                          No quiz responses available yet.
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ) : (
