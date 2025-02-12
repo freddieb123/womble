@@ -568,7 +568,7 @@ export default function Home() {
                           size="sm"
                           variant="secondary"
                           onClick={() => handleViewFeedback(config)}
-                          disabled={!config.feedbackCriteria || config.conversationCount === 0}
+                          disabled={config.type === 'chat' ? (!config.feedbackCriteria || config.conversationCount === 0) : config.conversationCount === 0}
                         >
                           <BarChart2 className="h-4 w-4 mr-2" />
                           <span className="md:hidden">View Feedback</span>
