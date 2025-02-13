@@ -621,11 +621,11 @@ export function registerRoutes(app: Express): Server {
 
       const feedbackPromises = answers.map(async ({ questionIndex, answer, expectedAnswer }) => {
         const prompt = `Compare the following answer to the expected answer and categorize it as either 'correct' (if it matches closely), 'almost' (if it's on the right track but not quite there), or 'incorrect' (if it's way off).
-
+        
         Question: ${questions[questionIndex].question}
         Expected Answer: ${expectedAnswer}
         User's Answer: ${answer}
-
+        
         Respond in exactly this format:
         {
           "status": "correct|almost|incorrect",
@@ -713,6 +713,33 @@ export function registerRoutes(app: Express): Server {
         error: error.message || "Failed to process quiz submission",
         details: error.errors || error.stack
       });
+    }
+  });
+
+  // Add new endpoint for fetching quiz responses after the existing quiz feedback endpoint
+  app.get("/api/quiz-responses/:configId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.configId);
+
+      if (isNaN(configId)) {
+        return res.status(400).json({ error: "Invalid config ID" });
+      }
+
+      const responses = await db.query.quizResponses.findMany({
+        where: eq(quizResponses.configId, configId),
+        orderBy: [desc(quizResponses.createdAt)]
+      });
+
+      const formattedResponses = responses.map(response => ({
+        sessionId: response.sessionId,
+        userName: response.userName,
+        feedback: response.feedback
+      }));
+
+      res.json(formattedResponses);
+    } catch (error: any) {
+      console.error("Error fetching quiz responses:", error);
+      res.status(500).json({ error: error.message });
     }
   });
 
@@ -909,20 +936,20 @@ export function registerRoutes(app: Express): Server {
       }
 
       const prompt = `Analyze these feedback points and identify two key themes:
-
+      
       Feedback points:
       ${allBullets.map(bullet => `- ${bullet}`).join('\n')}
-
+      
       Please provide exactly two themes in JSON format:
       1. One positive theme highlighting what's being done well
-      2. One constructive theme suggesting an area for improvement
-
+      2.One constructive theme suggesting an area for improvement
+      
       Response Format:
       {
         "positive": "A clear, concise positive theme",
         "constructive": "A clear, concise constructive theme"
       }
-
+      
       Rules:
       - Each theme should be 1-2 sentences
       - Use third-person perspective (e.g., "learners" or "users", not "you")

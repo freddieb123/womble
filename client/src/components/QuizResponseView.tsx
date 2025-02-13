@@ -7,10 +7,10 @@ import { AdminConfig } from "@/lib/types";
 interface QuizResponse {
   sessionId: string;
   userName: string;
-  answers: Record<number, {
+  feedback: Record<number, {
     status: 'correct' | 'almost' | 'incorrect';
     feedback: string;
-    answer: string;
+    answer?: string;
   }>;
 }
 
@@ -50,15 +50,15 @@ export default function QuizResponseView({ config, responses }: Props) {
   // Group all responses by question
   const questionResponses: Record<number, Array<{
     userName: string;
-    answer: string;
+    answer?: string;
     status: string;
     feedback: string;
   }>> = {};
 
   config.questions.forEach((_, qIndex) => {
     questionResponses[qIndex] = responses.map(response => ({
-      userName: response.userName,
-      ...response.answers[qIndex] || {
+      userName: response.userName || 'Anonymous',
+      ...response.feedback[qIndex] || {
         answer: 'No answer provided',
         status: 'incorrect',
         feedback: 'No response received'

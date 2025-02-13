@@ -22,10 +22,10 @@ interface ConversationFeedback {
 interface QuizResponse {
   sessionId: string;
   userName: string;
-  answers: Record<number, {
+  feedback: Record<number, {
     status: "correct" | "almost" | "incorrect";
     feedback: string;
-    answer: string;
+    answer?: string;
   }>;
 }
 
@@ -120,12 +120,6 @@ export default function ConversationAnalysis() {
         if (config.type === 'quiz') {
           const quizResponse = await fetch(`/api/quiz-responses/${configId}`);
 
-          // Check if the response is JSON
-          const contentType = quizResponse.headers.get("content-type");
-          if (!contentType || !contentType.includes("application/json")) {
-            throw new Error("Invalid response format from quiz responses endpoint");
-          }
-
           if (!quizResponse.ok) {
             if (quizResponse.status === 404) {
               setQuizResponses([]);
@@ -135,12 +129,20 @@ export default function ConversationAnalysis() {
           }
 
           const quizData = await quizResponse.json();
+          console.log("Received quiz responses:", quizData); // Debug log
 
           if (!Array.isArray(quizData)) {
             throw new Error("Invalid quiz response data format");
           }
 
-          setQuizResponses(quizData);
+          // Transform the data to match the expected format
+          const transformedResponses = quizData.map(response => ({
+            sessionId: response.sessionId,
+            userName: response.userName || 'Anonymous',
+            feedback: response.feedback
+          }));
+
+          setQuizResponses(transformedResponses);
         } else {
           const conversationsResponse = await fetch(`/api/conversations/${configId}`);
           if (!conversationsResponse.ok) {
