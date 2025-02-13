@@ -19,6 +19,8 @@ interface QuizQuestion {
   expectedAnswer: string;
 }
 
+import { useEffect } from 'react';
+
 export default function AdminPanel({ config, onConfigChange, isEditMode = false }: Props) {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
 
