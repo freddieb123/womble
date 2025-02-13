@@ -20,7 +20,15 @@ interface QuizQuestion {
 }
 
 export default function AdminPanel({ config, onConfigChange, isEditMode = false }: Props) {
-  const [questions, setQuestions] = useState<QuizQuestion[]>([{ question: "", expectedAnswer: "" }]);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+
+useEffect(() => {
+  if (config.type === 'quiz' && config.questions && config.questions.length > 0) {
+    setQuestions(config.questions);
+  } else if (config.type === 'quiz') {
+    setQuestions([{ question: "", expectedAnswer: "" }]);
+  }
+}, [config.type, config.questions]);
   const { toast } = useToast();
 
   const addQuestion = () => {
