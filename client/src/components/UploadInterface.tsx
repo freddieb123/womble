@@ -24,12 +24,13 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
     feedback: null
   });
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [showNameModal, setShowNameModal] = useState(false);
+  const [localUserName, setLocalUserName] = useState(userName);
+  const [showNameModal, setShowNameModal] = useState(!localUserName);
+  const { toast } = useToast();
 
   useEffect(() => {
-    setShowNameModal(!userName);
+    setLocalUserName(userName);
   }, [userName]);
-  const { toast } = useToast();
 
   // Fetch existing feedback if available
   const { data: conversations = [], error: fetchError } = useQuery<Array<{
@@ -106,7 +107,7 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
       return;
     }
 
-    if (!userName) {
+    if (!localUserName) {
       setShowNameModal(true);
       return;
     }
@@ -119,7 +120,7 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
         body: JSON.stringify({
           configId: config.id,
           sessionId,
-          userName,
+          userName: localUserName,
           fileContent: uploadState.file,
           fileName: "pasted_screenshot.png"
         }),
@@ -157,15 +158,12 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
           open={showNameModal}
           onSubmit={(name) => {
             onUserNameSubmit(name);
-            // Only close the modal if the name was successfully set
-            if (name.trim()) {
-              setShowNameModal(false);
-            }
+            setLocalUserName(name);
+            setShowNameModal(false);
           }}
         />
       )}
 
-      {/*The following lines were moved up to improve UI flow.*/}
       {config.userInstructions && (
         <Alert className="mb-4">
           <Info className="h-4 w-4" />
@@ -215,7 +213,7 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
       <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{userName ? `${userName}'s Upload` : 'Feedback'}</DialogTitle>
+            <DialogTitle>{localUserName ? `${localUserName}'s Upload` : 'Feedback'}</DialogTitle>
           </DialogHeader>
           {uploadState.feedback && (
             <div className="space-y-6">
