@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Wand2, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { AdminConfig } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,27 +19,26 @@ interface QuizQuestion {
   expectedAnswer: string;
 }
 
-import { useEffect } from 'react';
-
 export default function AdminPanel({ config, onConfigChange, isEditMode = false }: Props) {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const { toast } = useToast();
 
+  // Initialize questions when component mounts or config changes
   useEffect(() => {
     if (config.type === 'quiz') {
-      setQuestions(
-        config.questions && config.questions.length > 0
-          ? config.questions
-          : [{ question: "", expectedAnswer: "" }]
-      );
+      // If we have existing questions in config, use those
+      if (config.questions && Array.isArray(config.questions) && config.questions.length > 0) {
+        setQuestions(config.questions);
+      } else {
+        // Otherwise initialize with one empty question
+        setQuestions([{ question: "", expectedAnswer: "" }]);
+      }
     }
   }, [config.type, config.questions]); 
-
-  const { toast } = useToast();
 
   const addQuestion = () => {
     const newQuestions = [...questions, { question: "", expectedAnswer: "" }];
     setQuestions(newQuestions);
-
     onConfigChange({
       ...config,
       questions: newQuestions
@@ -50,7 +49,6 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
     if (questions.length > 1) {
       const newQuestions = questions.filter((_, i) => i !== index);
       setQuestions(newQuestions);
-
       onConfigChange({
         ...config,
         questions: newQuestions
@@ -63,7 +61,6 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
       i === index ? { ...q, [field]: value } : q
     );
     setQuestions(newQuestions);
-
     onConfigChange({
       ...config,
       questions: newQuestions
