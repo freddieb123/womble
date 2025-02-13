@@ -107,11 +107,6 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
     }
 
     if (!userName) {
-      toast({
-        variant: "destructive",
-        title: "Name Required",
-        description: "Please provide your name first"
-      });
       setShowNameModal(true);
       return;
     }
