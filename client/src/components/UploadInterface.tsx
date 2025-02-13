@@ -162,7 +162,10 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
           open={showNameModal}
           onSubmit={(name) => {
             onUserNameSubmit(name);
-            setShowNameModal(false);
+            // Only close the modal if the name was successfully set
+            if (name.trim()) {
+              setShowNameModal(false);
+            }
           }}
         />
       )}
