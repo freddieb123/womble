@@ -7,7 +7,7 @@ import { eq, and, or, desc, count } from "drizzle-orm";
 import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
-import type { ChatCompletionMessageParam } from 'openai/resources';
+import type { ChatCompletionMessage } from 'openai/resources/chat';
 
 const uploadFeedbackSchema = z.object({
   configId: z.number(),
@@ -430,7 +430,7 @@ export function registerRoutes(app: Express): Server {
 
       const enhancedSystemPrompt = `${parsedConfig.systemPrompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${userName || 'Anonymous'}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${userName || 'Anonymous'}!" or "Hi ${userName || 'Anonymous'}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much!`;
 
-      const apiMessages: ChatCompletionMessageParam[] = [
+      const apiMessages: ChatCompletionMessage[] = [
         { role: "system", content: enhancedSystemPrompt }
       ];
 
