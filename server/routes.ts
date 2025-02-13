@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "@db";
 import { chatConfigs, conversations, uploads, quizQuestions, quizResponses, type Message, type ConversationFeedback, type UploadFeedback } from "@db/schema";
-import { eq, and, or, desc } from "drizzle-orm";
+import { eq, and, or, desc, count } from "drizzle-orm";
 import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
@@ -88,13 +88,13 @@ export function registerRoutes(app: Express): Server {
       const configs = await db.query.chatConfigs.findMany({
         where: and(
           showDeleted ? undefined : eq(chatConfigs.deleted, false),
-          // Only return configs that are owned by the current user
           eq(chatConfigs.userId, userId)
         ),
         orderBy: [desc(chatConfigs.createdAt)],
         with: {
           conversations: true,
           uploads: true,
+          quizResponses: true,
         }
       });
 
@@ -108,18 +108,31 @@ export function registerRoutes(app: Express): Server {
         with: {
           conversations: true,
           uploads: true,
+          quizResponses: true,
         }
       });
 
       // Combine user's configs and public templates
       const allConfigs = [...configs, ...templates];
 
-      const configsWithCount = allConfigs.map(config => ({
-        ...config,
-        conversationCount: config.type === 'upload' ? config.uploads.length : config.conversations.length,
-        conversations: undefined,
-        uploads: undefined
-      }));
+      const configsWithCount = allConfigs.map(config => {
+        let responseCount;
+        if (config.type === 'upload') {
+          responseCount = config.uploads.length;
+        } else if (config.type === 'quiz') {
+          responseCount = config.quizResponses.length;
+        } else {
+          responseCount = config.conversations.length;
+        }
+
+        return {
+          ...config,
+          conversationCount: responseCount,
+          conversations: undefined,
+          uploads: undefined,
+          quizResponses: undefined
+        };
+      });
 
       res.json(configsWithCount);
     } catch (error: any) {
@@ -168,7 +181,7 @@ export function registerRoutes(app: Express): Server {
           question: q.question,
           expectedAnswer: q.expectedAnswer
         })) : undefined,
-        quizQuestions: undefined // Remove the original quizQuestions field
+        quizQuestions: undefined
       };
 
       res.json(responseConfig);
@@ -696,7 +709,7 @@ export function registerRoutes(app: Express): Server {
       res.json(feedbackMap);
     } catch (error: any) {
       console.error("Error processing quiz feedback:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: error.message || "Failed to process quiz submission",
         details: error.errors || error.stack
       });
@@ -939,7 +952,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-app.post("/api/chat-configs/:id/template", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/chat-configs/:id/template", requireAuth, async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.id);
 
@@ -980,7 +993,7 @@ app.post("/api/chat-configs/:id/template", requireAuth, async (req: Request, res
 
       const templatesWithoutPrivateData = templates.map(template => ({
         ...template,
-        userId: undefined // Remove userId from public templates
+        userId: undefined 
       }));
 
       res.json(templatesWithoutPrivateData);
