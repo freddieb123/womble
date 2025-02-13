@@ -112,8 +112,7 @@ export default function QuizResponseView({ config, responses }: Props) {
                           {response.status}
                         </span>
                       </div>
-                      <p className="mb-2 text-gray-700">{response.answer}</p>
-                      <p className="text-sm italic">{response.feedback}</p>
+                      <p className="text-gray-700">{response.answer}</p>
                     </div>
                   ))}
                 </div>
