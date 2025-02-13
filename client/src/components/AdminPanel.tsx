@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Wand2, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { AdminConfig } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,68 +19,88 @@ interface QuizQuestion {
   expectedAnswer: string;
 }
 
+import { useEffect } from 'react';
+
 export default function AdminPanel({ config, onConfigChange, isEditMode = false }: Props) {
-  console.log('AdminPanel mounted with config:', config); // Debug log
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
 
-  // Initialize questions state with config.questions if available
-  const [questions, setQuestions] = useState<QuizQuestion[]>(() => {
-    // Debug log
-    console.log('Initializing questions with:', {
-      type: config.type,
-      hasQuestions: Boolean(config.questions),
-      questionsLength: config.questions?.length
-    });
-
-    // Deep copy the questions from config if available
-    if (config.type === 'quiz' && config.questions && Array.isArray(config.questions) && config.questions.length > 0) {
-      return JSON.parse(JSON.stringify(config.questions));
-    }
-    return [{ question: "", expectedAnswer: "" }];
-  });
-
+useEffect(() => {
+  if (config.type === 'quiz' && config.questions && config.questions.length > 0) {
+    setQuestions(config.questions);
+  } else if (config.type === 'quiz') {
+    setQuestions([{ question: "", expectedAnswer: "" }]);
+  }
+}, [config.type, config.questions]);
   const { toast } = useToast();
 
-  // Keep questions in sync with config changes
-  useEffect(() => {
-    console.log('Config changed:', config); // Debug log
-    if (config.type === 'quiz' && config.questions && Array.isArray(config.questions) && config.questions.length > 0) {
-      // Deep copy the questions
-      const newQuestions = JSON.parse(JSON.stringify(config.questions));
-      console.log('Updating questions to:', newQuestions); // Debug log
-      setQuestions(newQuestions);
-    }
-  }, [config.type, config.questions]); 
-
   const addQuestion = () => {
-    const newQuestions = [...questions, { question: "", expectedAnswer: "" }];
-    setQuestions(newQuestions);
-    onConfigChange({
-      ...config,
-      questions: newQuestions
-    });
+    setQuestions([...questions, { question: "", expectedAnswer: "" }]);
   };
 
   const removeQuestion = (index: number) => {
     if (questions.length > 1) {
-      const newQuestions = questions.filter((_, i) => i !== index);
+      const newQuestions = [...questions];
+      newQuestions.splice(index, 1);
       setQuestions(newQuestions);
-      onConfigChange({
-        ...config,
-        questions: newQuestions
-      });
     }
   };
 
   const updateQuestion = (index: number, field: keyof QuizQuestion, value: string) => {
-    const newQuestions = questions.map((q, i) =>
-      i === index ? { ...q, [field]: value } : q
-    );
+    const newQuestions = [...questions];
+    newQuestions[index] = { ...newQuestions[index], [field]: value };
     setQuestions(newQuestions);
+
+    // Update the main config with the new questions
     onConfigChange({
       ...config,
       questions: newQuestions
     });
   };
+
+  const improveCriteria = async () => {
+    if (!config.feedbackCriteria) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please enter some initial feedback criteria first."
+      });
+      return;
+    }
+
+    try {
+      setIsImproving(true);
+      const response = await fetch("/api/improve-criteria", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feedbackCriteria: config.feedbackCriteria }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const { improvedCriteria } = await response.json();
+      onConfigChange({
+        ...config,
+        feedbackCriteria: improvedCriteria
+      });
+
+      setHasImproved(true);
+      toast({
+        description: "Feedback criteria improved successfully!"
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to improve criteria"
+      });
+    } finally {
+      setIsImproving(false);
+    }
+  };
+  const [isImproving, setIsImproving] = useState(false);
+  const [hasImproved, setHasImproved] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -108,6 +129,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
             value={config.type || "chat"}
             onValueChange={(value) => {
               const newType = value as 'chat' | 'upload' | 'quiz';
+              console.log('Type changed to:', newType);
               onConfigChange({
                 ...config,
                 type: newType,
@@ -133,61 +155,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
           </p>
         </div>
 
-        {config.type === 'quiz' ? (
-          <div className="space-y-4">
-            <div className="border rounded-lg p-4">
-              <h3 className="text-lg font-semibold mb-4">Quiz Questions</h3>
-              {questions.map((q, index) => (
-                <div key={index} className="space-y-4 mb-6 pb-6 border-b last:border-b-0">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-medium">Question {index + 1}</h4>
-                    {questions.length > 1 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeQuestion(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor={`question-${index}`}>Question Text</Label>
-                    <Textarea
-                      id={`question-${index}`}
-                      value={q.question}
-                      onChange={(e) => updateQuestion(index, 'question', e.target.value)}
-                      placeholder="Enter your question..."
-                      rows={2}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor={`answer-${index}`}>Expected Answer</Label>
-                    <Textarea
-                      id={`answer-${index}`}
-                      value={q.expectedAnswer}
-                      onChange={(e) => updateQuestion(index, 'expectedAnswer', e.target.value)}
-                      placeholder="Enter the expected answer..."
-                      rows={3}
-                    />
-                  </div>
-                </div>
-              ))}
-
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full mt-4"
-                onClick={addQuestion}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Question
-              </Button>
-            </div>
-          </div>
-        ) : (
+        {config.type !== 'quiz' ? (
           <>
             <div className="space-y-2">
               <Label htmlFor="system-prompt">System Prompt</Label>
@@ -243,6 +211,60 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               </p>
             </div>
           </>
+        ) : (
+          <div className="space-y-4">
+            <div className="border rounded-lg p-4">
+              <h3 className="text-lg font-semibold mb-4">Quiz Questions</h3>
+              {questions.map((q, index) => (
+                <div key={index} className="space-y-4 mb-6 pb-6 border-b last:border-b-0">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-medium">Question {index + 1}</h4>
+                    {questions.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeQuestion(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`question-${index}`}>Question Text</Label>
+                    <Textarea
+                      id={`question-${index}`}
+                      value={q.question}
+                      onChange={(e) => updateQuestion(index, 'question', e.target.value)}
+                      placeholder="Enter your question..."
+                      rows={2}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`answer-${index}`}>Expected Answer</Label>
+                    <Textarea
+                      id={`answer-${index}`}
+                      value={q.expectedAnswer}
+                      onChange={(e) => updateQuestion(index, 'expectedAnswer', e.target.value)}
+                      placeholder="Enter the expected answer..."
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full mt-4"
+                onClick={addQuestion}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Question
+              </Button>
+            </div>
+          </div>
         )}
       </div>
     </div>
