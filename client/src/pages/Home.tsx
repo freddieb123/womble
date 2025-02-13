@@ -521,6 +521,7 @@ export default function Home() {
                                       feedbackCriteria: editingConfig.feedbackCriteria || "",
                                       temperature: 0.7,
                                       maxTokens: 1000,
+                                      questions: editingConfig.questions || []
                                     }}
                                     onConfigChange={(updatedConfig) => {
                                       setEditingConfig({
