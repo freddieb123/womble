@@ -24,7 +24,11 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
     feedback: null
   });
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [showNameModal, setShowNameModal] = useState(!userName);
+  const [showNameModal, setShowNameModal] = useState(false);
+
+  useEffect(() => {
+    setShowNameModal(!userName);
+  }, [userName]);
   const { toast } = useToast();
 
   // Fetch existing feedback if available
