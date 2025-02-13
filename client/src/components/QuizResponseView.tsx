@@ -80,7 +80,7 @@ export default function QuizResponseView({ config, responses }: Props) {
             </div>
             <div className="flex items-center gap-4">
               <div className="text-sm text-gray-500">
-                {questionResponses[qIndex].length} responses
+                {questionResponses[qIndex].filter(r => r.status === 'correct').length}/{questionResponses[qIndex].length} correct
               </div>
               <Button variant="ghost" size="sm">
                 {expandedQuestions.includes(qIndex) ? (
