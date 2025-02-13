@@ -137,9 +137,7 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
         <Card key={index} className={`p-6 ${
           feedback?.[index]
             ? `border-2 border-${getFeedbackColor(feedback[index]?.status)}-500`
-            : !answers[index]?.trim()
-              ? 'border-2 border-yellow-200'
-              : ''
+            : ''
         }`}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -154,11 +152,7 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
                 onChange={(e) => handleAnswerChange(index, e.target.value)}
                 placeholder="Type your answer here..."
                 disabled={feedback !== null || isViewOnly}
-                className={!answers[index]?.trim() ? 'border-yellow-200' : ''}
               />
-              {!answers[index]?.trim() && !feedback && !isViewOnly && (
-                <p className="text-sm text-yellow-600">Please provide an answer</p>
-              )}
             </div>
             {feedback?.[index] && (
               <div className={`p-4 rounded-md bg-${getFeedbackColor(feedback[index].status)}-100`}>
