@@ -24,33 +24,46 @@ import { useEffect } from 'react';
 export default function AdminPanel({ config, onConfigChange, isEditMode = false }: Props) {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
 
-useEffect(() => {
-  if (config.type === 'quiz' && config.questions && config.questions.length > 0) {
-    setQuestions(config.questions);
-  } else if (config.type === 'quiz') {
-    setQuestions([{ question: "", expectedAnswer: "" }]);
-  }
-}, [config.type, config.questions]);
+  useEffect(() => {
+    if (config.type === 'quiz') {
+      setQuestions(
+        config.questions && config.questions.length > 0
+          ? config.questions
+          : [{ question: "", expectedAnswer: "" }]
+      );
+    }
+  }, [config.type, config.questions]); 
+
   const { toast } = useToast();
 
   const addQuestion = () => {
-    setQuestions([...questions, { question: "", expectedAnswer: "" }]);
+    const newQuestions = [...questions, { question: "", expectedAnswer: "" }];
+    setQuestions(newQuestions);
+
+    onConfigChange({
+      ...config,
+      questions: newQuestions
+    });
   };
 
   const removeQuestion = (index: number) => {
     if (questions.length > 1) {
-      const newQuestions = [...questions];
-      newQuestions.splice(index, 1);
+      const newQuestions = questions.filter((_, i) => i !== index);
       setQuestions(newQuestions);
+
+      onConfigChange({
+        ...config,
+        questions: newQuestions
+      });
     }
   };
 
   const updateQuestion = (index: number, field: keyof QuizQuestion, value: string) => {
-    const newQuestions = [...questions];
-    newQuestions[index] = { ...newQuestions[index], [field]: value };
+    const newQuestions = questions.map((q, i) => 
+      i === index ? { ...q, [field]: value } : q
+    );
     setQuestions(newQuestions);
 
-    // Update the main config with the new questions
     onConfigChange({
       ...config,
       questions: newQuestions
@@ -129,7 +142,6 @@ useEffect(() => {
             value={config.type || "chat"}
             onValueChange={(value) => {
               const newType = value as 'chat' | 'upload' | 'quiz';
-              console.log('Type changed to:', newType);
               onConfigChange({
                 ...config,
                 type: newType,
