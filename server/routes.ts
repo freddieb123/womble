@@ -653,19 +653,25 @@ export function registerRoutes(app: Express): Server {
           }
 
           try {
-            return JSON.parse(completion.choices[0].message.content);
+            const feedback = JSON.parse(completion.choices[0].message.content);
+            return {
+              ...feedback,
+              answer // Store the user's actual answer
+            };
           } catch (parseError) {
             console.error("Error parsing OpenAI response:", parseError);
             return {
               status: "error",
-              feedback: "Failed to evaluate answer. Please try again."
+              feedback: "Failed to evaluate answer. Please try again.",
+              answer // Store the user's actual answer even if evaluation fails
             };
           }
         } catch (error) {
           console.error("Error processing answer feedback:", error);
           return {
             status: "error",
-            feedback: "Failed to evaluate answer. Please try again."
+            feedback: "Failed to evaluate answer. Please try again.",
+            answer // Store the user's actual answer even if API call fails
           };
         }
       });
@@ -677,7 +683,7 @@ export function registerRoutes(app: Express): Server {
         feedbackMap[questionIndex] = feedbackResults[index];
       });
 
-      // Save the quiz response to the database using the new quizResponses table
+      // Save the quiz response to the database using the updated schema
       try {
         const insertData = {
           configId,

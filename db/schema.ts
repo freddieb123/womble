@@ -66,6 +66,7 @@ export const quizResponses = pgTable("quiz_responses", {
   feedback: jsonb("feedback").$type<Record<number, {
     status: 'correct' | 'almost' | 'incorrect';
     feedback: string;
+    answer: string;
   }>>().notNull().default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({

@@ -10,7 +10,7 @@ interface QuizResponse {
   feedback: Record<number, {
     status: 'correct' | 'almost' | 'incorrect';
     feedback: string;
-    answer?: string;
+    answer: string;  // Make sure answer is included in the type
   }>;
 }
 
