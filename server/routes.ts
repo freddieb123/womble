@@ -936,127 +936,421 @@ export function registerRoutes(app: Express): Server {
 
       if (allBullets.length === 0) {
         return res.json({
-          positive: "No positive themes identified yet",constructive: "No constructive feedback available yet"
+          positive: "No positive themes identified yet",
+          constructive: "No constructive feedback available yet"
         });
       }
 
-      const prompt = `Analyze these feedback points and identify two key themes:
-      
-      Feedback points:
-      ${allBullets.map(bullet => `- ${bullet}`).join('\n')}
-      
-      Please provide exactly two themes in JSON format:
-      1. One positive theme highlighting what's being done well
-      2. One constructive theme suggesting an area for improvement
-      
-      Response Format:
-      {
-        "positive": "A clear, concise positive theme",
-        "constructive": "A clear, concise constructive theme"
-      }
-      
-      Rules:
-      - Each theme should be 1-2 sentences
-      - Use third-person perspective (e.g., "learners" or "users", not "you")
-      - Be specific and actionable
-      - Base themes on patterns across multiple feedback points when possible`;
+      const prompt = `Based on the following feedback points, generate exactly two themes - one positive and one constructive. Return your response in a strict JSON format.
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert at analyzing feedback and identifying key themes. Focus on patterns and provide clear, actionable insights."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000,
-        response_format: { type: "json_object" }
+Feedback points:
+${allBullets.map(bullet => `- ${bullet}`).join('\n')}
+
+Instructions:
+1. Analyze the feedback points to identify common patterns
+2. Create one positive theme about what's being done well
+3. Create one constructive theme about areas for improvement
+4. Format your entire response as a JSON object with exactly these two keys: "positive" and "constructive"
+
+Required JSON format:
+{
+  "positive": "Brief positive theme here",
+  "constructive": "Brief constructive theme here"
+}
+
+Remember:
+- Keep each theme to 1-2 sentences
+- Use third-person perspective
+- Be specific and actionable
+- Focus on patterns across multiple feedback points`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert at analyzing feedback and identifying key themes. You must respond with a valid JSON object containing exactly two keys: 'positive' and 'constructive'. Each value should be a string containing a clear, actionable insight."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.5,
+      max_tokens: 500
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error("No response from OpenAI");
+    }
+
+    // Try to extract JSON even if it's embedded in other text
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("No JSON found in response");
+    }
+
+    const themes = JSON.parse(jsonMatch[0]);
+
+    // Validate the response structure
+    if (!themes.positive || !themes.constructive || 
+        typeof themes.positive !== 'string' || 
+        typeof themes.constructive !== 'string') {
+      throw new Error("Invalid theme structure");
+    }
+
+    res.json(themes);
+  } catch (error: any) {
+    console.error("Error analyzing themes:", error);
+    // Always return a valid response structure even in error cases
+    res.json({
+      positive: "Theme analysis unavailable",
+      constructive: "Theme analysis unavailable"
+    });
+  }
+});
+
+// Add new endpoint for fetching quiz responses after the existing quiz feedback endpoint
+app.get("/api/quiz-responses/:configId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const configId = parseInt(req.params.configId);
+
+    if (isNaN(configId)) {
+      return res.status(400).json({ error: "Invalid config ID" });
+    }
+
+    const responses = await db.query.quizResponses.findMany({
+      where: eq(quizResponses.configId, configId),
+      orderBy: [desc(quizResponses.createdAt)]
+    });
+
+    const formattedResponses = responses.map(response => ({
+      sessionId: response.sessionId,
+      userName: response.userName,
+      feedback: response.feedback
+    }));
+
+    res.json(formattedResponses);
+  } catch (error: any) {
+    console.error("Error fetching quiz responses:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/chat-feedback", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { configId, sessionId, messages } = req.body;
+
+    if (!configId || !sessionId || !messages) {
+      return res.status(400).json({ error: "Missing required parameters" });
+    }
+
+    const config = await db.query.chatConfigs.findFirst({
+      where: eq(chatConfigs.id, configId),
+    });
+
+    if (!config) {
+      return res.status(404).json({ error: "Configuration not found" });
+    }
+
+    if (!config.feedbackCriteria) {
+      return res.status(400).json({ error: "Feedback criteria not set for this configuration" });
+    }
+
+    const prompt = `Context:\n${config.systemPrompt}\n\nAnalyze the conversation based on these criteria:\n${config.feedbackCriteria}\n\nAddress the user as 'you' in your response (and do not just say 'the user').\n\nPlease provide your analysis in exactly this format, ensuring you are evaluating the user's side of the conversation (i.e. the person who first types, NOT the GPT (which is you as the bot):\n\n• [3 bullet points focusing on how well the conversation meets the criteria. Keep each bullet to 1 sentence]\n\nScore: [1-10]\n[Brief one-line summary of overall quality]`;
+
+    const conversation = messages.map((m: Message) =>
+      `${m.role}: ${typeof m.content === 'string' ? m.content : m.content.text}`
+    ).join('\n');
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert at analyzing conversations and providing constructive feedback. Focus on communication effectiveness and how well the content meets the specified criteria."
+        },
+        {
+          role: "user",
+          content: `${prompt}\n\nConversation to analyze:\n${conversation}`
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 1000,
+    });
+
+    const response = completion.choices[0]?.message?.content;
+    if (!response) {
+      throw new Error("Failed to get response from OpenAI");
+    }
+
+    const scoreMatch = response.match(/Score:\s*(\d+)/i);
+    const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
+
+    const summaryMatch = response.match(/Score:\s*\d+\s*\n([^\n]+)/i);
+    const summary = summaryMatch ? summaryMatch[1].trim() : null;
+
+    const bullets = response
+      .split(/Score:/i)[0]
+      .split(/[•\-\*]\s+/)
+      .filter(bullet => bullet.trim())
+      .map(bullet => bullet.trim());
+
+    const feedbackData: ConversationFeedback = {
+      bullets,
+      score,
+      summary
+    };
+
+    await db
+      .update(conversations)
+      .set({
+        feedback: feedbackData
+      })
+      .where(and(
+        eq(conversations.configId, configId),
+        eq(conversations.sessionId, sessionId)
+      ));
+
+    res.json(feedbackData);
+  } catch (error: any) {
+    console.error("Error processing chat feedback:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete("/api/chat-configs/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const configId = parseInt(req.params.id);
+    const userId = req.user?.id;
+
+    if (isNaN(configId)) {
+      return res.status(400).json({ error: "Invalid config ID" });
+    }
+
+    if (!userId) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    // First check if the user owns this config
+    const existingConfig = await db.query.chatConfigs.findFirst({
+      where: and(
+        eq(chatConfigs.id, configId),
+        eq(chatConfigs.userId, userId)
+      ),
+    });
+
+    if (!existingConfig) {
+      return res.status(403).json({ error: "You don't have permission to delete this configuration" });
+    }
+
+    await db
+      .update(chatConfigs)
+      .set({ deleted: true, deletedAt: new Date() })
+      .where(and(
+        eq(chatConfigs.id, configId),
+        eq(chatConfigs.userId, userId)
+      ));
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("Error deleting chat config:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/conversations/:configId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const configId = parseInt(req.params.configId);
+
+    if (isNaN(configId)) {
+      return res.status(400).json({ error: "Invalid config ID" });
+    }
+
+    const config = await db.query.chatConfigs.findFirst({
+      where: eq(chatConfigs.id, configId),
+    });
+
+    if (!config) {
+      return res.status(404).json({ error: "Configuration not found" });
+    }
+
+    if (config.type === 'upload') {
+      const uploadData = await db.query.uploads.findMany({
+        where: eq(uploads.configId, configId),
+        orderBy: [desc(uploads.createdAt)]
       });
 
-      let themes;
-      try {
-        themes = JSON.parse(completion.choices[0].message.content || "{}");
-        if (!themes.positive || !themes.constructive) {
-          themes = {
-            positive: themes.positive || "Theme analysis unavailable",
-            constructive: themes.constructive || "Theme analysis unavailable"
-          };
+      const uploadsWithMetadata = uploadData.map(upload => ({
+        sessionId: upload.sessionId,
+        userName: upload.userName,
+        fileName: upload.fileName,
+        feedback: upload.feedback
+      }));
+
+      res.json(uploadsWithMetadata);
+    } else {
+      const conversationData = await db.query.conversations.findMany({
+        where: eq(conversations.configId, configId),
+        orderBy: [desc(conversations.createdAt)]
+      });
+
+      const conversationsWithMetadata = conversationData.map(conv => ({
+        sessionId: conv.sessionId,
+        userName: conv.userName,
+        messages: conv.messages,
+        feedback: conv.feedback
+      }));
+
+      res.json(conversationsWithMetadata);
+    }
+  } catch (error: any) {
+    console.error("[GET /api/conversations] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/analyze-themes", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { feedbacks } = req.body;
+
+    if (!Array.isArray(feedbacks)) {
+      return res.status(400).json({ error: "Feedbacks must be an array" });
+    }
+
+    const allBullets = feedbacks
+      .flatMap(feedback => feedback.bullets || [])
+      .filter(bullet => bullet);
+
+    if (allBullets.length === 0) {
+      return res.json({
+        positive: "No positive themes identified yet",
+        constructive: "No constructive feedback available yet"
+      });
+    }
+
+    const prompt = `Analyze these feedback points and identify two key themes:
+
+    Feedback points:
+    ${allBullets.map(bullet => `- ${bullet}`).join('\n')}
+
+    Please provide exactly two themes:
+    1. One positive theme highlighting what's being done well
+    2. One constructive theme suggesting an area for improvement
+
+    Format your response exactly like this example:
+    {
+      "positive": "Learners consistently demonstrate strong engagement with the material",
+      "constructive": "More emphasis needed on practical application of concepts"
+    }
+
+    Rules:
+    - Each theme should be 1-2 sentences
+    - Use third-person perspective (e.g., "learners" or "users", not "you")
+    - Be specific and actionable
+    - Base themes on patterns across multiple feedback points when possible`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert at analyzing feedback and identifying key themes. Focus on patterns and provide clear, actionable insights. Always respond in valid JSON format with 'positive' and 'constructive' keys."
+        },
+        {
+          role: "user",
+          content: prompt
         }
-      } catch (parseError) {
-        console.error("Error parsing OpenAI response:", parseError);
+      ],
+      temperature: 0.7,
+      max_tokens: 1000
+    });
+
+    let themes;
+    try {
+      // Try to parse response as JSON
+      const content = completion.choices[0]?.message?.content || "{}";
+      themes = JSON.parse(content);
+
+      // Validate the response has both required fields
+      if (!themes.positive || !themes.constructive) {
+        console.error("Invalid theme response structure:", themes);
         themes = {
           positive: "Theme analysis unavailable",
           constructive: "Theme analysis unavailable"
         };
       }
-
-      res.json(themes);
-    } catch (error: any) {
-      console.error("Error analyzing themes:", error);
-      res.status(500).json({ 
-        error: error.message,
-        positive: "Error analyzing themes",
-        constructive: "Error analyzing themes"
-      });
+    } catch (parseError) {
+      console.error("Error parsing OpenAI response:", parseError);
+      themes = {
+        positive: "Theme analysis unavailable",
+        constructive: "Theme analysis unavailable"
+      };
     }
-  });
 
-  app.post("/api/chat-configs/:id/template", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const configId = parseInt(req.params.id);
+    res.json(themes);
+  } catch (error: any) {
+    console.error("Error analyzing themes:", error);
+    res.status(500).json({ 
+      error: error.message,
+      positive: "Error analyzing themes",
+      constructive: "Error analyzing themes"
+    });
+  }
+});
 
-      if (isNaN(configId)) {
-        return res.status(400).json({ error: "Invalid config ID" });
-      }
+app.post("/api/chat-configs/:id/template", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const configId = parseInt(req.params.id);
 
-      // Update the config to mark it as a template
-      const { templateDescription } = req.body;
-      const updatedConfig = await db.update(chatConfigs)
-        .set({
-          isTemplate: true,
-          templateDescription: templateDescription || null
-        })
-        .where(eq(chatConfigs.id, configId))
-        .returning();
-
-      if (!updatedConfig.length) {
-        return res.status(404).json({ error: "Configuration not found" });
-      }
-
-      res.json(updatedConfig[0]);
-    } catch (error: any) {
-      console.error("Error saving config as template:", error);
-      res.status(500).json({ error: error.message });
+    if (isNaN(configId)) {
+      return res.status(400).json({ error: "Invalid config ID" });
     }
-  });
 
-  app.get("/api/templates", requireAuth, async (req:Request, res: Response) => {
-    try {
-      const templates = await db.query.chatConfigs.findMany({
-        where: and(
-          eq(chatConfigs.isTemplate, true),
-          eq(chatConfigs.deleted, false)
-        ),
-        orderBy: [desc(chatConfigs.createdAt)],
-      });
+    // Update the config to mark it as a template
+    const { templateDescription } = req.body;
+    const updatedConfig = await db.update(chatConfigs)
+      .set({
+        isTemplate: true,
+        templateDescription: templateDescription || null
+      })
+      .where(eq(chatConfigs.id, configId))
+      .returning();
 
-      const templatesWithoutPrivateData = templates.map(template => ({
-        ...template,
-        userId: undefined 
-      }));
-
-      res.json(templatesWithoutPrivateData);
-    } catch (error: any) {
-      console.error("Error fetching templates:", error);
-      res.status(500).json({ error: error.message });
+    if (!updatedConfig.length) {
+      return res.status(404).json({ error: "Configuration not found" });
     }
-  });
 
-  const httpServer = createServer(app);
-  return httpServer;
+    res.json(updatedConfig[0]);
+  } catch (error: any) {
+    console.error("Error saving config as template:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/templates", requireAuth, async (req:Request, res: Response) => {
+  try {
+    const templates = await db.query.chatConfigs.findMany({
+      where: and(
+        eq(chatConfigs.isTemplate, true),
+        eq(chatConfigs.deleted, false)
+      ),
+      orderBy: [desc(chatConfigs.createdAt)],
+    });
+
+    const templatesWithoutPrivateData = templates.map(template => ({
+      ...template,
+      userId: undefined 
+    }));
+
+    res.json(templatesWithoutPrivateData);
+  } catch (error: any) {
+    console.error("Error fetching templates:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+const httpServer = createServer(app);
+return httpServer;
 }
