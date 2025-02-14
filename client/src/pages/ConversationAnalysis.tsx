@@ -88,17 +88,30 @@ export default function ConversationAnalysis() {
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to analyze themes: ${response.statusText}`);
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        themes = await response.json();
+        const data = await response.json();
+
+        // Check if we received valid theme data
+        if (data && typeof data.positive === 'string' && typeof data.constructive === 'string') {
+          themes = {
+            positive: data.positive,
+            constructive: data.constructive
+          };
+        } else {
+          console.error('Invalid theme data received:', data);
+          themes = {
+            positive: "Error analyzing themes",
+            constructive: "Error analyzing themes"
+          };
+        }
       } catch (error) {
         console.error('Error analyzing themes:', error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to analyze feedback themes",
-        });
+        themes = {
+          positive: "Error analyzing themes",
+          constructive: "Error analyzing themes"
+        };
       }
     }
 
@@ -284,8 +297,8 @@ export default function ConversationAnalysis() {
                     <Card key={conversation.sessionId || index}>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <h2 className="text-lg font-semibold">
-                          {conversation.userName ? 
-                            `${conversation.userName}'s ${config?.type === 'upload' ? 'Upload' : 'Conversation'}` : 
+                          {conversation.userName ?
+                            `${conversation.userName}'s ${config?.type === 'upload' ? 'Upload' : 'Conversation'}` :
                             `Anonymous ${config?.type === 'upload' ? 'Upload' : 'Conversation'} ${index + 1}`}
                         </h2>
                         {config?.type === 'chat' && (
