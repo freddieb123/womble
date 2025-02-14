@@ -289,6 +289,7 @@ export default function Home() {
       feedbackCriteria: configToDuplicate.feedbackCriteria || "",
       temperature: 0.7,
       maxTokens: 1000,
+      questions: configToDuplicate.questions || []
     });
     setIsCreateOpen(true);
   };
@@ -301,7 +302,8 @@ export default function Home() {
       userInstructions: template.userInstructions || "",
       feedbackCriteria: template.feedbackCriteria || "",
       temperature: 0.7,
-      maxTokens: 1000
+      maxTokens: 1000,
+      questions: template.questions || []
     });
     setIsPreviewingTemplate(true);
     setIsCreateOpen(true);
@@ -323,12 +325,28 @@ export default function Home() {
       userInstructions: "",
       feedbackCriteria: "",
       temperature: 0.7,
-      maxTokens: 1000
+      maxTokens: 1000,
+      questions: []
     });
     setIsTemplateGalleryOpen(false);
     setIsCreateOpen(true);
   };
 
+
+  const handleEditConfig = (configToEdit: ChatConfig) => {
+    const adminConfig: AdminConfig = {
+      title: configToEdit.title,
+      type: configToEdit.type,
+      systemPrompt: configToEdit.systemPrompt,
+      userInstructions: configToEdit.userInstructions || "",
+      feedbackCriteria: configToEdit.feedbackCriteria || "",
+      temperature: 0.7,
+      maxTokens: 1000,
+      questions: configToEdit.questions || []
+    };
+    setEditingConfig(configToEdit);
+    return adminConfig;
+  };
 
   if (isLoading) {
     return (
@@ -510,8 +528,18 @@ export default function Home() {
                               <ScrollArea className="flex-1 -mx-6 px-6">
                                 <div className="py-4">
                                   <AdminPanel
-                                    config={editingConfig}
-                                    onConfigChange={setEditingConfig}
+                                    config={handleEditConfig(editingConfig)}
+                                    onConfigChange={(updatedConfig) => {
+                                      setEditingConfig({
+                                        ...editingConfig,
+                                        title: updatedConfig.title,
+                                        type: updatedConfig.type,
+                                        systemPrompt: updatedConfig.systemPrompt,
+                                        userInstructions: updatedConfig.userInstructions || null,
+                                        feedbackCriteria: updatedConfig.feedbackCriteria || null,
+                                        questions: updatedConfig.questions
+                                      });
+                                    }}
                                     isEditMode={true}
                                   />
                                 </div>

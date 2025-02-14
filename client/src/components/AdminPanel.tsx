@@ -53,18 +53,15 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               ...config,
               title: e.target.value
             })}
-            placeholder="Enter a title for this GPT..."
+            placeholder="Give your GPT a memorable title."
             className="w-full px-3 py-2 border rounded-md"
           />
-          <p className="text-sm text-muted-foreground">
-            Give your GPT a memorable title.
-          </p>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="type">Type</Label>
           <Select
-            value={config.type || "chat"}
+            value={config.type}
             onValueChange={(value) => {
               const newType = value as 'chat' | 'upload' | 'quiz';
               onConfigChange({
@@ -177,7 +174,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                 rows={4}
               />
               <p className="text-sm text-muted-foreground">
-                Add helpful instructions or context that will be shown to users of this {config.type || 'chat'}.
+                Add helpful instructions or context that will be shown to users.
               </p>
             </div>
 
@@ -195,7 +192,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                 rows={4}
               />
               <p className="text-sm text-muted-foreground">
-                Specify criteria that will be used to assess and provide feedback on {config.type === 'upload' ? 'uploads' : 'user interactions'}.
+                Specify criteria that will be used to assess and provide feedback.
               </p>
             </div>
           </>
