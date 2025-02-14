@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AdminConfig } from "@/lib/types";
+import { useEffect } from "react";
 
 interface Props {
   config: AdminConfig;
@@ -12,6 +13,16 @@ interface Props {
 }
 
 export default function AdminPanel({ config, onConfigChange, isEditMode = false }: Props) {
+  // Initialize questions if they don't exist and we're in quiz mode
+  useEffect(() => {
+    if (config.type === 'quiz' && !config.questions) {
+      onConfigChange({
+        ...config,
+        questions: [{ question: "", expectedAnswer: "" }]
+      });
+    }
+  }, [config.type]);
+
   const handleAddQuestion = () => {
     const newQuestions = [
       ...(config.questions || []),
@@ -89,7 +100,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
           </p>
         </div>
 
-        {config.type === 'quiz' ? (
+        {config.type === 'quiz' && (
           <div className="space-y-4">
             <div className="border rounded-lg p-4">
               <h3 className="text-lg font-semibold mb-4">Quiz Questions</h3>
@@ -143,7 +154,9 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               </Button>
             </div>
           </div>
-        ) : (
+        )}
+
+        {config.type !== 'quiz' && (
           <>
             <div className="space-y-2">
               <Label htmlFor="system-prompt">System Prompt</Label>
