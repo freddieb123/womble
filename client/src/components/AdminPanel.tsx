@@ -14,64 +14,53 @@ interface Props {
   isEditMode?: boolean;
 }
 
-interface QuizQuestion {
-  question: string;
-  expectedAnswer: string;
+interface Question {
+  questionText: string;
+  idealAnswer: string;
 }
 
 export default function AdminPanel({ config, onConfigChange, isEditMode = false }: Props) {
-  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (config.type === 'quiz' && config.questions && config.questions.length > 0) {
-      const mappedQuestions = config.questions.map(q => ({
-        question: q.questionText || q.question || '',
-        expectedAnswer: q.idealAnswer || q.expectedAnswer || ''
-      }));
-      setQuestions(mappedQuestions);
-    } else if (config.type === 'quiz') {
-      setQuestions([{ question: "", expectedAnswer: "" }]);
+    if (config.type === 'quiz') {
+      if (config.questions && config.questions.length > 0) {
+        setQuestions(config.questions);
+      } else {
+        setQuestions([{ questionText: "", idealAnswer: "" }]);
+      }
     }
   }, [config.type, config.questions]);
 
   const addQuestion = () => {
-    setQuestions([...questions, { question: "", expectedAnswer: "" }]);
+    const newQuestions = [...questions, { questionText: "", idealAnswer: "" }];
+    setQuestions(newQuestions);
+    onConfigChange({
+      ...config,
+      questions: newQuestions
+    });
   };
 
   const removeQuestion = (index: number) => {
     if (questions.length > 1) {
-      const newQuestions = [...questions];
-      newQuestions.splice(index, 1);
+      const newQuestions = questions.filter((_, i) => i !== index);
       setQuestions(newQuestions);
-
-      // Map back to database format when updating config
-      const mappedQuestions = newQuestions.map(q => ({
-        questionText: q.question,
-        idealAnswer: q.expectedAnswer
-      }));
-
       onConfigChange({
         ...config,
-        questions: mappedQuestions
+        questions: newQuestions
       });
     }
   };
 
-  const updateQuestion = (index: number, field: keyof QuizQuestion, value: string) => {
-    const newQuestions = [...questions];
-    newQuestions[index] = { ...newQuestions[index], [field]: value };
+  const updateQuestion = (index: number, field: keyof Question, value: string) => {
+    const newQuestions = questions.map((q, i) => 
+      i === index ? { ...q, [field]: value } : q
+    );
     setQuestions(newQuestions);
-
-    // Map back to database format when updating config
-    const mappedQuestions = newQuestions.map(q => ({
-      questionText: q.question,
-      idealAnswer: q.expectedAnswer
-    }));
-
     onConfigChange({
       ...config,
-      questions: mappedQuestions
+      questions: newQuestions
     });
   };
 
@@ -108,7 +97,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                 questions: newType === 'quiz' ? [{ questionText: "", idealAnswer: "" }] : undefined
               });
               if (newType === 'quiz') {
-                setQuestions([{ question: "", expectedAnswer: "" }]);
+                setQuestions([{ questionText: "", idealAnswer: "" }]);
               }
             }}
             disabled={isEditMode}
@@ -150,8 +139,8 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                     <Label htmlFor={`question-${index}`}>Question Text</Label>
                     <Textarea
                       id={`question-${index}`}
-                      value={q.question}
-                      onChange={(e) => updateQuestion(index, 'question', e.target.value)}
+                      value={q.questionText}
+                      onChange={(e) => updateQuestion(index, 'questionText', e.target.value)}
                       placeholder="Enter your question..."
                       rows={2}
                     />
@@ -161,8 +150,8 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                     <Label htmlFor={`answer-${index}`}>Expected Answer</Label>
                     <Textarea
                       id={`answer-${index}`}
-                      value={q.expectedAnswer}
-                      onChange={(e) => updateQuestion(index, 'expectedAnswer', e.target.value)}
+                      value={q.idealAnswer}
+                      onChange={(e) => updateQuestion(index, 'idealAnswer', e.target.value)}
                       placeholder="Enter the expected answer..."
                       rows={3}
                     />

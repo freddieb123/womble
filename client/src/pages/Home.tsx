@@ -8,7 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import AdminPanel from "@/components/AdminPanel";
 import type { AdminConfig } from "@/lib/types";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   DropdownMenu,
@@ -508,6 +508,9 @@ export default function Home() {
                         <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
                           <DialogHeader>
                             <DialogTitle>Edit GPT</DialogTitle>
+                            <DialogDescription>
+                              Modify your GPT configuration below.
+                            </DialogDescription>
                           </DialogHeader>
                           {editingConfig && (
                             <>
@@ -515,14 +518,9 @@ export default function Home() {
                                 <div className="py-4">
                                   <AdminPanel
                                     config={{
-                                      title: editingConfig.title,
-                                      type: editingConfig.type,
-                                      systemPrompt: editingConfig.systemPrompt,
-                                      userInstructions: editingConfig.userInstructions || "",
-                                      feedbackCriteria: editingConfig.feedbackCriteria || "",
+                                      ...editingConfig,
                                       temperature: 0.7,
                                       maxTokens: 1000,
-                                      questions: editingConfig.questions || []
                                     }}
                                     onConfigChange={(updatedConfig) => {
                                       setEditingConfig({
