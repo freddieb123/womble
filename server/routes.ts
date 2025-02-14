@@ -371,7 +371,7 @@ export function registerRoutes(app: Express): Server {
       const { content, config: configData } = req.body;
       const configId = parseInt(req.query.configId as string);
       const sessionId = req.query.sessionId as string || crypto.randomUUID();
-      const userName = req.query.userName as string || 'Anonymous';
+      const userName = req.query.userName as string || null;
 
       if (!content) {
         return res.status(400).json({ error: "Message content is required" });
@@ -411,14 +411,14 @@ export function registerRoutes(app: Express): Server {
           .values({
             configId,
             sessionId,
-            userName,
+            userName: userName || null,
             messages: sessions[sessionId],
           })
           .onConflictDoUpdate({
             target: [conversations.configId, conversations.sessionId],
             set: {
               messages: sessions[sessionId],
-              userName
+              userName: userName || null
             }
           });
       } catch (error) {
@@ -429,7 +429,8 @@ export function registerRoutes(app: Express): Server {
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
-      const enhancedSystemPrompt = `${parsedConfig.systemPrompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${userName}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${userName}!" or "Hi ${userName}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much - only in the initial greeting\n4. NEVER address them as "Anonymous" even if that's their name`;
+      const displayName = userName || 'Friend';
+      const enhancedSystemPrompt = `${parsedConfig.systemPrompt}\n\nIMPORTANT: You MUST follow these name rules exactly:\n1. Your VERY FIRST response MUST start with "Hello ${displayName}!" or "Hi ${displayName}!"\n2. After the initial greeting, do NOT use their name again in the conversation\n3. Never refer to them as "Anonymous" or "Friend" - use ONLY the exact name provided ("${displayName}")`;
 
       const apiMessages: ChatCompletionMessageParam[] = [
         { role: "system", content: enhancedSystemPrompt }
@@ -481,6 +482,7 @@ export function registerRoutes(app: Express): Server {
           const content = chunk.choices[0]?.delta?.content || '';
           if (content) {
             accumulatedMessage += content;
+            // Ensure we're sending valid JSON
             res.write(`data: ${JSON.stringify({ content, messageId })}\n\n`);
           }
         }
@@ -494,17 +496,23 @@ export function registerRoutes(app: Express): Server {
         };
         sessions[sessionId].push(assistantMessage);
 
-        await db
-          .update(conversations)
-          .set({
-            messages: sessions[sessionId]
-          })
-          .where(and(
-            eq(conversations.configId, configId),
-            eq(conversations.sessionId, sessionId)
-          ));
+        try {
+          await db
+            .update(conversations)
+            .set({
+              messages: sessions[sessionId],
+              userName: userName || null
+            })
+            .where(and(
+              eq(conversations.configId, configId),
+              eq(conversations.sessionId, sessionId)
+            ));
+        } catch (dbError) {
+          console.error("Error updating conversation:", dbError);
+        }
 
-        res.write('data: [DONE]\n\n');
+        // Ensure we send a valid JSON string for the DONE message
+        res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
         res.end();
       } catch (streamError) {
         console.error("Stream error:", streamError);
@@ -923,6 +931,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Fix theme analysis syntax error
   app.post("/api/analyze-themes", requireAuth, async (req: Request, res: Response) => {
     try {
       const { feedbacks } = req.body;
@@ -943,126 +952,117 @@ export function registerRoutes(app: Express): Server {
       }
 
       const prompt = `Analyze these feedback points and identify two key themes:
-      
+
     Feedback points:
     ${allBullets.map(bullet => `- ${bullet}`).join('\n')}
-      
+
     Please provide exactly two themes:
     1. One positive theme highlighting what's being done well
     2. One constructive theme suggesting an area for improvement
-      
+
     Format your response exactly like this example:
     {
       "positive": "Learners consistently demonstrate strong engagement with the material",
       "constructive": "More emphasis needed on practical application of concepts"
     }
-      
+
     Rules:
     - Each theme should be 1-2 sentences
     - Use third-person perspective (e.g., "learners" or "users", not "you")
     - Be specific and actionable
     - Base themes on patterns across multiple feedback points when possible`;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert at analyzing feedback and identifying key themes. Focus on patterns and provide clear, actionable insights. Always respond in valid JSON format with 'positive' and 'constructive' keys."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 1000
-    });
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert at analyzing feedback and identifying key themes. Focus on patterns and provide clear, actionable insights."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
+      });
 
-    let themes;
-    try {
-      // Try to parse response as JSON
-      const content = completion.choices[0]?.message?.content || "{}";
-      themes = JSON.parse(content);
-
-      // Validate the response has both required fields
-      if (!themes.positive || !themes.constructive) {
-        console.error("Invalid theme response structure:", themes);
-        themes = {
-          positive: "Theme analysis unavailable",
-          constructive: "Theme analysis unavailable"
-        };
+      const response = completion.choices[0]?.message?.content;
+      if (!response) {
+        throw new Error("Failed to get response from OpenAI");
       }
-    } catch (parseError) {
-      console.error("Error parsing OpenAI response:", parseError);
-      themes = {
-        positive: "Theme analysis unavailable",
-        constructive: "Theme analysis unavailable"
-      };
+
+      let themes;
+      try {
+        themes = JSON.parse(response);
+      } catch (parseError) {
+        console.error("Error parsing OpenAI response:", parseError);
+        throw new Error("Failed to parse theme analysis response");
+      }
+
+      res.json(themes);
+    } catch (error: any) {
+      console.error("Error analyzing themes:", error);
+      res.status(500).json({
+        error: error.message,
+        positive: "Error analyzing themes",
+        constructive: "Error analyzing themes"
+      });
     }
+  });
 
-    res.json(themes);
-  } catch (error: any) {
-    console.error("Error analyzing themes:", error);
-    res.status(500).json({
-      error: error.message,
-      positive: "Error analyzing themes",
-      constructive: "Error analyzing themes"
-    });
-  }
-});
+  app.post("/api/chat-configs/:id/template", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.id);
 
-app.post("/api/chat-configs/:id/template", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const configId = parseInt(req.params.id);
+      if (isNaN(configId)) {
+        return res.status(400).json({ error: "Invalid config ID" });
+      }
 
-    if (isNaN(configId)) {
-      return res.status(400).json({ error: "Invalid config ID" });
+      // Update the config to mark it as a template
+      const { templateDescription } = req.body;
+      const updatedConfig = await db.update(chatConfigs)
+        .set({
+          isTemplate: true,
+          templateDescription: templateDescription || null
+        })
+        .where(eq(chatConfigs.id, configId))
+        .returning();
+
+      if (!updatedConfig.length) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+
+      res.json(updatedConfig[0]);
+    } catch (error: any) {
+      console.error("Error saving config as template:", error);
+      res.status(500).json({ error: error.message });
     }
+  });
 
-    // Update the config to mark it as a template
-    const { templateDescription } = req.body;
-    const updatedConfig = await db.update(chatConfigs)
-      .set({
-        isTemplate: true,
-        templateDescription: templateDescription || null
-      })
-      .where(eq(chatConfigs.id, configId))
-      .returning();
+  app.get("/api/templates", requireAuth, async (req:Request, res: Response) => {
+    try {
+      const templates = await db.query.chatConfigs.findMany({
+        where: and(
+          eq(chatConfigs.isTemplate, true),
+          eq(chatConfigs.deleted, false)
+        ),
+        orderBy: [desc(chatConfigs.createdAt)],
+      });
 
-    if (!updatedConfig.length) {
-      return res.status(404).json({ error: "Configuration not found" });
+      const templatesWithoutPrivateData = templates.map(template => ({
+        ...template,
+        userId: undefined
+      }));
+
+      res.json(templatesWithoutPrivateData);
+    } catch (error: any) {
+      console.error("Error fetching templates:", error);
+      res.status(500).json({ error: error.message });
     }
+  });
 
-    res.json(updatedConfig[0]);
-  } catch (error: any) {
-    console.error("Error saving config as template:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get("/api/templates", requireAuth, async (req:Request, res: Response) => {
-  try {
-    const templates = await db.query.chatConfigs.findMany({
-      where: and(
-        eq(chatConfigs.isTemplate, true),
-        eq(chatConfigs.deleted, false)
-      ),
-      orderBy: [desc(chatConfigs.createdAt)],
-    });
-
-    const templatesWithoutPrivateData = templates.map(template => ({
-      ...template,
-      userId: undefined
-    }));
-
-    res.json(templatesWithoutPrivateData);
-  } catch (error: any) {
-    console.error("Error fetching templates:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-const httpServer = createServer(app);
-return httpServer;
+  const httpServer = createServer(app);
+  return httpServer;
 }
