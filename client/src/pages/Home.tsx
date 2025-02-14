@@ -522,10 +522,7 @@ export default function Home() {
                                       feedbackCriteria: editingConfig.feedbackCriteria || "",
                                       temperature: 0.7,
                                       maxTokens: 1000,
-                                      questions: editingConfig.questions?.map(q => ({
-                                        questionText: q.questionText,
-                                        idealAnswer: q.idealAnswer
-                                      })) || []
+                                      questions: editingConfig.questions || []
                                     }}
                                     onConfigChange={(updatedConfig) => {
                                       setEditingConfig({
