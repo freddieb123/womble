@@ -15,7 +15,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
   const handleAddQuestion = () => {
     const newQuestions = [
       ...(config.questions || []),
-      { questionText: "", idealAnswer: "" }
+      { question: "", expectedAnswer: "" }
     ];
     onConfigChange({
       ...config,
@@ -32,7 +32,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
     });
   };
 
-  const handleQuestionChange = (index: number, field: 'questionText' | 'idealAnswer', value: string) => {
+  const handleQuestionChange = (index: number, field: 'question' | 'expectedAnswer', value: string) => {
     if (!config.questions) return;
     const newQuestions = config.questions.map((q, i) => 
       i === index ? { ...q, [field]: value } : q
@@ -56,7 +56,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               ...config,
               title: e.target.value
             })}
-            placeholder="Give your GPT a memorable title."
+            placeholder="Give your quiz a memorable title."
             className="w-full px-3 py-2 border rounded-md"
           />
         </div>
@@ -70,7 +70,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               onConfigChange({
                 ...config,
                 type: newType,
-                questions: newType === 'quiz' ? [{ questionText: "", idealAnswer: "" }] : undefined
+                questions: newType === 'quiz' ? [{ question: "", expectedAnswer: "" }] : undefined
               });
             }}
             disabled={isEditMode}
@@ -112,8 +112,8 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                     <Label htmlFor={`question-${index}`}>Question Text</Label>
                     <Textarea
                       id={`question-${index}`}
-                      value={question.questionText}
-                      onChange={(e) => handleQuestionChange(index, 'questionText', e.target.value)}
+                      value={question.question}
+                      onChange={(e) => handleQuestionChange(index, 'question', e.target.value)}
                       placeholder="Enter your question..."
                       rows={2}
                     />
@@ -123,8 +123,8 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                     <Label htmlFor={`answer-${index}`}>Expected Answer</Label>
                     <Textarea
                       id={`answer-${index}`}
-                      value={question.idealAnswer}
-                      onChange={(e) => handleQuestionChange(index, 'idealAnswer', e.target.value)}
+                      value={question.expectedAnswer}
+                      onChange={(e) => handleQuestionChange(index, 'expectedAnswer', e.target.value)}
                       placeholder="Enter the expected answer..."
                       rows={3}
                     />
