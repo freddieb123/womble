@@ -63,7 +63,7 @@ export default function ConversationAnalysis() {
   });
 
   const generateSummary = async (conversationsData: ConversationData[]): Promise<FeedbackSummary> => {
-    const withFeedback = conversationsData.filter(conv => conv.feedback !== null);
+    const withFeedback = conversationsData.filter(conv => conv.feedback && conv.feedback.score !== null);
     const feedbackCount = withFeedback.length;
     const totalCount = conversationsData.length;
 
@@ -83,7 +83,10 @@ export default function ConversationAnalysis() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            feedbacks: withFeedback.map(conv => conv.feedback)
+            feedbacks: withFeedback.map(conv => ({
+              ...conv.feedback,
+              bullets: conv.feedback?.bullets || []
+            }))
           }),
         });
 
@@ -92,20 +95,10 @@ export default function ConversationAnalysis() {
         }
 
         const data = await response.json();
-
-        // Check if we received valid theme data
-        if (data && typeof data.positive === 'string' && typeof data.constructive === 'string') {
-          themes = {
-            positive: data.positive,
-            constructive: data.constructive
-          };
-        } else {
-          console.error('Invalid theme data received:', data);
-          themes = {
-            positive: "Error analyzing themes",
-            constructive: "Error analyzing themes"
-          };
-        }
+        themes = {
+          positive: data.positive || "Error analyzing themes",
+          constructive: data.constructive || "Error analyzing themes"
+        };
       } catch (error) {
         console.error('Error analyzing themes:', error);
         themes = {
@@ -142,17 +135,16 @@ export default function ConversationAnalysis() {
           }
 
           const quizData = await quizResponse.json();
-          console.log("Received quiz responses:", quizData); // Debug log
+          console.log("Received quiz responses:", quizData);
 
           if (!Array.isArray(quizData)) {
             throw new Error("Invalid quiz response data format");
           }
 
-          // Transform the data to match the expected format
           const transformedResponses = quizData.map(response => ({
             sessionId: response.sessionId,
             userName: response.userName || 'Anonymous',
-            feedback: response.feedback
+            feedback: response.feedback || {}
           }));
 
           setQuizResponses(transformedResponses);
@@ -167,9 +159,18 @@ export default function ConversationAnalysis() {
             throw new Error("Invalid conversations data format");
           }
 
-          setConversations(conversationsData);
+          // Transform data to ensure feedback is never null
+          const transformedData = conversationsData.map(conv => ({
+            ...conv,
+            feedback: conv.feedback || {
+              bullets: [],
+              score: null,
+              summary: null
+            }
+          }));
 
-          const summaryData = await generateSummary(conversationsData);
+          setConversations(transformedData);
+          const summaryData = await generateSummary(transformedData);
           setSummary(summaryData);
         }
       } catch (error) {
@@ -317,26 +318,32 @@ export default function ConversationAnalysis() {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
-                          <div className="space-y-2">
-                            {conversation.feedback.bullets.map((bullet, bulletIndex) => (
-                              <div key={bulletIndex} className="flex items-start gap-2 text-sm">
-                                <span>•</span>
-                                <span>{bullet}</span>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="border-t pt-4">
-                            <div className="flex flex-col gap-2 bg-blue-50 p-4 rounded-lg">
-                              <span className="text-2xl font-bold text-blue-900">
-                                {conversation.feedback.score}/10
-                              </span>
-                              {conversation.feedback.summary && (
-                                <p className="text-sm text-blue-700">
-                                  {conversation.feedback.summary}
-                                </p>
-                              )}
+                          {conversation.feedback?.bullets && Array.isArray(conversation.feedback.bullets) && (
+                            <div className="space-y-2">
+                              {conversation.feedback.bullets.map((bullet, bulletIndex) => (
+                                <div key={bulletIndex} className="flex items-start gap-2 text-sm">
+                                  <span>•</span>
+                                  <span>{bullet}</span>
+                                </div>
+                              ))}
                             </div>
-                          </div>
+                          )}
+                          {(conversation.feedback?.score !== null || conversation.feedback?.summary) && (
+                            <div className="border-t pt-4">
+                              <div className="flex flex-col gap-2 bg-blue-50 p-4 rounded-lg">
+                                {conversation.feedback?.score !== null && (
+                                  <span className="text-2xl font-bold text-blue-900">
+                                    {conversation.feedback.score}/10
+                                  </span>
+                                )}
+                                {conversation.feedback?.summary && (
+                                  <p className="text-sm text-blue-700">
+                                    {conversation.feedback.summary}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
