@@ -149,6 +149,7 @@ export default function Home() {
           systemPrompt: configToUpdate.systemPrompt,
           userInstructions: configToUpdate.userInstructions || "",
           feedbackCriteria: configToUpdate.feedbackCriteria || "",
+          questions: configToUpdate.questions
         }),
       });
 
@@ -434,16 +435,16 @@ export default function Home() {
                     <div>
                       <div className="flex items-center gap-2">
                         <CardTitle>{config.title}</CardTitle>
-                        <Badge 
-                          variant={config.type === 'chat' ? 'custom-green' : config.type === 'upload' ? 'custom-purple' : 'custom-blue'} 
+                        <Badge
+                          variant={config.type === 'chat' ? 'custom-green' : config.type === 'upload' ? 'custom-purple' : 'custom-blue'}
                           className={
-                            config.type === 'chat' ? 'bg-green-100 text-green-800' : 
-                            config.type === 'upload' ? 'bg-purple-100 text-purple-800' :
-                            'bg-blue-100 text-blue-800'
+                            config.type === 'chat' ? 'bg-green-100 text-green-800' :
+                              config.type === 'upload' ? 'bg-purple-100 text-purple-800' :
+                                'bg-blue-100 text-blue-800'
                           }
                         >
-                          {config.type === 'chat' ? 'conversation' : 
-                           config.type === 'upload' ? 'upload' : 'quiz'}
+                          {config.type === 'chat' ? 'conversation' :
+                            config.type === 'upload' ? 'upload' : 'quiz'}
                         </Badge>
                         {config.isTemplate && (
                           <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 flex items-center gap-1">
@@ -521,7 +522,10 @@ export default function Home() {
                                       feedbackCriteria: editingConfig.feedbackCriteria || "",
                                       temperature: 0.7,
                                       maxTokens: 1000,
-                                      questions: editingConfig.questions || []
+                                      questions: editingConfig.questions?.map(q => ({
+                                        questionText: q.questionText,
+                                        idealAnswer: q.idealAnswer
+                                      })) || []
                                     }}
                                     onConfigChange={(updatedConfig) => {
                                       setEditingConfig({
@@ -531,6 +535,7 @@ export default function Home() {
                                         systemPrompt: updatedConfig.systemPrompt,
                                         userInstructions: updatedConfig.userInstructions || null,
                                         feedbackCriteria: updatedConfig.feedbackCriteria || null,
+                                        questions: updatedConfig.questions
                                       });
                                     }}
                                     isEditMode={true}

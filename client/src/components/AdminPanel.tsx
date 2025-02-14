@@ -23,15 +23,20 @@ import { useEffect } from 'react';
 
 export default function AdminPanel({ config, onConfigChange, isEditMode = false }: Props) {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
-
-useEffect(() => {
-  if (config.type === 'quiz' && config.questions && config.questions.length > 0) {
-    setQuestions(config.questions);
-  } else if (config.type === 'quiz') {
-    setQuestions([{ question: "", expectedAnswer: "" }]);
-  }
-}, [config.type, config.questions]);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (config.type === 'quiz' && config.questions && config.questions.length > 0) {
+      // Map database format to component format
+      const mappedQuestions = config.questions.map(q => ({
+        question: q.questionText || q.question || '',
+        expectedAnswer: q.idealAnswer || q.expectedAnswer || ''
+      }));
+      setQuestions(mappedQuestions);
+    } else if (config.type === 'quiz') {
+      setQuestions([{ question: "", expectedAnswer: "" }]);
+    }
+  }, [config.type, config.questions]);
 
   const addQuestion = () => {
     setQuestions([...questions, { question: "", expectedAnswer: "" }]);
@@ -42,6 +47,17 @@ useEffect(() => {
       const newQuestions = [...questions];
       newQuestions.splice(index, 1);
       setQuestions(newQuestions);
+
+      // Map back to database format when updating config
+      const mappedQuestions = newQuestions.map(q => ({
+        questionText: q.question,
+        idealAnswer: q.expectedAnswer
+      }));
+
+      onConfigChange({
+        ...config,
+        questions: mappedQuestions
+      });
     }
   };
 
@@ -50,10 +66,15 @@ useEffect(() => {
     newQuestions[index] = { ...newQuestions[index], [field]: value };
     setQuestions(newQuestions);
 
-    // Update the main config with the new questions
+    // Map back to database format when updating config
+    const mappedQuestions = newQuestions.map(q => ({
+      questionText: q.question,
+      idealAnswer: q.expectedAnswer
+    }));
+
     onConfigChange({
       ...config,
-      questions: newQuestions
+      questions: mappedQuestions
     });
   };
 
