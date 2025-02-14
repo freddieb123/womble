@@ -536,7 +536,7 @@ export function registerRoutes(app: Express): Server {
       const prompt = `Context:\n${config.systemPrompt}\n\nAnalyze the uploaded screenshot based on these criteria:\n${config.feedbackCriteria}\n\nAddress the user as 'you' in your response (and do not just say 'the user').\n\nPlease provide your analysis in exactly this format, ensuring you are evaluating the user's side of the conversation (i.e. the person who first types, NOT the GPT (which is you as the bot):\n\n• [3 bullet points focusing on how well the screenshot meets the criteria. Keep each bullet to 1 sentence]\n\nScore: [1-10]\n[Brief one-line summary of overall quality]`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4",
         messages: [
           {
             role: "system",
@@ -936,8 +936,7 @@ export function registerRoutes(app: Express): Server {
 
       if (allBullets.length === 0) {
         return res.json({
-          positive: "No positive themes identified yet",
-          constructive: "No constructive feedback available yet"
+          positive: "No positive themes identified yet",constructive: "No constructive feedback available yet"
         });
       }
 
@@ -948,7 +947,7 @@ export function registerRoutes(app: Express): Server {
       
       Please provide exactly two themes in JSON format:
       1. One positive theme highlighting what's being done well
-      2.One constructive theme suggesting an area for improvement
+      2. One constructive theme suggesting an area for improvement
       
       Response Format:
       {
@@ -974,14 +973,36 @@ export function registerRoutes(app: Express): Server {
             content: prompt
           }
         ],
+        temperature: 0.7,
+        max_tokens: 1000,
         response_format: { type: "json_object" }
       });
 
-      const themes = JSON.parse(completion.choices[0].message.content);
+      let themes;
+      try {
+        themes = JSON.parse(completion.choices[0].message.content || "{}");
+        if (!themes.positive || !themes.constructive) {
+          themes = {
+            positive: themes.positive || "Theme analysis unavailable",
+            constructive: themes.constructive || "Theme analysis unavailable"
+          };
+        }
+      } catch (parseError) {
+        console.error("Error parsing OpenAI response:", parseError);
+        themes = {
+          positive: "Theme analysis unavailable",
+          constructive: "Theme analysis unavailable"
+        };
+      }
+
       res.json(themes);
     } catch (error: any) {
       console.error("Error analyzing themes:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ 
+        error: error.message,
+        positive: "Error analyzing themes",
+        constructive: "Error analyzing themes"
+      });
     }
   });
 
