@@ -143,14 +143,7 @@ export default function Home() {
       const response = await fetch(`/api/chat-configs/${configToUpdate.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: configToUpdate.title,
-          type: configToUpdate.type,
-          systemPrompt: configToUpdate.systemPrompt,
-          userInstructions: configToUpdate.userInstructions || "",
-          feedbackCriteria: configToUpdate.feedbackCriteria || "",
-          questions: configToUpdate.questions
-        }),
+        body: JSON.stringify(configToUpdate),
       });
 
       if (!response.ok) {
@@ -517,27 +510,13 @@ export default function Home() {
                               <ScrollArea className="flex-1 -mx-6 px-6">
                                 <div className="py-4">
                                   <AdminPanel
-                                    config={{
-                                      ...editingConfig,
-                                      temperature: 0.7,
-                                      maxTokens: 1000,
-                                    }}
-                                    onConfigChange={(updatedConfig) => {
-                                      setEditingConfig({
-                                        ...editingConfig,
-                                        title: updatedConfig.title,
-                                        type: updatedConfig.type,
-                                        systemPrompt: updatedConfig.systemPrompt,
-                                        userInstructions: updatedConfig.userInstructions || null,
-                                        feedbackCriteria: updatedConfig.feedbackCriteria || null,
-                                        questions: updatedConfig.questions
-                                      });
-                                    }}
+                                    config={editingConfig}
+                                    onConfigChange={setEditingConfig}
                                     isEditMode={true}
                                   />
                                 </div>
                               </ScrollArea>
-                              <div className="mt-4 pt-4 border-t flex justify-end">
+                              <div className="pt-4 border-t flex justify-end">
                                 <Button
                                   onClick={() => editingConfig && updateConfig.mutate(editingConfig)}
                                   disabled={updateConfig.isPending}
