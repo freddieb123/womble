@@ -371,7 +371,7 @@ export function registerRoutes(app: Express): Server {
       const { content, config: configData } = req.body;
       const configId = parseInt(req.query.configId as string);
       const sessionId = req.query.sessionId as string || crypto.randomUUID();
-      const userName = req.query.userName as string;
+      const userName = req.query.userName as string || 'Anonymous';
 
       if (!content) {
         return res.status(400).json({ error: "Message content is required" });
@@ -417,7 +417,8 @@ export function registerRoutes(app: Express): Server {
           .onConflictDoUpdate({
             target: [conversations.configId, conversations.sessionId],
             set: {
-              messages: sessions[sessionId]
+              messages: sessions[sessionId],
+              userName
             }
           });
       } catch (error) {
@@ -428,10 +429,7 @@ export function registerRoutes(app: Express): Server {
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
-      // Get userName from query params and use it consistently
-      const userDisplayName = userName || 'Anonymous';
-
-      const enhancedSystemPrompt = `${parsedConfig.systemPrompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${userDisplayName}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${userDisplayName}!" or "Hi ${userDisplayName}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much!`;
+      const enhancedSystemPrompt = `${parsedConfig.systemPrompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${userName}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${userName}!" or "Hi ${userName}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much - only in the initial greeting\n4. NEVER address them as "Anonymous" even if that's their name`;
 
       const apiMessages: ChatCompletionMessageParam[] = [
         { role: "system", content: enhancedSystemPrompt }
@@ -624,11 +622,11 @@ export function registerRoutes(app: Express): Server {
 
       const feedbackPromises = answers.map(async ({ questionIndex, answer, expectedAnswer }) => {
         const prompt = `Compare the following answer to the expected answer and categorize it as either 'correct' (if it matches closely), 'almost' (if it's on the right track but not quite there), or 'incorrect' (if it's way off).
-
+        
         Question: ${questions[questionIndex].question}
         Expected Answer: ${expectedAnswer}
         User's Answer: ${answer}
-
+        
         Respond in exactly this format:
         {
           "status": "correct|almost|incorrect",
@@ -945,20 +943,20 @@ export function registerRoutes(app: Express): Server {
       }
 
       const prompt = `Analyze these feedback points and identify two key themes:
-
+      
     Feedback points:
     ${allBullets.map(bullet => `- ${bullet}`).join('\n')}
-
+      
     Please provide exactly two themes:
     1. One positive theme highlighting what's being done well
     2. One constructive theme suggesting an area for improvement
-
+      
     Format your response exactly like this example:
     {
       "positive": "Learners consistently demonstrate strong engagement with the material",
       "constructive": "More emphasis needed on practical application of concepts"
     }
-
+      
     Rules:
     - Each theme should be 1-2 sentences
     - Use third-person perspective (e.g., "learners" or "users", not "you")
@@ -1006,7 +1004,7 @@ export function registerRoutes(app: Express): Server {
     res.json(themes);
   } catch (error: any) {
     console.error("Error analyzing themes:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: error.message,
       positive: "Error analyzing themes",
       constructive: "Error analyzing themes"
@@ -1055,7 +1053,7 @@ app.get("/api/templates", requireAuth, async (req:Request, res: Response) => {
 
     const templatesWithoutPrivateData = templates.map(template => ({
       ...template,
-      userId: undefined 
+      userId: undefined
     }));
 
     res.json(templatesWithoutPrivateData);
