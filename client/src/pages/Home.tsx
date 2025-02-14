@@ -334,18 +334,12 @@ export default function Home() {
 
 
   const handleEditConfig = (configToEdit: ChatConfig) => {
-    const adminConfig: AdminConfig = {
-      title: configToEdit.title,
-      type: configToEdit.type,
-      systemPrompt: configToEdit.systemPrompt,
+    setEditingConfig({
+      ...configToEdit,
       userInstructions: configToEdit.userInstructions || "",
       feedbackCriteria: configToEdit.feedbackCriteria || "",
-      temperature: 0.7,
-      maxTokens: 1000,
       questions: configToEdit.questions || []
-    };
-    setEditingConfig(configToEdit);
-    return adminConfig;
+    });
   };
 
   if (isLoading) {
@@ -483,7 +477,7 @@ export default function Home() {
                         <DropdownMenuContent align="end">
                           {!config.deleted ? (
                             <>
-                              <DropdownMenuItem onClick={() => setEditingConfig(config)}>
+                              <DropdownMenuItem onClick={() => handleEditConfig(config)}>
                                 <Pencil className="h-4 w-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>
@@ -528,7 +522,16 @@ export default function Home() {
                               <ScrollArea className="flex-1 -mx-6 px-6">
                                 <div className="py-4">
                                   <AdminPanel
-                                    config={handleEditConfig(editingConfig)}
+                                    config={{
+                                      title: editingConfig.title,
+                                      type: editingConfig.type,
+                                      systemPrompt: editingConfig.systemPrompt,
+                                      userInstructions: editingConfig.userInstructions || "",
+                                      feedbackCriteria: editingConfig.feedbackCriteria || "",
+                                      temperature: 0.7,
+                                      maxTokens: 1000,
+                                      questions: editingConfig.questions || []
+                                    }}
                                     onConfigChange={(updatedConfig) => {
                                       setEditingConfig({
                                         ...editingConfig,
@@ -537,7 +540,7 @@ export default function Home() {
                                         systemPrompt: updatedConfig.systemPrompt,
                                         userInstructions: updatedConfig.userInstructions || null,
                                         feedbackCriteria: updatedConfig.feedbackCriteria || null,
-                                        questions: updatedConfig.questions
+                                        questions: updatedConfig.questions || []
                                       });
                                     }}
                                     isEditMode={true}

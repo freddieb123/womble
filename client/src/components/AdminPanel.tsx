@@ -12,15 +12,18 @@ interface Props {
 }
 
 export default function AdminPanel({ config, onConfigChange, isEditMode = false }: Props) {
-  const addQuestion = () => {
-    const newQuestions = [...(config.questions || []), { questionText: "", idealAnswer: "" }];
+  const handleAddQuestion = () => {
+    const newQuestions = [
+      ...(config.questions || []),
+      { questionText: "", idealAnswer: "" }
+    ];
     onConfigChange({
       ...config,
       questions: newQuestions
     });
   };
 
-  const removeQuestion = (index: number) => {
+  const handleRemoveQuestion = (index: number) => {
     if (!config.questions || config.questions.length <= 1) return;
     const newQuestions = config.questions.filter((_, i) => i !== index);
     onConfigChange({
@@ -29,7 +32,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
     });
   };
 
-  const updateQuestion = (index: number, field: 'questionText' | 'idealAnswer', value: string) => {
+  const handleQuestionChange = (index: number, field: 'questionText' | 'idealAnswer', value: string) => {
     if (!config.questions) return;
     const newQuestions = config.questions.map((q, i) => 
       i === index ? { ...q, [field]: value } : q
@@ -90,7 +93,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
           <div className="space-y-4">
             <div className="border rounded-lg p-4">
               <h3 className="text-lg font-semibold mb-4">Quiz Questions</h3>
-              {(config.questions || []).map((q, index) => (
+              {(config.questions || []).map((question, index) => (
                 <div key={index} className="space-y-4 mb-6 pb-6 border-b last:border-b-0">
                   <div className="flex justify-between items-center">
                     <h4 className="font-medium">Question {index + 1}</h4>
@@ -98,7 +101,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => removeQuestion(index)}
+                        onClick={() => handleRemoveQuestion(index)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -109,8 +112,8 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                     <Label htmlFor={`question-${index}`}>Question Text</Label>
                     <Textarea
                       id={`question-${index}`}
-                      value={q.questionText}
-                      onChange={(e) => updateQuestion(index, 'questionText', e.target.value)}
+                      value={question.questionText}
+                      onChange={(e) => handleQuestionChange(index, 'questionText', e.target.value)}
                       placeholder="Enter your question..."
                       rows={2}
                     />
@@ -120,8 +123,8 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                     <Label htmlFor={`answer-${index}`}>Expected Answer</Label>
                     <Textarea
                       id={`answer-${index}`}
-                      value={q.idealAnswer}
-                      onChange={(e) => updateQuestion(index, 'idealAnswer', e.target.value)}
+                      value={question.idealAnswer}
+                      onChange={(e) => handleQuestionChange(index, 'idealAnswer', e.target.value)}
                       placeholder="Enter the expected answer..."
                       rows={3}
                     />
@@ -133,7 +136,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                 type="button"
                 variant="outline"
                 className="w-full mt-4"
-                onClick={addQuestion}
+                onClick={handleAddQuestion}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Question
