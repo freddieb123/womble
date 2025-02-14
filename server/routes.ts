@@ -428,10 +428,10 @@ export function registerRoutes(app: Express): Server {
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
-      // Ensure userName is properly handled
-      let displayName = userName && userName.trim() !== '' ? userName : 'Anonymous';
+      // Get userName from query params and use it consistently
+      const userDisplayName = userName || 'Anonymous';
 
-      const enhancedSystemPrompt = `${parsedConfig.systemPrompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${displayName}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${displayName}!" or "Hi ${displayName}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much!`;
+      const enhancedSystemPrompt = `${parsedConfig.systemPrompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${userDisplayName}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${userDisplayName}!" or "Hi ${userDisplayName}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much!`;
 
       const apiMessages: ChatCompletionMessageParam[] = [
         { role: "system", content: enhancedSystemPrompt }
@@ -624,11 +624,11 @@ export function registerRoutes(app: Express): Server {
 
       const feedbackPromises = answers.map(async ({ questionIndex, answer, expectedAnswer }) => {
         const prompt = `Compare the following answer to the expected answer and categorize it as either 'correct' (if it matches closely), 'almost' (if it's on the right track but not quite there), or 'incorrect' (if it's way off).
-        
+
         Question: ${questions[questionIndex].question}
         Expected Answer: ${expectedAnswer}
         User's Answer: ${answer}
-        
+
         Respond in exactly this format:
         {
           "status": "correct|almost|incorrect",
@@ -944,299 +944,10 @@ export function registerRoutes(app: Express): Server {
         });
       }
 
-      const prompt = `Based on the following feedback points, generate exactly two themes - one positive and one constructive. Return your response in a strict JSON format.
-
-Feedback points:
-${allBullets.map(bullet => `- ${bullet}`).join('\n')}
-
-Instructions:
-1. Analyze the feedback points to identify common patterns
-2. Create one positive theme about what's being done well
-3. Create one constructive theme about areas for improvement
-4. Format your entire response as a JSON object with exactly these two keys: "positive" and "constructive"
-
-Required JSON format:
-{
-  "positive": "Brief positive theme here",
-  "constructive": "Brief constructive theme here"
-}
-
-Remember:
-- Keep each theme to 1-2 sentences
-- Use third-person perspective
-- Be specific and actionable
-- Focus on patterns across multiple feedback points`;
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert at analyzing feedback and identifying key themes. You must respond with a valid JSON object containing exactly two keys: 'positive' and 'constructive'. Each value should be a string containing a clear, actionable insight."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.5,
-      max_tokens: 500
-    });
-
-    const content = completion.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error("No response from OpenAI");
-    }
-
-    // Try to extract JSON even if it's embedded in other text
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in response");
-    }
-
-    const themes = JSON.parse(jsonMatch[0]);
-
-    // Validate the response structure
-    if (!themes.positive || !themes.constructive || 
-        typeof themes.positive !== 'string' || 
-        typeof themes.constructive !== 'string') {
-      throw new Error("Invalid theme structure");
-    }
-
-    res.json(themes);
-  } catch (error: any) {
-    console.error("Error analyzing themes:", error);
-    // Always return a valid response structure even in error cases
-    res.json({
-      positive: "Theme analysis unavailable",
-      constructive: "Theme analysis unavailable"
-    });
-  }
-});
-
-// Add new endpoint for fetching quiz responses after the existing quiz feedback endpoint
-app.get("/api/quiz-responses/:configId", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const configId = parseInt(req.params.configId);
-
-    if (isNaN(configId)) {
-      return res.status(400).json({ error: "Invalid config ID" });
-    }
-
-    const responses = await db.query.quizResponses.findMany({
-      where: eq(quizResponses.configId, configId),
-      orderBy: [desc(quizResponses.createdAt)]
-    });
-
-    const formattedResponses = responses.map(response => ({
-      sessionId: response.sessionId,
-      userName: response.userName,
-      feedback: response.feedback
-    }));
-
-    res.json(formattedResponses);
-  } catch (error: any) {
-    console.error("Error fetching quiz responses:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post("/api/chat-feedback", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const { configId, sessionId, messages } = req.body;
-
-    if (!configId || !sessionId || !messages) {
-      return res.status(400).json({ error: "Missing required parameters" });
-    }
-
-    const config = await db.query.chatConfigs.findFirst({
-      where: eq(chatConfigs.id, configId),
-    });
-
-    if (!config) {
-      return res.status(404).json({ error: "Configuration not found" });
-    }
-
-    if (!config.feedbackCriteria) {
-      return res.status(400).json({ error: "Feedback criteria not set for this configuration" });
-    }
-
-    const prompt = `Context:\n${config.systemPrompt}\n\nAnalyze the conversation based on these criteria:\n${config.feedbackCriteria}\n\nAddress the user as 'you' in your response (and do not just say 'the user').\n\nPlease provide your analysis in exactly this format, ensuring you are evaluating the user's side of the conversation (i.e. the person who first types, NOT the GPT (which is you as the bot):\n\n• [3 bullet points focusing on how well the conversation meets the criteria. Keep each bullet to 1 sentence]\n\nScore: [1-10]\n[Brief one-line summary of overall quality]`;
-
-    const conversation = messages.map((m: Message) =>
-      `${m.role}: ${typeof m.content === 'string' ? m.content : m.content.text}`
-    ).join('\n');
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert at analyzing conversations and providing constructive feedback. Focus on communication effectiveness and how well the content meets the specified criteria."
-        },
-        {
-          role: "user",
-          content: `${prompt}\n\nConversation to analyze:\n${conversation}`
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 1000,
-    });
-
-    const response = completion.choices[0]?.message?.content;
-    if (!response) {
-      throw new Error("Failed to get response from OpenAI");
-    }
-
-    const scoreMatch = response.match(/Score:\s*(\d+)/i);
-    const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
-
-    const summaryMatch = response.match(/Score:\s*\d+\s*\n([^\n]+)/i);
-    const summary = summaryMatch ? summaryMatch[1].trim() : null;
-
-    const bullets = response
-      .split(/Score:/i)[0]
-      .split(/[•\-\*]\s+/)
-      .filter(bullet => bullet.trim())
-      .map(bullet => bullet.trim());
-
-    const feedbackData: ConversationFeedback = {
-      bullets,
-      score,
-      summary
-    };
-
-    await db
-      .update(conversations)
-      .set({
-        feedback: feedbackData
-      })
-      .where(and(
-        eq(conversations.configId, configId),
-        eq(conversations.sessionId, sessionId)
-      ));
-
-    res.json(feedbackData);
-  } catch (error: any) {
-    console.error("Error processing chat feedback:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.delete("/api/chat-configs/:id", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const configId = parseInt(req.params.id);
-    const userId = req.user?.id;
-
-    if (isNaN(configId)) {
-      return res.status(400).json({ error: "Invalid config ID" });
-    }
-
-    if (!userId) {
-      return res.status(401).json({ error: "User not authenticated" });
-    }
-
-    // First check if the user owns this config
-    const existingConfig = await db.query.chatConfigs.findFirst({
-      where: and(
-        eq(chatConfigs.id, configId),
-        eq(chatConfigs.userId, userId)
-      ),
-    });
-
-    if (!existingConfig) {
-      return res.status(403).json({ error: "You don't have permission to delete this configuration" });
-    }
-
-    await db
-      .update(chatConfigs)
-      .set({ deleted: true, deletedAt: new Date() })
-      .where(and(
-        eq(chatConfigs.id, configId),
-        eq(chatConfigs.userId, userId)
-      ));
-
-    res.json({ success: true });
-  } catch (error: any) {
-    console.error("Error deleting chat config:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get("/api/conversations/:configId", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const configId = parseInt(req.params.configId);
-
-    if (isNaN(configId)) {
-      return res.status(400).json({ error: "Invalid config ID" });
-    }
-
-    const config = await db.query.chatConfigs.findFirst({
-      where: eq(chatConfigs.id, configId),
-    });
-
-    if (!config) {
-      return res.status(404).json({ error: "Configuration not found" });
-    }
-
-    if (config.type === 'upload') {
-      const uploadData = await db.query.uploads.findMany({
-        where: eq(uploads.configId, configId),
-        orderBy: [desc(uploads.createdAt)]
-      });
-
-      const uploadsWithMetadata = uploadData.map(upload => ({
-        sessionId: upload.sessionId,
-        userName: upload.userName,
-        fileName: upload.fileName,
-        feedback: upload.feedback
-      }));
-
-      res.json(uploadsWithMetadata);
-    } else {
-      const conversationData = await db.query.conversations.findMany({
-        where: eq(conversations.configId, configId),
-        orderBy: [desc(conversations.createdAt)]
-      });
-
-      const conversationsWithMetadata = conversationData.map(conv => ({
-        sessionId: conv.sessionId,
-        userName: conv.userName,
-        messages: conv.messages,
-        feedback: conv.feedback
-      }));
-
-      res.json(conversationsWithMetadata);
-    }
-  } catch (error: any) {
-    console.error("[GET /api/conversations] Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post("/api/analyze-themes", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const { feedbacks } = req.body;
-
-    if (!Array.isArray(feedbacks)) {
-      return res.status(400).json({ error: "Feedbacks must be an array" });
-    }
-
-    const allBullets = feedbacks
-      .flatMap(feedback => feedback.bullets || [])
-      .filter(bullet => bullet);
-
-    if (allBullets.length === 0) {
-      return res.json({
-        positive: "No positive themes identified yet",
-        constructive: "No constructive feedback available yet"
-      });
-    }
-
-    const prompt = `Analyze these feedback points and identify two key themes:
+      const prompt = `Analyze these feedback points and identify two key themes:
 
     Feedback points:
-    ${allBullets.map(bullet => `- ${bullet}`).join('\n')}
+    ${allBullets.map(bullet => `-`bullet`).join('\n')}
 
     Please provide exactly two themes:
     1. One positive theme highlighting what's being done well
