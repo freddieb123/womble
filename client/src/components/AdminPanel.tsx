@@ -13,9 +13,9 @@ interface Props {
 }
 
 export default function AdminPanel({ config, onConfigChange, isEditMode = false }: Props) {
-  // Initialize questions if they don't exist and we're in quiz mode
   useEffect(() => {
-    if (config.type === 'quiz' && !config.questions) {
+    // Initialize questions array if in quiz mode and no questions exist
+    if (config.type === 'quiz' && (!config.questions || config.questions.length === 0)) {
       onConfigChange({
         ...config,
         questions: [{ question: "", expectedAnswer: "" }]
@@ -54,6 +54,9 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
     });
   };
 
+  // Log current config state for debugging
+  console.log('Current config:', config);
+
   return (
     <div className="space-y-6">
       <div className="space-y-4">
@@ -67,7 +70,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               ...config,
               title: e.target.value
             })}
-            placeholder="Give your quiz a memorable title."
+            placeholder="Give your quiz a memorable title"
             className="w-full px-3 py-2 border rounded-md"
           />
         </div>
@@ -101,14 +104,14 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
         </div>
 
         {config.type === 'quiz' && (
-          <div className="space-y-4">
-            <div className="border rounded-lg p-4">
-              <h3 className="text-lg font-semibold mb-4">Quiz Questions</h3>
-              {(config.questions || []).map((question, index) => (
+          <div className="space-y-4 border rounded-lg p-4">
+            <h3 className="text-lg font-semibold mb-4">Quiz Questions</h3>
+            {config.questions && config.questions.length > 0 ? (
+              config.questions.map((question, index) => (
                 <div key={index} className="space-y-4 mb-6 pb-6 border-b last:border-b-0">
                   <div className="flex justify-between items-center">
                     <h4 className="font-medium">Question {index + 1}</h4>
-                    {(config.questions?.length || 0) > 1 && (
+                    {config.questions!.length > 1 && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -141,18 +144,20 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                     />
                   </div>
                 </div>
-              ))}
+              ))
+            ) : (
+              <p className="text-gray-500 text-center">No questions added yet</p>
+            )}
 
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full mt-4"
-                onClick={handleAddQuestion}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Question
-              </Button>
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full mt-4"
+              onClick={handleAddQuestion}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Question
+            </Button>
           </div>
         )}
 
