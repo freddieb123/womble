@@ -947,7 +947,7 @@ export function registerRoutes(app: Express): Server {
       const prompt = `Analyze these feedback points and identify two key themes:
 
     Feedback points:
-    ${allBullets.map(bullet => `-`bullet`).join('\n')}
+    ${allBullets.map(bullet => `- ${bullet}`).join('\n')}
 
     Please provide exactly two themes:
     1. One positive theme highlighting what's being done well
