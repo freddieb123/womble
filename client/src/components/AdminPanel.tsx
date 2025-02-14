@@ -13,8 +13,8 @@ interface Props {
 }
 
 export default function AdminPanel({ config, onConfigChange, isEditMode = false }: Props) {
+  // Initialize questions if they don't exist and we're in quiz mode
   useEffect(() => {
-    // Initialize questions array if in quiz mode and no questions exist
     if (config.type === 'quiz' && (!config.questions || config.questions.length === 0)) {
       onConfigChange({
         ...config,
@@ -106,48 +106,44 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
         {config.type === 'quiz' && (
           <div className="space-y-4 border rounded-lg p-4">
             <h3 className="text-lg font-semibold mb-4">Quiz Questions</h3>
-            {config.questions && config.questions.length > 0 ? (
-              config.questions.map((question, index) => (
-                <div key={index} className="space-y-4 mb-6 pb-6 border-b last:border-b-0">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-medium">Question {index + 1}</h4>
-                    {config.questions!.length > 1 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveQuestion(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor={`question-${index}`}>Question Text</Label>
-                    <Textarea
-                      id={`question-${index}`}
-                      value={question.question}
-                      onChange={(e) => handleQuestionChange(index, 'question', e.target.value)}
-                      placeholder="Enter your question..."
-                      rows={2}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor={`answer-${index}`}>Expected Answer</Label>
-                    <Textarea
-                      id={`answer-${index}`}
-                      value={question.expectedAnswer}
-                      onChange={(e) => handleQuestionChange(index, 'expectedAnswer', e.target.value)}
-                      placeholder="Enter the expected answer..."
-                      rows={3}
-                    />
-                  </div>
+            {Array.isArray(config.questions) && config.questions.map((question, index) => (
+              <div key={index} className="space-y-4 mb-6 pb-6 border-b last:border-b-0">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-medium">Question {index + 1}</h4>
+                  {config.questions.length > 1 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveQuestion(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
-              ))
-            ) : (
-              <p className="text-gray-500 text-center">No questions added yet</p>
-            )}
+
+                <div className="space-y-2">
+                  <Label htmlFor={`question-${index}`}>Question Text</Label>
+                  <Textarea
+                    id={`question-${index}`}
+                    value={question.question}
+                    onChange={(e) => handleQuestionChange(index, 'question', e.target.value)}
+                    placeholder="Enter your question..."
+                    rows={2}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor={`answer-${index}`}>Expected Answer</Label>
+                  <Textarea
+                    id={`answer-${index}`}
+                    value={question.expectedAnswer}
+                    onChange={(e) => handleQuestionChange(index, 'expectedAnswer', e.target.value)}
+                    placeholder="Enter the expected answer..."
+                    rows={3}
+                  />
+                </div>
+              </div>
+            ))}
 
             <Button
               type="button"
