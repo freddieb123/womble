@@ -428,7 +428,10 @@ export function registerRoutes(app: Express): Server {
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
-      const enhancedSystemPrompt = `${parsedConfig.systemPrompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${userName ? userName : 'Anonymous'}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${userName ? userName : 'Anonymous'}!" or "Hi ${userName ? userName : 'Anonymous'}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much!`;
+      // Ensure userName is properly handled
+      let displayName = userName && userName.trim() !== '' ? userName : 'Anonymous';
+
+      const enhancedSystemPrompt = `${parsedConfig.systemPrompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${displayName}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${displayName}!" or "Hi ${displayName}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much!`;
 
       const apiMessages: ChatCompletionMessageParam[] = [
         { role: "system", content: enhancedSystemPrompt }
