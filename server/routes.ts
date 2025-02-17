@@ -368,10 +368,13 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/messages", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { content, config: configData } = req.body;
+      const { content, config: configData, userName: bodyUserName } = req.body;
       const configId = parseInt(req.query.configId as string);
       const sessionId = req.query.sessionId as string || crypto.randomUUID();
-      const userName = req.query.userName as string;
+      const queryUserName = req.query.userName as string;
+
+      // Use userName from body if available, otherwise from query
+      const userName = bodyUserName || queryUserName || null;
 
       if (!content) {
         return res.status(400).json({ error: "Message content is required" });
@@ -411,14 +414,14 @@ export function registerRoutes(app: Express): Server {
           .values({
             configId,
             sessionId,
-            userName: userName || null,
+            userName,
             messages: sessions[sessionId],
           })
           .onConflictDoUpdate({
             target: [conversations.configId, conversations.sessionId],
             set: {
               messages: sessions[sessionId],
-              userName: userName || null
+              userName
             }
           });
       } catch (error) {
@@ -431,7 +434,6 @@ export function registerRoutes(app: Express): Server {
 
       const displayName = userName || 'Friend';
       console.log("Using display name:", displayName);
-
       const enhancedSystemPrompt = `${parsedConfig.systemPrompt}
 
 CRITICAL INSTRUCTIONS FOR ADDRESSING THE USER:
@@ -509,7 +511,7 @@ CRITICAL INSTRUCTIONS FOR ADDRESSING THE USER:
             .update(conversations)
             .set({
               messages: sessions[sessionId],
-              userName: userName || null
+              userName
             })
             .where(and(
               eq(conversations.configId, configId),
