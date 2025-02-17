@@ -334,7 +334,7 @@ export function registerRoutes(app: Express): Server {
     try {
       const configId = parseInt(req.query.configId as string);
       const sessionId = req.query.sessionId as string || crypto.randomUUID();
-      const userName = req.query.userName ? String(req.query.userName) : null;
+      const userName = req.query.userName ? decodeURIComponent(String(req.query.userName)) : null;
       console.log("Received userName:", userName);
 
       if (isNaN(configId)) {
@@ -611,15 +611,15 @@ export function registerRoutes(app: Express): Server {
     try {
       const { configId, sessionId, userName, questions, answers } = quizSubmissionSchema.parse(req.body);
 
-     
+
 
       const feedbackPromises = answers.map(async ({ questionIndex, answer, expectedAnswer }) => {
         const prompt = `Compare the following answer to the expected answer and categorize it as either 'correct' (if it matches closely), 'almost' (if it's on the right track but not quite there), or 'incorrect' (if it's way off).
-        
+
         Question: ${questions[questionIndex].question}
         Expected Answer: ${expectedAnswer}
         User's Answer: ${answer}
-        
+
         Respond in exactly this format:
         {
           "status": "correct|almost|incorrect",
@@ -946,7 +946,7 @@ export function registerRoutes(app: Express): Server {
     Format your response exactly like this example:
     {
       "positive": "Learners consistently demonstrate strong engagement with the material",
-      "constructive": "More emphasis needed on practical application of concepts"
+      "constructive": "More emphasisneeded on practical application of concepts"
     }
 
     Rules:
