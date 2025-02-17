@@ -611,14 +611,7 @@ export function registerRoutes(app: Express): Server {
     try {
       const { configId, sessionId, userName, questions, answers } = quizSubmissionSchema.parse(req.body);
 
-      // Log the request body for debugging
-      console.log("Quiz submission request:", {
-        configId,
-        sessionId,
-        userName,
-        questionsCount: questions?.length,
-        answersCount: answers?.length
-      });
+     
 
       const feedbackPromises = answers.map(async ({ questionIndex, answer, expectedAnswer }) => {
         const prompt = `Compare the following answer to the expected answer and categorize it as either 'correct' (if it matches closely), 'almost' (if it's on the right track but not quite there), or 'incorrect' (if it's way off).
@@ -694,7 +687,6 @@ export function registerRoutes(app: Express): Server {
           createdAt: new Date()
         };
 
-        console.log("Attempting to insert quiz response with data:", insertData);
 
         const result = await db.insert(quizResponses).values(insertData)
           .onConflictDoUpdate({
@@ -706,7 +698,6 @@ export function registerRoutes(app: Express): Server {
           })
           .returning();
 
-        console.log("Quiz response saved successfully. Result:", result);
 
       } catch (dbError) {
         console.error("Error saving quiz response to database:", dbError);
