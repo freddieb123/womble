@@ -430,7 +430,13 @@ export function registerRoutes(app: Express): Server {
       res.setHeader('Connection', 'keep-alive');
 
       const displayName = userName || 'Friend';
-      const enhancedSystemPrompt = `${parsedConfig.systemPrompt}\n\nIMPORTANT: You MUST follow these name rules exactly:\n1. Your VERY FIRST response MUST start with "Hello ${displayName}!" or "Hi ${displayName}!"\n2. After the initial greeting, do NOT use their name again in the conversation\n3. Never refer to them as "Anonymous" or "Friend" - use ONLY the exact name provided ("${displayName}")`;
+      const enhancedSystemPrompt = `${parsedConfig.systemPrompt}
+
+CRITICAL INSTRUCTIONS FOR ADDRESSING THE USER:
+1. In your FIRST message, ALWAYS start with a personalized greeting "Hello ${displayName}!" or "Hi ${displayName}!"
+2. ALWAYS remember this is the user's name: "${displayName}"
+3. Use their name naturally in your responses, about once every 2-3 messages
+4. Never address them as just "Friend" or "Anonymous"`;
 
       const apiMessages: ChatCompletionMessageParam[] = [
         { role: "system", content: enhancedSystemPrompt }
