@@ -10,18 +10,16 @@ interface UserNameModalProps {
 }
 
 export default function UserNameModal({ open, onSubmit }: UserNameModalProps) {
+  console.log("UserNameModal mounted, open state:", open);
   const [name, setName] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Form submitted in UserNameModal");
     const trimmedName = name.trim();
-    console.log("Name before trim:", name);
-    console.log("Trimmed name:", trimmedName);
-    console.log("Condition check:", !!trimmedName);
     if (trimmedName) {
-      console.log("About to submit name:", trimmedName);
+      console.log("Submitting name:", trimmedName);
       onSubmit(trimmedName);
-      console.log("Name submitted:", trimmedName);
     }
   };
 
