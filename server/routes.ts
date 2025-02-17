@@ -366,15 +366,12 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/messages", requireAuth, async (req: Request, res: Response) => {
+ app.post("/api/messages", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { content, config: configData, userName: bodyUserName } = req.body;
+      const { content, config: configData } = req.body;
       const configId = parseInt(req.query.configId as string);
       const sessionId = req.query.sessionId as string || crypto.randomUUID();
-      const queryUserName = req.query.userName as string;
-
-      // Use userName from body if available, otherwise from query
-      const userName = bodyUserName || queryUserName || null;
+      const userName = req.query.userName as string || null;
 
       if (!content) {
         return res.status(400).json({ error: "Message content is required" });
@@ -420,8 +417,7 @@ export function registerRoutes(app: Express): Server {
           .onConflictDoUpdate({
             target: [conversations.configId, conversations.sessionId],
             set: {
-              messages: sessions[sessionId],
-              userName
+              messages: sessions[sessionId]
             }
           });
       } catch (error) {
@@ -432,15 +428,7 @@ export function registerRoutes(app: Express): Server {
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
-      const displayName = userName || 'Friend';
-      console.log("Using display name:", displayName);
-      const enhancedSystemPrompt = `${parsedConfig.systemPrompt}
-
-CRITICAL INSTRUCTIONS FOR ADDRESSING THE USER:
-1. In your FIRST message, ALWAYS start with a personalized greeting "Hello ${displayName}!" or "Hi ${displayName}!"
-2. ALWAYS remember this is the user's name: "${displayName}"
-3. Use their name naturally in your responses, about once every 2-3 messages
-4. Never address them as just "Friend" or "Anonymous"`;
+      const enhancedSystemPrompt = `${parsedConfig.systemPrompt}\n\nIMPORTANT INSTRUCTION: The user's name is "${userName || 'Anonymous'}". You must follow these rules:\n1. Your VERY FIRST WORDS must be a greeting with their name (e.g. "Hello ${userName || 'Anonymous'}!" or "Hi ${userName || 'Anonymous'}!")\n2. Never skip the name in the initial greeting\n3. Don't use the name too much!`;
 
       const apiMessages: ChatCompletionMessageParam[] = [
         { role: "system", content: enhancedSystemPrompt }
@@ -481,7 +469,7 @@ CRITICAL INSTRUCTIONS FOR ADDRESSING THE USER:
 
       try {
         const stream = await openai.chat.completions.create({
-          model: "gpt-4",
+          model: "gpt-4o",
           messages: apiMessages,
           temperature: parsedConfig.temperature,
           max_tokens: parsedConfig.maxTokens,
@@ -492,7 +480,6 @@ CRITICAL INSTRUCTIONS FOR ADDRESSING THE USER:
           const content = chunk.choices[0]?.delta?.content || '';
           if (content) {
             accumulatedMessage += content;
-            // Ensure we're sending valid JSON
             res.write(`data: ${JSON.stringify({ content, messageId })}\n\n`);
           }
         }
@@ -506,23 +493,17 @@ CRITICAL INSTRUCTIONS FOR ADDRESSING THE USER:
         };
         sessions[sessionId].push(assistantMessage);
 
-        try {
-          await db
-            .update(conversations)
-            .set({
-              messages: sessions[sessionId],
-              userName
-            })
-            .where(and(
-              eq(conversations.configId, configId),
-              eq(conversations.sessionId, sessionId)
-            ));
-        } catch (dbError) {
-          console.error("Error updating conversation:", dbError);
-        }
+        await db
+          .update(conversations)
+          .set({
+            messages: sessions[sessionId]
+          })
+          .where(and(
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId)
+          ));
 
-        // Ensure we send a valid JSON string for the DONE message
-        res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
+        res.write('data: [DONE]\n\n');
         res.end();
       } catch (streamError) {
         console.error("Stream error:", streamError);
