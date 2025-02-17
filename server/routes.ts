@@ -334,7 +334,8 @@ export function registerRoutes(app: Express): Server {
     try {
       const configId = parseInt(req.query.configId as string);
       const sessionId = req.query.sessionId as string || crypto.randomUUID();
-      const userName = req.query.userName as string || null;
+      const userName = req.query.userName ? String(req.query.userName) : null;
+      console.log("Received userName:", userName);
 
       if (isNaN(configId)) {
         return res.status(400).json({ error: "Valid config ID is required" });

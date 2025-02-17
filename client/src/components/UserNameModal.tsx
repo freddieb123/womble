@@ -14,8 +14,10 @@ export default function UserNameModal({ open, onSubmit }: UserNameModalProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) {
-      onSubmit(name.trim());
+    const trimmedName = name.trim();
+    if (trimmedName) {
+      onSubmit(trimmedName);
+      console.log("Submitting name:", trimmedName);
     }
   };
 
