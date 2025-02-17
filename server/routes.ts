@@ -371,7 +371,7 @@ export function registerRoutes(app: Express): Server {
       const { content, config: configData } = req.body;
       const configId = parseInt(req.query.configId as string);
       const sessionId = req.query.sessionId as string || crypto.randomUUID();
-      const userName = req.query.userName as string || null;
+      const userName = req.query.userName as string;
 
       if (!content) {
         return res.status(400).json({ error: "Message content is required" });
@@ -430,6 +430,8 @@ export function registerRoutes(app: Express): Server {
       res.setHeader('Connection', 'keep-alive');
 
       const displayName = userName || 'Friend';
+      console.log("Using display name:", displayName);
+
       const enhancedSystemPrompt = `${parsedConfig.systemPrompt}
 
 CRITICAL INSTRUCTIONS FOR ADDRESSING THE USER:
