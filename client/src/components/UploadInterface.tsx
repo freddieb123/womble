@@ -71,7 +71,7 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
           isCurrentUser: entry.userName === localUserName && entry.sessionId === sessionId
         }));
 
-      const sortedEntries = scoredEntries.sort((a: LeaderboardEntry, b: LeaderboardEntry) => 
+      const sortedEntries = scoredEntries.sort((a: LeaderboardEntry, b: LeaderboardEntry) =>
         b.score - a.score
       );
 
@@ -307,6 +307,7 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
         currentUserRank={userRank}
         title="Upload Leaderboard"
         maxScore={10}
+        onRefresh={fetchLeaderboard}
       />
     </div>
   );

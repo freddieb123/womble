@@ -496,6 +496,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
         currentUserRank={userRank}
         title="Conversation Leaderboard"
         maxScore={10}
+        onRefresh={fetchLeaderboard}
       />
     </div>
   );

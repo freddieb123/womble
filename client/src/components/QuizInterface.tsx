@@ -100,7 +100,7 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
         };
       });
 
-      const sortedEntries = scoredEntries.sort((a: LeaderboardEntry, b: LeaderboardEntry) => 
+      const sortedEntries = scoredEntries.sort((a: LeaderboardEntry, b: LeaderboardEntry) =>
         b.score - a.score
       );
 
@@ -216,6 +216,7 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
         currentUserRank={userRank}
         title="Quiz Leaderboard"
         maxScore={questions.length}
+        onRefresh={fetchLeaderboard}
       />
 
       {feedback && overallScore && (

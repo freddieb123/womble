@@ -5,7 +5,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
-import { Medal } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Medal, RefreshCw } from "lucide-react";
 
 interface LeaderboardEntry {
   userName: string;
@@ -20,6 +21,7 @@ interface Props {
   currentUserRank?: number;
   title: string;
   maxScore: number;
+  onRefresh?: () => void;
 }
 
 export default function LeaderboardModal({
@@ -29,6 +31,7 @@ export default function LeaderboardModal({
   currentUserRank,
   title,
   maxScore,
+  onRefresh
 }: Props) {
   // Get top 3 entries
   const topEntries = entries.slice(0, 3);
@@ -54,8 +57,18 @@ export default function LeaderboardModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+        <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle>{title}</DialogTitle>
+          {onRefresh && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onRefresh}
+              className="h-8 w-8 p-0"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          )}
         </DialogHeader>
         <div className="space-y-4">
           {/* Top 3 Podium */}
