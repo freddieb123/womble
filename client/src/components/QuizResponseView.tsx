@@ -106,12 +106,9 @@ export default function QuizResponseView({ config, responses }: Props) {
             {overallStats.map((stat, index) => (
               <div key={index} className="flex justify-between items-center p-2 bg-white rounded-lg shadow-sm">
                 <span className="font-medium">{stat.userName}</span>
-                <div className="text-right">
-                  <span className="font-bold text-blue-600">
-                    {stat.score}/{stat.total} ({stat.percentage.toFixed(1)}%)
-                  </span>
-                  <p className="text-sm text-gray-600">{getScoreMessage(stat.percentage)}</p>
-                </div>
+                <span className="font-bold text-blue-600">
+                  {stat.score}/{stat.total}
+                </span>
               </div>
             ))}
           </div>

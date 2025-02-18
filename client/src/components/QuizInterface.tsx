@@ -159,12 +159,9 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
         <Card className="bg-blue-50 border-blue-200">
           <CardContent className="p-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-blue-900 mb-2">
+              <h2 className="text-2xl font-bold text-blue-900">
                 Overall Score: {overallScore.score} / {overallScore.total}
               </h2>
-              <p className="text-blue-600">
-                {overallScore.percentage.toFixed(1)}% - {getScoreMessage(overallScore.percentage)}
-              </p>
             </div>
           </CardContent>
         </Card>
