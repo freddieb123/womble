@@ -34,6 +34,7 @@ export default function UserView() {
     }
     const newUrl = `${window.location.pathname}?${newParams.toString()}`;
     window.history.replaceState({}, '', newUrl);
+    window.location.reload();
     return newUrl;
   };
 

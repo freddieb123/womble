@@ -178,9 +178,6 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
             if (data === '[DONE]') continue;
 
             try {
-              // Handle [DONE] message separately
-              if (data === '[DONE]') continue;
-              
               const parsed = JSON.parse(data);
               if (parsed.error) throw new Error(parsed.error);
 
