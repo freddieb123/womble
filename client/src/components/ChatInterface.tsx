@@ -54,6 +54,50 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
     enabled: !!config.id && !!sessionId,
   });
 
+  const hasEnoughMessages = chatState.messages.length >= 5;
+
+  const getHint = async () => {
+    if (!config.feedbackCriteria) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No feedback criteria specified for this chat."
+      });
+      return;
+    }
+
+    try {
+      setIsGettingHint(true);
+      const response = await fetch("/api/chat-hint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          feedbackCriteria: config.feedbackCriteria,
+          userInstructions: config.userInstructions,
+          messages: chatState.messages
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const hint = await response.json();
+      toast({
+        title: "Hint",
+        description: hint.message,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to get hint",
+      });
+    } finally {
+      setIsGettingHint(false);
+    }
+  };
+
   const fetchLeaderboard = async () => {
     try {
       const response = await fetch(`/api/conversations/${config.id}`);
@@ -72,7 +116,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
           isCurrentUser: entry.userName === userName && entry.sessionId === sessionId
         }));
 
-      const sortedEntries = scoredEntries.sort((a: LeaderboardEntry, b: LeaderboardEntry) => 
+      const sortedEntries = scoredEntries.sort((a: LeaderboardEntry, b: LeaderboardEntry) =>
         b.score - a.score
       );
 
@@ -91,31 +135,6 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
       });
     }
   };
-
-  useEffect(() => {
-    const handlePaste = async (e: ClipboardEvent) => {
-      if (!e.clipboardData) return;
-
-      const items = e.clipboardData.items;
-      for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf('image') !== -1) {
-          const blob = items[i].getAsFile();
-          if (!blob) continue;
-
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            const base64String = event.target?.result as string;
-            setPastedImage(base64String);
-          };
-          reader.readAsDataURL(blob);
-          break;
-        }
-      }
-    };
-
-    document.addEventListener('paste', handlePaste);
-    return () => document.removeEventListener('paste', handlePaste);
-  }, []);
 
   const sendMessage = useMutation({
     mutationFn: async (content: string) => {
