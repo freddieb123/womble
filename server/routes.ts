@@ -367,7 +367,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
- app.post("/api/messages", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/messages", requireAuth, async (req: Request, res: Response) => {
     try {
       const { content, config: configData } = req.body;
       const configId = parseInt(req.query.configId as string);
@@ -612,14 +612,13 @@ export function registerRoutes(app: Express): Server {
       const { configId, sessionId, userName, questions, answers } = quizSubmissionSchema.parse(req.body);
 
 
-
       const feedbackPromises = answers.map(async ({ questionIndex, answer, expectedAnswer }) => {
         const prompt = `Compare the following answer to the expected answer and categorize it as either 'correct' (if it matches closely), 'almost' (if it's on the right track but not quite there), or 'incorrect' (if it's way off).
-
+        
         Question: ${questions[questionIndex].question}
         Expected Answer: ${expectedAnswer}
         User's Answer: ${answer}
-
+        
         Respond in exactly this format:
         {
           "status": "correct|almost|incorrect",
@@ -687,7 +686,6 @@ export function registerRoutes(app: Express): Server {
           createdAt: new Date()
         };
 
-
         const result = await db.insert(quizResponses).values(insertData)
           .onConflictDoUpdate({
             target: [quizResponses.configId, quizResponses.sessionId],
@@ -697,7 +695,6 @@ export function registerRoutes(app: Express): Server {
             }
           })
           .returning();
-
 
       } catch (dbError) {
         console.error("Error saving quiz response to database:", dbError);
@@ -723,11 +720,13 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Invalid config ID" });
       }
 
+      // Fetch all responses for this quiz
       const responses = await db.query.quizResponses.findMany({
         where: eq(quizResponses.configId, configId),
         orderBy: [desc(quizResponses.createdAt)]
       });
 
+      // Format the response data
       const formattedResponses = responses.map(response => ({
         sessionId: response.sessionId,
         userName: response.userName,
@@ -935,20 +934,20 @@ export function registerRoutes(app: Express): Server {
       }
 
       const prompt = `Analyze these feedback points and identify two key themes:
-
+      
     Feedback points:
     ${allBullets.map(bullet => `- ${bullet}`).join('\n')}
-
+    
     Please provide exactly two themes:
     1. One positive theme highlighting what's being done well
     2. One constructive theme suggesting an area for improvement
-
+        
     Format your response exactly like this example:
     {
       "positive": "Learners consistently demonstrate strong engagement with the material",
       "constructive": "More emphasisneeded on practical application of concepts"
     }
-
+    
     Rules:
     - Each theme should be 1-2 sentences
     - Use third-person perspective (e.g., "learners" or "users", not "you")

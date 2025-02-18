@@ -6,6 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import type { AdminConfig } from "@/lib/types";
 import UserNameModal from "./UserNameModal";
+import LeaderboardModal from "./LeaderboardModal";
+import { Trophy } from "lucide-react";
 
 interface QuizQuestion {
   question: string;
@@ -24,12 +26,22 @@ type FeedbackStatus = 'correct' | 'almost' | 'incorrect';
 type FeedbackEntry = { status: FeedbackStatus; feedback: string };
 type FeedbackState = Record<number, FeedbackEntry>;
 
+interface LeaderboardEntry {
+  userName: string;
+  score: number;
+  total: number;
+  isCurrentUser: boolean;
+}
+
 export default function QuizInterface({ config, sessionId, userName, isViewOnly, onUserNameSubmit }: Props) {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localUserName, setLocalUserName] = useState(userName);
   const [showNameModal, setShowNameModal] = useState(!isViewOnly && !localUserName);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
+  const [userRank, setUserRank] = useState<number>();
   const { toast } = useToast();
 
   const handleAnswerChange = (index: number, value: string) => {
@@ -41,7 +53,6 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
 
   const questions = config.questions || [];
 
-  // Calculate the overall score when feedback is available
   const calculateOverallScore = () => {
     if (!feedback) return null;
 
@@ -60,16 +71,58 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
     };
   };
 
-  // Check if all questions have been answered
   const areAllQuestionsAnswered = questions.length > 0 && questions.every((_, index) => {
     const hasAnswer = answers[index]?.trim().length > 0;
     return hasAnswer;
   });
 
+  const fetchLeaderboard = async () => {
+    try {
+      const response = await fetch(`/api/quiz-responses/${config.id}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch leaderboard data');
+      }
+
+      const data = await response.json();
+
+      const scoredEntries = data.map((entry: any) => {
+        const score = Object.values(entry.feedback).reduce((acc: number, curr: any) => {
+          if (curr.status === 'correct') return acc + 1;
+          if (curr.status === 'almost') return acc + 0.5;
+          return acc;
+        }, 0);
+
+        return {
+          userName: entry.userName || 'Anonymous',
+          score,
+          total: questions.length,
+          isCurrentUser: entry.userName === localUserName
+        };
+      });
+
+      const sortedEntries = scoredEntries.sort((a: LeaderboardEntry, b: LeaderboardEntry) => 
+        b.score - a.score
+      );
+
+      const userRankIndex = sortedEntries.findIndex(entry => entry.isCurrentUser);
+      if (userRankIndex !== -1) {
+        setUserRank(userRankIndex + 1);
+      }
+
+      setLeaderboardData(sortedEntries);
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load leaderboard data",
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
 
-    // Validate required data
     if (!Array.isArray(questions) || questions.length === 0) {
       console.error("Questions must be a non-empty array");
       return;
@@ -82,7 +135,6 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
 
     setIsSubmitting(true);
     try {
-      // Format the submission data to match the server's expected schema
       const submissionData = {
         configId: config.id,
         sessionId,
@@ -114,6 +166,8 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
       const data = await response.json();
       console.log("Received feedback data:", data);
       setFeedback(data);
+
+      await fetchLeaderboard();
 
       toast({
         title: "Quiz Submitted",
@@ -155,13 +209,32 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
         />
       )}
 
+      <LeaderboardModal
+        open={showLeaderboard}
+        onOpenChange={setShowLeaderboard}
+        entries={leaderboardData}
+        currentUserRank={userRank}
+        title="Quiz Leaderboard"
+        maxScore={questions.length}
+      />
+
       {feedback && overallScore && (
         <Card className="bg-blue-50 border-blue-200">
           <CardContent className="p-6">
-            <div className="text-center">
+            <div className="text-center space-y-4">
               <h2 className="text-2xl font-bold text-blue-900">
-                Overall Score: {overallScore.score} / {overallScore.total}
+                Overall Score: {overallScore?.score} / {overallScore?.total}
               </h2>
+              <Button
+                onClick={() => {
+                  fetchLeaderboard();
+                  setShowLeaderboard(true);
+                }}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Trophy className="w-4 h-4 mr-2" />
+                View Leaderboard
+              </Button>
             </div>
           </CardContent>
         </Card>
