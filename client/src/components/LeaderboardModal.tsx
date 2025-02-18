@@ -32,7 +32,7 @@ export default function LeaderboardModal({
 }: Props) {
   // Get top 3 entries
   const topEntries = entries.slice(0, 3);
-  
+
   // Get current user entry if not in top 3
   const currentUserEntry = currentUserRank && currentUserRank > 3
     ? entries.find(entry => entry.isCurrentUser)
@@ -65,7 +65,7 @@ export default function LeaderboardModal({
                 key={index}
                 className={`p-4 ${
                   entry.isCurrentUser
-                    ? "bg-blue-50 border-blue-200"
+                    ? "bg-blue-50 border-2 border-red-500"
                     : "bg-white"
                 }`}
               >
@@ -88,7 +88,7 @@ export default function LeaderboardModal({
           {currentUserEntry && (
             <>
               <div className="text-center text-sm text-gray-500">• • •</div>
-              <Card className="p-4 bg-blue-50 border-blue-200">
+              <Card className="p-4 bg-blue-50 border-2 border-red-500">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <span className="text-sm text-gray-500">
