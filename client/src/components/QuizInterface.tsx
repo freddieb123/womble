@@ -41,6 +41,25 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
 
   const questions = config.questions || [];
 
+  // Calculate the overall score when feedback is available
+  const calculateOverallScore = () => {
+    if (!feedback) return null;
+
+    const totalQuestions = questions.length;
+    let score = 0;
+
+    Object.values(feedback).forEach(entry => {
+      if (entry.status === 'correct') score += 1;
+      else if (entry.status === 'almost') score += 0.5;
+    });
+
+    return {
+      score,
+      total: totalQuestions,
+      percentage: (score / totalQuestions) * 100
+    };
+  };
+
   // Check if all questions have been answered
   const areAllQuestionsAnswered = questions.length > 0 && questions.every((_, index) => {
     const hasAnswer = answers[index]?.trim().length > 0;
@@ -121,6 +140,8 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
     );
   }
 
+  const overallScore = calculateOverallScore();
+
   return (
     <div className="space-y-8 max-w-3xl mx-auto">
       {showNameModal && (
@@ -133,6 +154,22 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
           }}
         />
       )}
+
+      {feedback && overallScore && (
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="p-6">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-blue-900 mb-2">
+                Overall Score: {overallScore.score} / {overallScore.total}
+              </h2>
+              <p className="text-blue-600">
+                {overallScore.percentage.toFixed(1)}% - {getScoreMessage(overallScore.percentage)}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {questions.map((question, index) => (
         <Card key={index} className={`p-6 ${
           feedback?.[index]
@@ -191,4 +228,12 @@ function getFeedbackColor(status: FeedbackStatus | undefined): string {
     default:
       return 'gray';
   }
+}
+
+function getScoreMessage(percentage: number): string {
+  if (percentage >= 90) return "Excellent!";
+  if (percentage >= 80) return "Great job!";
+  if (percentage >= 70) return "Good work!";
+  if (percentage >= 60) return "Keep practicing!";
+  return "More practice needed";
 }

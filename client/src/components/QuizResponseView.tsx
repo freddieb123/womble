@@ -10,7 +10,7 @@ interface QuizResponse {
   feedback: Record<number, {
     status: 'correct' | 'almost' | 'incorrect';
     feedback: string;
-    answer: string;  // Make sure answer is included in the type
+    answer: string;
   }>;
 }
 
@@ -32,6 +32,27 @@ function getStatusColor(status: string) {
   }
 }
 
+function calculateScore(feedback: QuizResponse['feedback'], totalQuestions: number) {
+  let score = 0;
+  Object.values(feedback).forEach(entry => {
+    if (entry.status === 'correct') score += 1;
+    else if (entry.status === 'almost') score += 0.5;
+  });
+  return {
+    score,
+    total: totalQuestions,
+    percentage: (score / totalQuestions) * 100
+  };
+}
+
+function getScoreMessage(percentage: number): string {
+  if (percentage >= 90) return "Excellent!";
+  if (percentage >= 80) return "Great job!";
+  if (percentage >= 70) return "Good work!";
+  if (percentage >= 60) return "Keep practicing!";
+  return "More practice needed";
+}
+
 export default function QuizResponseView({ config, responses }: Props) {
   const [expandedQuestions, setExpandedQuestions] = useState<number[]>([]);
 
@@ -46,6 +67,15 @@ export default function QuizResponseView({ config, responses }: Props) {
   if (!config.questions || config.questions.length === 0) {
     return <div className="p-4 text-center text-gray-500">No questions found in this quiz</div>;
   }
+
+  // Calculate overall statistics
+  const overallStats = responses.map(response => {
+    const score = calculateScore(response.feedback, config.questions!.length);
+    return {
+      userName: response.userName || 'Anonymous',
+      ...score
+    };
+  });
 
   // Group all responses by question
   const questionResponses: Record<number, Array<{
@@ -68,6 +98,26 @@ export default function QuizResponseView({ config, responses }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Overall Statistics Card */}
+      <Card className="p-4 bg-blue-50">
+        <CardContent>
+          <h2 className="text-xl font-semibold text-blue-900 mb-4">Quiz Results Overview</h2>
+          <div className="space-y-3">
+            {overallStats.map((stat, index) => (
+              <div key={index} className="flex justify-between items-center p-2 bg-white rounded-lg shadow-sm">
+                <span className="font-medium">{stat.userName}</span>
+                <div className="text-right">
+                  <span className="font-bold text-blue-600">
+                    {stat.score}/{stat.total} ({stat.percentage.toFixed(1)}%)
+                  </span>
+                  <p className="text-sm text-gray-600">{getScoreMessage(stat.percentage)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
       {config.questions.map((question, qIndex) => (
         <Card key={qIndex} className="overflow-hidden">
           <div 
