@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Lightbulb, Info, X } from "lucide-react";
+import { Send, Lightbulb, Info, X, Trophy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -15,6 +15,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import MessageBubble from "./MessageBubble";
 import UserNameModal from "./UserNameModal";
+import LeaderboardModal from "./LeaderboardModal";
 import type { Message, ChatState, AdminConfig, MessageContent } from "@/lib/types";
 
 interface Props {
@@ -25,10 +26,20 @@ interface Props {
   onUserNameSubmit: (name: string) => string;
 }
 
+interface LeaderboardEntry {
+  userName: string;
+  score: number;
+  total: number;
+  isCurrentUser: boolean;
+}
+
 export default function ChatInterface({ config, sessionId, userName, isViewOnly, onUserNameSubmit }: Props) {
   const [input, setInput] = useState("");
   const [pastedImage, setPastedImage] = useState<string | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
+  const [userRank, setUserRank] = useState<number>();
   const inputRef = useRef<HTMLInputElement>(null);
   const [feedbackData, setFeedbackData] = useState<{ bullets: string[], score: number | null, summary: string | null }>({ bullets: [], score: null, summary: null });
   const [isGettingHint, setIsGettingHint] = useState(false);
@@ -43,47 +54,41 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
     enabled: !!config.id && !!sessionId,
   });
 
-  const hasEnoughMessages = chatState.messages.length >= 5;
-
-  const getHint = async () => {
-    if (!config.feedbackCriteria) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No feedback criteria specified for this chat."
-      });
-      return;
-    }
-
+  const fetchLeaderboard = async () => {
     try {
-      setIsGettingHint(true);
-      const response = await fetch("/api/chat-hint", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          feedbackCriteria: config.feedbackCriteria,
-          userInstructions: config.userInstructions,
-          messages: chatState.messages
-        }),
-      });
-
+      const response = await fetch(`/api/conversations/${config.id}`);
       if (!response.ok) {
-        throw new Error(await response.text());
+        throw new Error('Failed to fetch leaderboard data');
       }
 
-      const hint = await response.json();
-      toast({
-        title: "Hint",
-        description: hint.message,
-      });
+      const data = await response.json();
+
+      const scoredEntries = data
+        .filter((entry: any) => entry.feedback && entry.feedback.score !== null)
+        .map((entry: any) => ({
+          userName: entry.userName || 'Anonymous',
+          score: entry.feedback.score,
+          total: 10, // Feedback scores are out of 10
+          isCurrentUser: entry.userName === userName && entry.sessionId === sessionId
+        }));
+
+      const sortedEntries = scoredEntries.sort((a: LeaderboardEntry, b: LeaderboardEntry) => 
+        b.score - a.score
+      );
+
+      const userRankIndex = sortedEntries.findIndex(entry => entry.isCurrentUser);
+      if (userRankIndex !== -1) {
+        setUserRank(userRankIndex + 1);
+      }
+
+      setLeaderboardData(sortedEntries);
     } catch (error) {
+      console.error('Error fetching leaderboard:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to get hint",
+        description: "Failed to load leaderboard data",
       });
-    } finally {
-      setIsGettingHint(false);
     }
   };
 
@@ -444,16 +449,35 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
               ))}
             </div>
             <div className="border-t pt-4">
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-4">
                 <span className="text-2xl font-bold">{feedbackData.score}/10</span>
                 {feedbackData.summary && (
                   <p className="text-sm text-muted-foreground">{feedbackData.summary}</p>
                 )}
+                <Button
+                  onClick={() => {
+                    fetchLeaderboard();
+                    setShowLeaderboard(true);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Trophy className="w-4 h-4 mr-2" />
+                  View Leaderboard
+                </Button>
               </div>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
+      <LeaderboardModal
+        open={showLeaderboard}
+        onOpenChange={setShowLeaderboard}
+        entries={leaderboardData}
+        currentUserRank={userRank}
+        title="Conversation Leaderboard"
+        maxScore={10}
+      />
     </div>
   );
 }

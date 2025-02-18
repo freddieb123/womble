@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { X, Trophy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -8,12 +8,20 @@ import { Info } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { AdminConfig, UploadState, Feedback, Message } from "@/lib/types";
 import UserNameModal from "./UserNameModal";
+import LeaderboardModal from "./LeaderboardModal";
 
 interface Props {
   config: AdminConfig;
   sessionId: string;
   userName: string | null;
   onUserNameSubmit: (name: string) => string;
+}
+
+interface LeaderboardEntry {
+  userName: string;
+  score: number;
+  total: number;
+  isCurrentUser: boolean;
 }
 
 export default function UploadInterface({ config, sessionId, userName, onUserNameSubmit }: Props) {
@@ -26,6 +34,9 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [localUserName, setLocalUserName] = useState(userName);
   const [showNameModal, setShowNameModal] = useState(!localUserName);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
+  const [userRank, setUserRank] = useState<number>();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -41,6 +52,44 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
     queryKey: [`/api/conversations/${config.id}`],
     enabled: !!config.id,
   });
+
+  const fetchLeaderboard = async () => {
+    try {
+      const response = await fetch(`/api/conversations/${config.id}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch leaderboard data');
+      }
+
+      const data = await response.json();
+
+      const scoredEntries = data
+        .filter((entry: any) => entry.feedback && entry.feedback.score !== null)
+        .map((entry: any) => ({
+          userName: entry.userName || 'Anonymous',
+          score: entry.feedback.score,
+          total: 10, // Feedback scores are out of 10
+          isCurrentUser: entry.userName === localUserName && entry.sessionId === sessionId
+        }));
+
+      const sortedEntries = scoredEntries.sort((a: LeaderboardEntry, b: LeaderboardEntry) => 
+        b.score - a.score
+      );
+
+      const userRankIndex = sortedEntries.findIndex(entry => entry.isCurrentUser);
+      if (userRankIndex !== -1) {
+        setUserRank(userRankIndex + 1);
+      }
+
+      setLeaderboardData(sortedEntries);
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load leaderboard data",
+      });
+    }
+  };
 
   useEffect(() => {
     if (fetchError) {
@@ -136,6 +185,9 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
         feedback: feedbackData
       }));
       setFeedbackOpen(true);
+
+      // Fetch leaderboard data after getting feedback
+      await fetchLeaderboard();
     } catch (error) {
       toast({
         variant: "destructive",
@@ -226,17 +278,36 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
                 ))}
               </div>
               <div className="border-t pt-4">
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-4">
                   <span className="text-2xl font-bold">{uploadState.feedback.score}/10</span>
                   {uploadState.feedback.summary && (
                     <p className="text-sm text-muted-foreground">{uploadState.feedback.summary}</p>
                   )}
+                  <Button
+                    onClick={() => {
+                      fetchLeaderboard();
+                      setShowLeaderboard(true);
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Trophy className="w-4 h-4 mr-2" />
+                    View Leaderboard
+                  </Button>
                 </div>
               </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      <LeaderboardModal
+        open={showLeaderboard}
+        onOpenChange={setShowLeaderboard}
+        entries={leaderboardData}
+        currentUserRank={userRank}
+        title="Upload Leaderboard"
+        maxScore={10}
+      />
     </div>
   );
 }
