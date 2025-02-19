@@ -603,7 +603,7 @@ export default function Home() {
                     <div>
                       {config.type === 'quiz' ? (
                         <>
-                          <h3 className="font-semibold mb-1">Questions</h3>
+                          
                           <p className="text-sm text-gray-600">
                             {config.questions?.length || 0} question{config.questions?.length !== 1 ? 's' : ''}
                           </p>
