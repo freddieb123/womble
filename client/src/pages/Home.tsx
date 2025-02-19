@@ -47,8 +47,8 @@ type ChatConfig = {
   isTemplate?: boolean;
   templateDescription?: string;
   questions?: Array<{
-    questionText: string;
-    idealAnswer: string;
+    question: string;
+    expectedAnswer: string;
   }>;
 };
 
@@ -334,15 +334,22 @@ export default function Home() {
   };
 
 
-  const handleEditConfig = (configToEdit: ChatConfig) => {
-    setEditingConfig({
-      ...configToEdit,
-      userInstructions: configToEdit.userInstructions || "",
-      feedbackCriteria: configToEdit.feedbackCriteria || "",
-      questions: configToEdit.questions || []
-    });
+  const handleEditConfig = async (configToEdit: ChatConfig) => {
+    try {
+      // Fetch the full config including quiz questions
+      const response = await fetch(`/api/chat-configs/${configToEdit.id}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch full config");
+      }
+      const fullConfig: ChatConfig = await response.json();
+      // Set the editing config with full details (including questions)
+      setEditingConfig(fullConfig);
+    } catch (error) {
+      console.error(error);
+      // Optionally show a toast notification here
+    }
   };
-
+  
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">

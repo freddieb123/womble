@@ -266,13 +266,31 @@ export function registerRoutes(app: Express): Server {
           systemPrompt,
           userInstructions,
           feedbackCriteria,
-          questions
         })
         .where(and(
           eq(chatConfigs.id, configId),
           eq(chatConfigs.userId, userId)
         ))
         .returning();
+
+      if (type === 'quiz') {
+        // Delete existing quiz questions for this config
+        await db.delete(quizQuestions).where(eq(quizQuestions.configId, configId));
+
+        // Insert the updated list of quiz questions
+        if (questions && questions.length > 0) {
+          const questionsToInsert = questions.map((q, index) => ({
+            configId,
+            question: q.question,
+            expectedAnswer: q.expectedAnswer,
+            orderIndex: index,
+            createdAt: new Date(),
+            deleted: false
+          }));
+          await db.insert(quizQuestions).values(questionsToInsert);
+        }
+      }
+
 
       if (!updatedConfig.length) {
         return res.status(404).json({ error: "Configuration not found" });
