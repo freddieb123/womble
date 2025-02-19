@@ -4,11 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2 } from "lucide-react";
-import type { ChatConfig } from "@/lib/types";
+import type { AdminConfig } from "@/lib/types";
 
 interface Props {
-  config: ChatConfig;
-  onConfigChange: (config: ChatConfig) => void;
+  config: AdminConfig;
+  onConfigChange: (config: AdminConfig) => void;
 }
 
 export default function QuizEditor({ config, onConfigChange }: Props) {
@@ -36,7 +36,7 @@ export default function QuizEditor({ config, onConfigChange }: Props) {
   };
 
   const removeQuestion = (index: number) => {
-    const newQuestions = (config.questions || []).filter((_, i) => i !== index);
+    const newQuestions = (config.questions || []).filter((_, idx) => idx !== index);
     onConfigChange({
       ...config,
       questions: newQuestions
