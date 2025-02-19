@@ -141,7 +141,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/chat-configs/:id", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/chat-configs/:id", async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.id);
       const userId = req.user?.id;
@@ -155,13 +155,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       const config = await db.query.chatConfigs.findFirst({
-        where: and(
-          eq(chatConfigs.id, configId),
-          or(
-            eq(chatConfigs.userId, userId),
-            eq(chatConfigs.isTemplate, true)
-          )
-        ),
+        where: eq(chatConfigs.id, configId),
         with: {
           quizQuestions: {
             where: eq(quizQuestions.deleted, false),
