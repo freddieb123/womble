@@ -12,26 +12,15 @@ interface Props {
 }
 
 export default function QuizEditor({ config, onConfigChange }: Props) {
-  console.log('QuizEditor received config:', config);
-
-  // Initialize questions array if undefined
-  if (!config.questions) {
-    config = {
-      ...config,
-      questions: []
-    };
-  }
-
-  console.log('QuizEditor working with questions:', config.questions);
+  // Ensure questions array exists
+  const questions = config.questions || [];
 
   const handleQuestionChange = (index: number, field: 'question' | 'expectedAnswer', value: string) => {
-    console.log('Handling question change:', { index, field, value });
-    const newQuestions = [...(config.questions || [])];
+    const newQuestions = [...questions];
     newQuestions[index] = {
       ...newQuestions[index],
       [field]: value
     };
-    console.log('Updated questions:', newQuestions);
     onConfigChange({
       ...config,
       questions: newQuestions
@@ -39,22 +28,14 @@ export default function QuizEditor({ config, onConfigChange }: Props) {
   };
 
   const addQuestion = () => {
-    console.log('Adding new question');
-    const newQuestions = [
-      ...(config.questions || []),
-      { question: '', expectedAnswer: '' }
-    ];
-    console.log('Questions after adding:', newQuestions);
     onConfigChange({
       ...config,
-      questions: newQuestions
+      questions: [...questions, { question: '', expectedAnswer: '' }]
     });
   };
 
   const removeQuestion = (index: number) => {
-    console.log('Removing question at index:', index);
-    const newQuestions = (config.questions || []).filter((_, idx) => idx !== index);
-    console.log('Questions after removal:', newQuestions);
+    const newQuestions = questions.filter((_, idx) => idx !== index);
     onConfigChange({
       ...config,
       questions: newQuestions
@@ -82,7 +63,7 @@ export default function QuizEditor({ config, onConfigChange }: Props) {
           </Button>
         </div>
 
-        {(config.questions || []).map((question, index) => (
+        {questions.map((question, index) => (
           <div key={index} className="space-y-4 p-4 border rounded-lg relative">
             <Button
               variant="ghost"
