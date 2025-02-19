@@ -31,6 +31,7 @@ import { Switch } from "@/components/ui/switch";
 import TemplateGallery from "@/components/TemplateGallery";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut } from "lucide-react";
+import QuizEditor from "@/components/QuizEditor";
 
 type ChatConfig = {
   id: number;
@@ -521,30 +522,43 @@ export default function Home() {
                             <>
                               <ScrollArea className="flex-1 -mx-6 px-6">
                                 <div className="py-4">
-                                  <AdminPanel
-                                    config={{
-                                      title: editingConfig.title,
-                                      type: editingConfig.type,
-                                      systemPrompt: editingConfig.systemPrompt,
-                                      userInstructions: editingConfig.userInstructions || "",
-                                      feedbackCriteria: editingConfig.feedbackCriteria || "",
-                                      temperature: 0.7,
-                                      maxTokens: 1000,
-                                      questions: editingConfig.questions || []
-                                    }}
-                                    onConfigChange={(updatedConfig) => {
-                                      setEditingConfig({
-                                        ...editingConfig,
-                                        title: updatedConfig.title,
-                                        type: updatedConfig.type,
-                                        systemPrompt: updatedConfig.systemPrompt,
-                                        userInstructions: updatedConfig.userInstructions || null,
-                                        feedbackCriteria: updatedConfig.feedbackCriteria || null,
-                                        questions: updatedConfig.questions || []
-                                      });
-                                    }}
-                                    isEditMode={true}
-                                  />
+                                  {editingConfig.type === 'quiz' ? (
+                                    <QuizEditor
+                                      config={editingConfig}
+                                      onConfigChange={(updatedConfig) => {
+                                        setEditingConfig(prev => prev ? {
+                                          ...prev,
+                                          ...updatedConfig,
+                                          questions: updatedConfig.questions
+                                        } : null);
+                                      }}
+                                    />
+                                  ) : (
+                                    <AdminPanel
+                                      config={{
+                                        title: editingConfig.title,
+                                        type: editingConfig.type,
+                                        systemPrompt: editingConfig.systemPrompt,
+                                        userInstructions: editingConfig.userInstructions || "",
+                                        feedbackCriteria: editingConfig.feedbackCriteria || "",
+                                        temperature: 0.7,
+                                        maxTokens: 1000,
+                                        questions: editingConfig.questions || []
+                                      }}
+                                      onConfigChange={(updatedConfig) => {
+                                        setEditingConfig({
+                                          ...editingConfig,
+                                          title: updatedConfig.title,
+                                          type: updatedConfig.type,
+                                          systemPrompt: updatedConfig.systemPrompt,
+                                          userInstructions: updatedConfig.userInstructions || null,
+                                          feedbackCriteria: updatedConfig.feedbackCriteria || null,
+                                          questions: updatedConfig.questions || []
+                                        });
+                                      }}
+                                      isEditMode={true}
+                                    />
+                                  )}
                                 </div>
                               </ScrollArea>
                               <div className="pt-4 border-t flex justify-end">
