@@ -524,11 +524,20 @@ export default function Home() {
                                 <div className="py-4">
                                   {editingConfig.type === 'quiz' ? (
                                     <QuizEditor
-                                      config={editingConfig}
+                                      config={{
+                                        title: editingConfig.title,
+                                        type: editingConfig.type,
+                                        systemPrompt: editingConfig.systemPrompt,
+                                        userInstructions: editingConfig.userInstructions || "",
+                                        feedbackCriteria: editingConfig.feedbackCriteria || "",
+                                        temperature: 0.7,
+                                        maxTokens: 1000,
+                                        questions: editingConfig.questions || []
+                                      }}
                                       onConfigChange={(updatedConfig) => {
                                         setEditingConfig(prev => prev ? {
                                           ...prev,
-                                          ...updatedConfig,
+                                          title: updatedConfig.title,
                                           questions: updatedConfig.questions
                                         } : null);
                                       }}
