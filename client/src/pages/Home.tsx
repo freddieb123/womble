@@ -642,7 +642,7 @@ export default function Home() {
                         </Button>
                       </div>
                       <span className="hidden md:inline text-sm text-muted-foreground">
-                        {config.conversationCount} conversation{config.conversationCount !== 1 ? 's' : ''}
+                        {config.conversationCount} submission{config.conversationCount !== 1 ? 's' : ''}
                       </span>
                     </div>
                   </div>
