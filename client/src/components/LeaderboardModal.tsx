@@ -1,3 +1,4 @@
+
 import {
   Dialog,
   DialogContent,
@@ -6,7 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Medal, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 
 interface LeaderboardEntry {
   userName: string;
@@ -57,18 +58,8 @@ export default function LeaderboardModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader className="flex flex-row items-center justify-between">
+        <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          {onRefresh && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onRefresh}
-              className="h-8 w-8 p-0"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-          )}
         </DialogHeader>
         <div className="space-y-4">
           {/* Top 3 Podium */}
@@ -117,6 +108,20 @@ export default function LeaderboardModal({
                 </div>
               </Card>
             </>
+          )}
+
+          {/* Update Button */}
+          {onRefresh && (
+            <div className="flex justify-center pt-2">
+              <Button
+                variant="outline"
+                onClick={onRefresh}
+                className="w-full"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Update
+              </Button>
+            </div>
           )}
         </div>
       </DialogContent>
