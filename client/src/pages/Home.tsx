@@ -601,11 +601,22 @@ export default function Home() {
                 <CardContent>
                   <div className="space-y-4">
                     <div>
-                      <h3 className="font-semibold mb-1">System Prompt</h3>
-                      <p className="text-sm text-gray-600">
-                        {config.systemPrompt.split(' ').slice(0, 30).join(' ')}
-                        {config.systemPrompt.split(' ').length > 30 ? '...' : ''}
-                      </p>
+                      {config.type === 'quiz' ? (
+                        <>
+                          <h3 className="font-semibold mb-1">Questions</h3>
+                          <p className="text-sm text-gray-600">
+                            {config.questions?.length || 0} question{config.questions?.length !== 1 ? 's' : ''}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <h3 className="font-semibold mb-1">System Prompt</h3>
+                          <p className="text-sm text-gray-600">
+                            {config.systemPrompt.split(' ').slice(0, 30).join(' ')}
+                            {config.systemPrompt.split(' ').length > 30 ? '...' : ''}
+                          </p>
+                        </>
+                      )}
                     </div>
                     {config.userInstructions && (
                       <div>
