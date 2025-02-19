@@ -596,7 +596,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Update the quiz feedback endpoint to use quiz_responses table
-  app.post("/api/quiz-feedback", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/quiz-feedback", async (req: Request, res: Response) => {
     try {
       const { configId, sessionId, userName, questions, answers } = quizSubmissionSchema.parse(req.body);
 
