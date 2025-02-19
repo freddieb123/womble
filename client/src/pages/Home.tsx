@@ -535,11 +535,17 @@ export default function Home() {
                                         questions: editingConfig.questions || []
                                       }}
                                       onConfigChange={(updatedConfig) => {
-                                        setEditingConfig(prev => prev ? {
-                                          ...prev,
-                                          title: updatedConfig.title,
-                                          questions: updatedConfig.questions
-                                        } : null);
+                                        console.log('QuizEditor onConfigChange called with:', updatedConfig);
+                                        console.log('Current editingConfig:', editingConfig);
+                                        setEditingConfig(prev => {
+                                          const updated = prev ? {
+                                            ...prev,
+                                            title: updatedConfig.title,
+                                            questions: updatedConfig.questions
+                                          } : null;
+                                          console.log('Updated editingConfig:', updated);
+                                          return updated;
+                                        });
                                       }}
                                     />
                                   ) : (

@@ -12,12 +12,17 @@ interface Props {
 }
 
 export default function QuizEditor({ config, onConfigChange }: Props) {
+  console.log('QuizEditor received config:', config);
+  console.log('QuizEditor questions:', config.questions);
+
   const handleQuestionChange = (index: number, field: 'questionText' | 'idealAnswer', value: string) => {
+    console.log('Handling question change:', { index, field, value });
     const newQuestions = [...(config.questions || [])];
     newQuestions[index] = {
       ...newQuestions[index],
       [field]: value
     };
+    console.log('Updated questions:', newQuestions);
     onConfigChange({
       ...config,
       questions: newQuestions
@@ -25,10 +30,12 @@ export default function QuizEditor({ config, onConfigChange }: Props) {
   };
 
   const addQuestion = () => {
+    console.log('Adding new question');
     const newQuestions = [
       ...(config.questions || []),
       { questionText: '', idealAnswer: '' }
     ];
+    console.log('Questions after adding:', newQuestions);
     onConfigChange({
       ...config,
       questions: newQuestions
@@ -36,7 +43,9 @@ export default function QuizEditor({ config, onConfigChange }: Props) {
   };
 
   const removeQuestion = (index: number) => {
+    console.log('Removing question at index:', index);
     const newQuestions = (config.questions || []).filter((_, idx) => idx !== index);
+    console.log('Questions after removal:', newQuestions);
     onConfigChange({
       ...config,
       questions: newQuestions
@@ -64,40 +73,43 @@ export default function QuizEditor({ config, onConfigChange }: Props) {
           </Button>
         </div>
 
-        {(config.questions || []).map((question, index) => (
-          <div key={index} className="space-y-4 p-4 border rounded-lg relative">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-2 right-2"
-              onClick={() => removeQuestion(index)}
-            >
-              <Trash2 className="h-4 w-4 text-red-500" />
-            </Button>
+        {(config.questions || []).map((question, index) => {
+          console.log('Rendering question:', { index, question });
+          return (
+            <div key={index} className="space-y-4 p-4 border rounded-lg relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2"
+                onClick={() => removeQuestion(index)}
+              >
+                <Trash2 className="h-4 w-4 text-red-500" />
+              </Button>
 
-            <div>
-              <Label htmlFor={`question-${index}`}>Question {index + 1}</Label>
-              <Textarea
-                id={`question-${index}`}
-                value={question.questionText}
-                onChange={(e) => handleQuestionChange(index, 'questionText', e.target.value)}
-                placeholder="Enter your question"
-                className="mt-1"
-              />
-            </div>
+              <div>
+                <Label htmlFor={`question-${index}`}>Question {index + 1}</Label>
+                <Textarea
+                  id={`question-${index}`}
+                  value={question.questionText}
+                  onChange={(e) => handleQuestionChange(index, 'questionText', e.target.value)}
+                  placeholder="Enter your question"
+                  className="mt-1"
+                />
+              </div>
 
-            <div>
-              <Label htmlFor={`answer-${index}`}>Expected Answer</Label>
-              <Textarea
-                id={`answer-${index}`}
-                value={question.idealAnswer}
-                onChange={(e) => handleQuestionChange(index, 'idealAnswer', e.target.value)}
-                placeholder="Enter the expected answer"
-                className="mt-1"
-              />
+              <div>
+                <Label htmlFor={`answer-${index}`}>Expected Answer</Label>
+                <Textarea
+                  id={`answer-${index}`}
+                  value={question.idealAnswer}
+                  onChange={(e) => handleQuestionChange(index, 'idealAnswer', e.target.value)}
+                  placeholder="Enter the expected answer"
+                  className="mt-1"
+                />
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
