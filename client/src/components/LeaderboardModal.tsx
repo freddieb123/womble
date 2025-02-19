@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Medal } from "lucide-react";
 
 interface LeaderboardEntry {
   userName: string;
