@@ -8,6 +8,7 @@ import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam } from 'openai/resources';
+import chatConfigsRouter from './routes/chat-configs';
 
 const uploadFeedbackSchema = z.object({
   configId: z.number(),
@@ -65,6 +66,9 @@ const sessions: Record<string, Message[]> = {};
 export function registerRoutes(app: Express): Server {
   // Set up authentication routes and middleware
   setupAuth(app);
+
+  // Register chat-configs routes
+  app.use('/api', chatConfigsRouter);
 
   // Middleware to check authentication for API routes
   const requireAuth = (req: any, res: any, next: any) => {
@@ -925,7 +929,7 @@ export function registerRoutes(app: Express): Server {
       const prompt = `Analyze these feedback points and identify two key themes:
       
     Feedback points:
-    ${allBullets.map(bullet => `- ${bullet}`).join('\n')}
+    ${allBullets.map(bullet => `-${bullet}`).join('\n')}
     
     Please provide exactly two themes:
     1. One positive theme highlighting what's being done well

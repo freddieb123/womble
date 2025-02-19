@@ -1,6 +1,6 @@
-import { db } from "@/db";
-import { chatConfigs, quizQuestions } from "@/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { db } from "../../db";
+import { chatConfigs, quizQuestions } from "../../db/schema";
+import { eq } from "drizzle-orm";
 import { Router } from "express";
 
 const router = Router();
@@ -11,40 +11,33 @@ router.get("/chat-configs/:id", async (req, res) => {
     const configId = parseInt(req.params.id);
     const config = await db.query.chatConfigs.findFirst({
       where: eq(chatConfigs.id, configId),
+      with: {
+        quizQuestions: {
+          where: eq(quizQuestions.deleted, false),
+          orderBy: [quizQuestions.orderIndex],
+        }
+      }
     });
 
     if (!config) {
-      return res.status(404).json({ error: "Config not found" });
+      return res.status(404).json({ error: "Configuration not found" });
     }
 
-    // If it's a quiz type, fetch the associated questions
-    if (config.type === 'quiz') {
-      console.log('Fetching quiz questions for config:', configId);
-      const questions = await db.query.quizQuestions.findMany({
-        where: and(
-          eq(quizQuestions.configId, configId),
-          eq(quizQuestions.deleted, false)
-        ),
-        orderBy: [desc(quizQuestions.orderIndex)]
-      });
+    // Transform the response to match the expected format
+    const responseConfig = {
+      ...config,
+      questions: config.type === 'quiz' ? config.quizQuestions.map(q => ({
+        question: q.question,
+        expectedAnswer: q.expectedAnswer
+      })) : undefined,
+      quizQuestions: undefined
+    };
 
-      console.log('Found questions:', questions);
-
-      const transformedQuestions = questions.map(q => ({
-        questionText: q.question,
-        idealAnswer: q.expectedAnswer
-      }));
-
-      return res.json({
-        ...config,
-        questions: transformedQuestions
-      });
-    }
-
-    res.json(config);
-  } catch (error) {
+    console.log('Sending response config:', responseConfig);
+    res.json(responseConfig);
+  } catch (error: any) {
     console.error("Error fetching chat config:", error);
-    res.status(500).json({ error: "Failed to fetch chat config" });
+    res.status(500).json({ error: error.message });
   }
 });
 
