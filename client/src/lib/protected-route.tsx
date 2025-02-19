@@ -5,11 +5,18 @@ import { Route, Redirect } from "wouter";
 export function ProtectedRoute({
   path,
   component: Component,
+  requireAuth = true,
 }: {
   path: string;
   component: () => React.JSX.Element;
+  requireAuth?: boolean;
 }) {
   const { user, isLoading } = useAuth();
+
+  // Skip auth check for routes that don't require it
+  if (!requireAuth) {
+    return <Route path={path} component={Component} />;
+  }
 
   if (isLoading) {
     return (

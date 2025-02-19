@@ -17,7 +17,7 @@ function App() {
         <Route path="/auth" component={AuthPage} />
         <Route path="/reset-password" component={ResetPasswordPage} />
         <ProtectedRoute path="/" component={Home} />
-        <ProtectedRoute path="/chat" component={UserView} />
+        <ProtectedRoute path="/chat" component={UserView} requireAuth={false} />
         <ProtectedRoute path="/analysis" component={ConversationAnalysis} />
         <ProtectedRoute path="/conversation" component={StaticConversationView} />
         <Route component={NotFound} />
