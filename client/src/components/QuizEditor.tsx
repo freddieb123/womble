@@ -15,7 +15,7 @@ export default function QuizEditor({ config, onConfigChange }: Props) {
   console.log('QuizEditor received config:', config);
   console.log('QuizEditor questions:', config.questions);
 
-  const handleQuestionChange = (index: number, field: 'questionText' | 'idealAnswer', value: string) => {
+  const handleQuestionChange = (index: number, field: 'question' | 'expectedAnswer', value: string) => {
     console.log('Handling question change:', { index, field, value });
     const newQuestions = [...(config.questions || [])];
     newQuestions[index] = {
@@ -33,7 +33,7 @@ export default function QuizEditor({ config, onConfigChange }: Props) {
     console.log('Adding new question');
     const newQuestions = [
       ...(config.questions || []),
-      { questionText: '', idealAnswer: '' }
+      { question: '', expectedAnswer: '' }
     ];
     console.log('Questions after adding:', newQuestions);
     onConfigChange({
@@ -90,8 +90,8 @@ export default function QuizEditor({ config, onConfigChange }: Props) {
                 <Label htmlFor={`question-${index}`}>Question {index + 1}</Label>
                 <Textarea
                   id={`question-${index}`}
-                  value={question.questionText}
-                  onChange={(e) => handleQuestionChange(index, 'questionText', e.target.value)}
+                  value={question.question}
+                  onChange={(e) => handleQuestionChange(index, 'question', e.target.value)}
                   placeholder="Enter your question"
                   className="mt-1"
                 />
@@ -101,8 +101,8 @@ export default function QuizEditor({ config, onConfigChange }: Props) {
                 <Label htmlFor={`answer-${index}`}>Expected Answer</Label>
                 <Textarea
                   id={`answer-${index}`}
-                  value={question.idealAnswer}
-                  onChange={(e) => handleQuestionChange(index, 'idealAnswer', e.target.value)}
+                  value={question.expectedAnswer}
+                  onChange={(e) => handleQuestionChange(index, 'expectedAnswer', e.target.value)}
                   placeholder="Enter the expected answer"
                   className="mt-1"
                 />
