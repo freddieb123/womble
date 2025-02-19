@@ -150,10 +150,6 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Invalid config ID" });
       }
 
-      if (!userId) {
-        return res.status(401).json({ error: "User not authenticated" });
-      }
-
       const config = await db.query.chatConfigs.findFirst({
         where: eq(chatConfigs.id, configId),
         with: {
