@@ -145,14 +145,16 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Update the GET endpoint for a single config
   app.get("/api/chat-configs/:id", async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.id);
-      const userId = req.user?.id;
 
       if (isNaN(configId)) {
         return res.status(400).json({ error: "Invalid config ID" });
       }
+
+      console.log('Fetching config with ID:', configId);
 
       const config = await db.query.chatConfigs.findFirst({
         where: eq(chatConfigs.id, configId),
@@ -168,6 +170,8 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: "Configuration not found" });
       }
 
+      console.log('Found config:', config);
+
       // Transform the response to match the expected format
       const responseConfig = {
         ...config,
@@ -178,6 +182,7 @@ export function registerRoutes(app: Express): Server {
         quizQuestions: undefined
       };
 
+      console.log('Sending transformed config:', responseConfig);
       res.json(responseConfig);
     } catch (error: any) {
       console.error("Error fetching chat config:", error);
@@ -232,6 +237,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Update the PUT endpoint to handle quiz questions
   app.put("/api/chat-configs/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.id);
@@ -259,14 +265,14 @@ export function registerRoutes(app: Express): Server {
 
       const { title, type, systemPrompt, userInstructions, feedbackCriteria, questions } = chatConfigSchema.parse(req.body);
 
+      // Update the chat config
       const updatedConfig = await db.update(chatConfigs)
         .set({
           title,
           type,
           systemPrompt,
           userInstructions,
-          feedbackCriteria,
-          questions
+          feedbackCriteria
         })
         .where(and(
           eq(chatConfigs.id, configId),
@@ -274,11 +280,50 @@ export function registerRoutes(app: Express): Server {
         ))
         .returning();
 
-      if (!updatedConfig.length) {
-        return res.status(404).json({ error: "Configuration not found" });
+      if (type === 'quiz' && questions) {
+        // First, mark all existing questions as deleted
+        await db.update(quizQuestions)
+          .set({
+            deleted: true,
+            deletedAt: new Date()
+          })
+          .where(eq(quizQuestions.configId, configId));
+
+        // Then insert the new questions
+        const questionsToInsert = questions.map((q, index) => ({
+          configId: configId,
+          question: q.question,
+          expectedAnswer: q.expectedAnswer,
+          orderIndex: index,
+          createdAt: new Date(),
+          deleted: false
+        }));
+
+        await db.insert(quizQuestions).values(questionsToInsert);
       }
 
-      res.json(updatedConfig[0]);
+      // Fetch the updated config with questions
+      const config = await db.query.chatConfigs.findFirst({
+        where: eq(chatConfigs.id, configId),
+        with: {
+          quizQuestions: {
+            where: eq(quizQuestions.deleted, false),
+            orderBy: [quizQuestions.orderIndex],
+          }
+        }
+      });
+
+      // Transform the response
+      const responseConfig = {
+        ...config,
+        questions: config?.type === 'quiz' ? config.quizQuestions.map(q => ({
+          question: q.question,
+          expectedAnswer: q.expectedAnswer
+        })) : undefined,
+        quizQuestions: undefined
+      };
+
+      res.json(responseConfig);
     } catch (error: any) {
       console.error("Error updating chat config:", error);
       res.status(400).json({ error: error.message });

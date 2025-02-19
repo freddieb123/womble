@@ -13,7 +13,16 @@ interface Props {
 
 export default function QuizEditor({ config, onConfigChange }: Props) {
   console.log('QuizEditor received config:', config);
-  console.log('QuizEditor questions:', config.questions);
+
+  // Initialize questions array if undefined
+  if (!config.questions) {
+    config = {
+      ...config,
+      questions: []
+    };
+  }
+
+  console.log('QuizEditor working with questions:', config.questions);
 
   const handleQuestionChange = (index: number, field: 'question' | 'expectedAnswer', value: string) => {
     console.log('Handling question change:', { index, field, value });
@@ -73,43 +82,40 @@ export default function QuizEditor({ config, onConfigChange }: Props) {
           </Button>
         </div>
 
-        {(config.questions || []).map((question, index) => {
-          console.log('Rendering question:', { index, question });
-          return (
-            <div key={index} className="space-y-4 p-4 border rounded-lg relative">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-2 right-2"
-                onClick={() => removeQuestion(index)}
-              >
-                <Trash2 className="h-4 w-4 text-red-500" />
-              </Button>
+        {(config.questions || []).map((question, index) => (
+          <div key={index} className="space-y-4 p-4 border rounded-lg relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2"
+              onClick={() => removeQuestion(index)}
+            >
+              <Trash2 className="h-4 w-4 text-red-500" />
+            </Button>
 
-              <div>
-                <Label htmlFor={`question-${index}`}>Question {index + 1}</Label>
-                <Textarea
-                  id={`question-${index}`}
-                  value={question.question}
-                  onChange={(e) => handleQuestionChange(index, 'question', e.target.value)}
-                  placeholder="Enter your question"
-                  className="mt-1"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor={`answer-${index}`}>Expected Answer</Label>
-                <Textarea
-                  id={`answer-${index}`}
-                  value={question.expectedAnswer}
-                  onChange={(e) => handleQuestionChange(index, 'expectedAnswer', e.target.value)}
-                  placeholder="Enter the expected answer"
-                  className="mt-1"
-                />
-              </div>
+            <div>
+              <Label htmlFor={`question-${index}`}>Question {index + 1}</Label>
+              <Textarea
+                id={`question-${index}`}
+                value={question.question}
+                onChange={(e) => handleQuestionChange(index, 'question', e.target.value)}
+                placeholder="Enter your question"
+                className="mt-1"
+              />
             </div>
-          );
-        })}
+
+            <div>
+              <Label htmlFor={`answer-${index}`}>Expected Answer</Label>
+              <Textarea
+                id={`answer-${index}`}
+                value={question.expectedAnswer}
+                onChange={(e) => handleQuestionChange(index, 'expectedAnswer', e.target.value)}
+                placeholder="Enter the expected answer"
+                className="mt-1"
+              />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
