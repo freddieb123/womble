@@ -43,6 +43,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
   const inputRef = useRef<HTMLInputElement>(null);
   const [feedbackData, setFeedbackData] = useState<{ bullets: string[], score: number | null, summary: string | null }>({ bullets: [], score: null, summary: null });
   const [isGettingHint, setIsGettingHint] = useState(false);
+  const [isGettingFeedback, setIsGettingFeedback] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -405,6 +406,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
                           }
 
                           try {
+                            setIsGettingFeedback(true);
                             const response = await fetch("/api/chat-feedback", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
@@ -429,13 +431,15 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
                               title: "Error",
                               description: error instanceof Error ? error.message : "Failed to get feedback",
                             });
+                          } finally {
+                            setIsGettingFeedback(false);
                           }
                         }}
-                        variant="outline"
-                        disabled={!hasEnoughMessages}
-                        className="w-full"
+                        variant="default"
+                        disabled={!hasEnoughMessages || isGettingFeedback}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                       >
-                        Get Feedback
+                        {isGettingFeedback ? "Analyzing conversation..." : "Get Feedback"}
                       </Button>
                     </div>
                   </TooltipTrigger>
