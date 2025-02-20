@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Copy, ExternalLink, MoreVertical, BarChart2, Trash2, ArrowUpCircle, Flag } from "lucide-react";
+import { Plus, Pencil, Copy, ExternalLink, MoreVertical, BarChart2, Trash2, ArrowUpCircle, Flag, Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
@@ -629,8 +629,8 @@ export default function Home() {
                     <div className="flex justify-between items-center">
                       <div className="flex gap-2">
                         <Button size="sm" onClick={() => handleCopyLink(config.id)}>
-                          <Copy className="h-4 w-4 mr-2" />
-                          Copy Link
+                          <Share2 className="h-4 w-4 mr-2" />
+                          Share GPT
                         </Button>
                         <Button
                           size="sm"
