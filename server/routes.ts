@@ -771,7 +771,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Feedback criteria not set for this configuration" });
       }
 
-      const prompt = `Context:\n${config.systemPrompt}\n\nAnalyze the conversation based on these criteria:\n${config.feedbackCriteria}\n\nYOU MUST address the user as 'you' in your response (and do NOT just say 'the user').\n\nPlease provide your analysis in exactly this format, ensuring you are evaluating the user's side of the conversation (i.e. the person who first types, NOT the GPT (which is you as the bot):\n\n• [3 bullet points focusing on how well the conversation meets the criteria. Keep each bullet to 1 sentence]\n\nScore: [1-10]\n[Brief one-line summary of overall quality]`;
+      const prompt = `Context:\n${config.systemPrompt}\n\nAnalyze the conversation based on these criteria:\n${config.feedbackCriteria}\n\nIMPORTANT: You MUST address the person being evaluated as 'you' in ALL feedback points. NEVER use phrases like 'the user' or 'they' - always write as if speaking directly to the person (e.g. "You demonstrated strong understanding" instead of "The user demonstrated strong understanding").\n\nPlease provide your analysis in exactly this format, evaluating the person's side of the conversation (NOT the GPT responses):\n\n• [3 bullet points focusing on how well the conversation meets the criteria. Each bullet must use 'you' and be 1 sentence]\n\nScore: [1-10]\n[Brief one-line summary of overall quality using 'you']`;
 
       const conversation = messages.map((m: Message) =>
         `${m.role}: ${typeof m.content === 'string' ? m.content : m.content.text}`
