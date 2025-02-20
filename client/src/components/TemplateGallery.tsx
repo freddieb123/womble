@@ -29,18 +29,20 @@ export default function TemplateGallery({ templates, onSelectTemplate, onStartFr
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center mb-8">
+      <div className="mb-8">
         <div>
           <h2 className="text-2xl font-bold text-blue-900">Choose a Template</h2>
           <p className="text-muted-foreground">Start with a template or create from scratch</p>
         </div>
+      </div>
+
+      <div className="space-y-4">
         <Button variant="default" className="bg-blue-600 hover:bg-blue-700" onClick={onStartFromScratch}>
           <Plus className="h-4 w-4 mr-2" />
           Start from Scratch
         </Button>
-      </div>
 
-      <div className="relative">
+        <div className="relative">
         <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search templates..."
