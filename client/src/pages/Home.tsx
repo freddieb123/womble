@@ -611,8 +611,8 @@ export default function Home() {
                         <>
                           
                           <p className="text-sm text-gray-600">
-                          {config.quizQuestions?.length || 0} question{config.quizQuestions?.length !== 1 ? 's' : ''}
-                        </p>
+                            {config.quizQuestions?.length || 0} question{(config.quizQuestions?.length || 0) !== 1 ? 's' : ''}
+                          </p>
                         </>
                       ) : (
                         <>
