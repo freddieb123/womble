@@ -609,10 +609,6 @@ export default function Home() {
                     <div>
                       {config.type === 'quiz' ? (
                         <>
-                          
-                          <p className="text-sm text-gray-600">
-                            {config.quizQuestions?.length || 0} question{(config.quizQuestions?.length || 0) !== 1 ? 's' : ''}
-                          </p>
                         </>
                       ) : (
                         <>
