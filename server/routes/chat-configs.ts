@@ -30,7 +30,7 @@ router.get("/chat-configs/:id", async (req, res) => {
         question: q.question,
         expectedAnswer: q.expectedAnswer
       })) : undefined,
-      quizQuestions: undefined
+      quizQuestions: config.type === 'quiz' ? config.quizQuestions : undefined
     };
 
     console.log('Sending response config:', responseConfig);
