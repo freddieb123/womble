@@ -50,6 +50,12 @@ type ChatConfig = {
     question: string;
     expectedAnswer: string;
   }>;
+  quizQuestions?: Array<{
+    id: number;
+    question: string;
+    expectedAnswer: string;
+    orderIndex: number;
+  }>;
 };
 
 export default function Home() {
@@ -605,8 +611,8 @@ export default function Home() {
                         <>
                           
                           <p className="text-sm text-gray-600">
-                            {config.questions?.length || 0} question{config.questions?.length !== 1 ? 's' : ''}
-                          </p>
+                          {config.quizQuestions?.length || 0} question{config.quizQuestions?.length !== 1 ? 's' : ''}
+                        </p>
                         </>
                       ) : (
                         <>
