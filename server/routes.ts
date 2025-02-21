@@ -89,11 +89,19 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Get user's own configs, excluding templates
+      // Get user's personal configs and all templates
       const configs = await db.query.chatConfigs.findMany({
         where: and(
           showDeleted ? undefined : eq(chatConfigs.deleted, false),
-          eq(chatConfigs.userId, userId),
-          eq(chatConfigs.isTemplate, false)
+          or(
+            and(
+              eq(chatConfigs.userId, userId),
+              eq(chatConfigs.isTemplate, false)
+            ),
+            and(
+              eq(chatConfigs.isTemplate, true)
+            )
+          )
         ),
         orderBy: [desc(chatConfigs.createdAt)],
         with: {
@@ -103,8 +111,10 @@ export function registerRoutes(app: Express): Server {
         }
       });
 
-      // Only use the user's configs
-      const allConfigs = configs;
+      // Filter templates out for the main list, but keep personal configs
+      const allConfigs = configs.filter(config => 
+        !config.isTemplate || config.userId === userId
+      );
 
       const configsWithCount = allConfigs.map(config => {
         let responseCount;
