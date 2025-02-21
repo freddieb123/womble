@@ -208,9 +208,9 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                 className="resize-none"
                 rows={4}
               />
-              <p className="text-sm text-muted-foreground">
+              <div className="text-sm text-muted-foreground">
                 Specify criteria that will be used to assess and provide feedback.
-              </p>
+              </div>
             </div>
           </>
         )}
