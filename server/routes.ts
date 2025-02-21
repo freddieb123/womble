@@ -753,7 +753,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/chat-feedback", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/chat-feedback", async (req: Request, res: Response) => {
     try {
       const { configId, sessionId, messages } = req.body;
 
