@@ -111,9 +111,9 @@ export function registerRoutes(app: Express): Server {
         }
       });
 
-      // Filter templates out for the main list, but keep personal configs
+      // For homepage, only show user's own configs (both normal and templates)
       const allConfigs = configs.filter(config => 
-        !config.isTemplate || config.userId === userId
+        config.userId === userId
       );
 
       const configsWithCount = allConfigs.map(config => {
