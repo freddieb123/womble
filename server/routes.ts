@@ -1039,21 +1039,25 @@ export function registerRoutes(app: Express): Server {
       });
 
       const templatesWithCount = templates.map(template => {
-        let responseCount;
+        let responseCount = 0;
         if (template.type === 'upload') {
-          responseCount = template.uploads.length;
+          responseCount = template.uploads?.length || 0;
         } else if (template.type === 'quiz') {
-          responseCount = template.quizResponses.length;
+          responseCount = template.quizResponses?.length || 0;
         } else {
-          responseCount = template.conversations.length;
+          responseCount = template.conversations?.length || 0;
         }
 
         return {
-          ...template,
-          userId: undefined,
-          conversations: undefined,
-          uploads: undefined,
-          quizResponses: undefined,
+          id: template.id,
+          title: template.title,
+          type: template.type,
+          systemPrompt: template.systemPrompt,
+          userInstructions: template.userInstructions,
+          feedbackCriteria: template.feedbackCriteria,
+          createdAt: template.createdAt,
+          isTemplate: true,
+          templateDescription: template.templateDescription,
           conversationCount: responseCount
         };
       });
