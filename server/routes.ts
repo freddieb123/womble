@@ -88,7 +88,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(401).json({ error: "User not authenticated" });
       }
 
-      // Get user's own configs
+      // Get user's own configs and templates
       const configs = await db.query.chatConfigs.findMany({
         where: and(
           showDeleted ? undefined : eq(chatConfigs.deleted, false),
@@ -102,22 +102,8 @@ export function registerRoutes(app: Express): Server {
         }
       });
 
-      // Get public templates separately
-      const templates = await db.query.chatConfigs.findMany({
-        where: and(
-          eq(chatConfigs.isTemplate, true),
-          showDeleted ? undefined : eq(chatConfigs.deleted, false)
-        ),
-        orderBy: [desc(chatConfigs.createdAt)],
-        with: {
-          conversations: true,
-          uploads: true,
-          quizResponses: true,
-        }
-      });
-
-      // Combine user's configs and public templates
-      const allConfigs = [...configs, ...templates];
+      // Only use the user's configs
+      const allConfigs = configs;
 
       const configsWithCount = allConfigs.map(config => {
         let responseCount;
