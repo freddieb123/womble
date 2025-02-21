@@ -193,9 +193,6 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               <p className="text-sm text-muted-foreground">
                 Add helpful instructions or context that will be shown to users.
               </p>
-              <p className="text-xs text-gray-500 mt-4 mb-2">
-                Any responses will not be accessible to others, they will remain secure and private to you.
-              </p>
             </div>
 
             <div className="space-y-2">
