@@ -92,7 +92,11 @@ export function registerRoutes(app: Express): Server {
       const configs = await db.query.chatConfigs.findMany({
         where: and(
           showDeleted ? undefined : eq(chatConfigs.deleted, false),
-          eq(chatConfigs.userId, userId)
+          eq(chatConfigs.userId, userId),
+          or(
+            eq(chatConfigs.isTemplate, false),
+            eq(chatConfigs.userId, userId)
+          )
         ),
         orderBy: [desc(chatConfigs.createdAt)],
         with: {
