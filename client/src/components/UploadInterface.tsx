@@ -55,9 +55,7 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
 
   const fetchLeaderboard = async () => {
     try {
-      const response = await fetch(`/api/conversations/${config.id}`, {
-        credentials: 'include'
-      });
+      const response = await fetch(`/api/conversations/${config.id}`);
       if (!response.ok) {
         throw new Error('Failed to fetch leaderboard data');
       }
