@@ -320,19 +320,38 @@ export default function Home() {
     }
   };
 
-  const handleTemplateSelect = (template: ChatConfig) => {
-    setConfig({
-      title: `${template.title} (Copy)`,
-      type: template.type,
-      systemPrompt: template.systemPrompt,
-      userInstructions: template.userInstructions || "",
-      feedbackCriteria: template.feedbackCriteria || "",
-      temperature: 0.7,
-      maxTokens: 1000,
-      questions: template.questions || []
-    });
-    setIsPreviewingTemplate(true);
-    setIsCreateOpen(true);
+  const handleTemplateSelect = async (template: ChatConfig) => {
+    try {
+      // Fetch the full config including quiz questions if it's a quiz
+      let fullConfig = template;
+      if (template.type === 'quiz') {
+        const response = await fetch(`/api/chat-configs/${template.id}`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch full template config");
+        }
+        fullConfig = await response.json();
+      }
+
+      setConfig({
+        title: `${fullConfig.title} (Copy)`,
+        type: fullConfig.type,
+        systemPrompt: fullConfig.systemPrompt,
+        userInstructions: fullConfig.userInstructions || "",
+        feedbackCriteria: fullConfig.feedbackCriteria || "",
+        temperature: 0.7,
+        maxTokens: 1000,
+        questions: fullConfig.questions || []
+      });
+      setIsPreviewingTemplate(true);
+      setIsCreateOpen(true);
+    } catch (error) {
+      console.error(error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load template",
+      });
+    }
   };
 
   const handleCreateModalClose = (open: boolean) => {
