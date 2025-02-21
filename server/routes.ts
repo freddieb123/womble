@@ -88,11 +88,12 @@ export function registerRoutes(app: Express): Server {
         return res.status(401).json({ error: "User not authenticated" });
       }
 
-      // Get user's own configs
+      // Get user's own configs, excluding templates
       const configs = await db.query.chatConfigs.findMany({
         where: and(
           showDeleted ? undefined : eq(chatConfigs.deleted, false),
-          eq(chatConfigs.userId, userId)
+          eq(chatConfigs.userId, userId),
+          eq(chatConfigs.isTemplate, false)
         ),
         orderBy: [desc(chatConfigs.createdAt)],
         with: {
@@ -1030,14 +1031,34 @@ export function registerRoutes(app: Express): Server {
           eq(chatConfigs.deleted, false)
         ),
         orderBy: [desc(chatConfigs.createdAt)],
+        with: {
+          conversations: true,
+          uploads: true,
+          quizResponses: true,
+        }
       });
 
-      const templatesWithoutPrivateData = templates.map(template => ({
-        ...template,
-        userId: undefined
-      }));
+      const templatesWithCount = templates.map(template => {
+        let responseCount;
+        if (template.type === 'upload') {
+          responseCount = template.uploads.length;
+        } else if (template.type === 'quiz') {
+          responseCount = template.quizResponses.length;
+        } else {
+          responseCount = template.conversations.length;
+        }
 
-      res.json(templatesWithoutPrivateData);
+        return {
+          ...template,
+          userId: undefined,
+          conversations: undefined,
+          uploads: undefined,
+          quizResponses: undefined,
+          conversationCount: responseCount
+        };
+      });
+
+      res.json(templatesWithCount);
     } catch (error: any) {
       console.error("Error fetching templates:", error);
       res.status(500).json({ error: error.message });
