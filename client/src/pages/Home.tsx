@@ -481,8 +481,32 @@ export default function Home() {
         </div>
 
         <ScrollArea className="h-[calc(100vh-12rem)]">
-          <div className="space-y-4">
-            {configs?.map((config) => (
+            <div className="space-y-4">
+              {(!configs || configs.length === 0) ? (
+                <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+                  <div className="w-48 h-48 mb-6 relative">
+                    <svg viewBox="0 0 24 24" fill="none" className="w-full h-full text-blue-100">
+                      <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2"/>
+                      <path d="M12 8V12L14.5 14.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    </svg>
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-4">Get Started with GPTs</h2>
+                  <p className="text-gray-600 max-w-md mb-8">
+                    Start getting bespoke formative feedback to your participants. You can create quizzes, give feedback on screenshots of documents or create practice conversations.
+                  </p>
+                  <Dialog open={isTemplateGalleryOpen} onOpenChange={setIsTemplateGalleryOpen}>
+                    <Button 
+                      size="lg"
+                      onClick={() => setIsTemplateGalleryOpen(true)}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create your first GPT
+                    </Button>
+                  </Dialog>
+                </div>
+              ) : (
+                configs.map((config) => (
               <Card
                 key={config.id}
                 className={`p-6 ${config.deleted ? 'opacity-60' : ''}`}
@@ -688,9 +712,10 @@ export default function Home() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        </ScrollArea>
+                ))
+              )}
+            </div>
+          </ScrollArea>
       </div>
       <AlertDialog
         open={deletingConfig !== null}
