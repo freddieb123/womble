@@ -725,7 +725,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Add new endpoint for fetching quiz responses after the existing quiz feedback endpoint
-  app.get("/api/quiz-responses/:configId", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/quiz-responses/:configId", async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.configId);
 
