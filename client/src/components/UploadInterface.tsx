@@ -55,7 +55,9 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
 
   const fetchLeaderboard = async () => {
     try {
-      const response = await fetch(`/api/conversations/${config.id}`);
+      const response = await fetch(`/api/conversations/${config.id}`, {
+        credentials: 'include'
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch leaderboard data');
       }
@@ -92,7 +94,7 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
   };
 
   useEffect(() => {
-    if (fetchError) {
+    if (fetchError && uploadState.feedback) {
       console.error('Error fetching conversations:', fetchError);
       toast({
         variant: "destructive",
@@ -100,7 +102,7 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
         description: "Failed to load feedback data"
       });
     }
-  }, [fetchError, toast]);
+  }, [fetchError, uploadState.feedback, toast]);
 
   // Get the latest feedback if available
   useEffect(() => {
