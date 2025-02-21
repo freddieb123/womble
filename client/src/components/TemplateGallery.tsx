@@ -73,7 +73,7 @@ export default function TemplateGallery({ templates, onSelectTemplate, onStartFr
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="flex flex-col h-[180px]">
+                <CardContent className="flex flex-col h-[100px]">
                   <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
                     {template.templateDescription || template.systemPrompt.slice(0, 150) + "..."}
                   </p>
