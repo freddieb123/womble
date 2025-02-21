@@ -54,9 +54,6 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
     });
   };
 
-  // Log current config state for debugging
-  console.log('Current config:', config);
-
   return (
     <div className="space-y-6">
       <div className="space-y-4">
@@ -84,7 +81,10 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               onConfigChange({
                 ...config,
                 type: newType,
-                questions: newType === 'quiz' ? [{ question: "", expectedAnswer: "" }] : undefined
+                // Preserve questions if switching back to quiz type
+                questions: newType === 'quiz' ? 
+                  (config.questions?.length ? config.questions : [{ question: "", expectedAnswer: "" }]) : 
+                  undefined
               });
             }}
             disabled={isEditMode}
@@ -110,7 +110,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               <div key={index} className="space-y-4 mb-6 pb-6 border-b last:border-b-0">
                 <div className="flex justify-between items-center">
                   <h4 className="font-medium">Question {index + 1}</h4>
-                  {config.questions.length > 1 && (
+                  {Array.isArray(config.questions) && config.questions.length > 1 && (
                     <Button
                       variant="ghost"
                       size="sm"
