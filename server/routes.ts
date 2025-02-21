@@ -88,15 +88,11 @@ export function registerRoutes(app: Express): Server {
         return res.status(401).json({ error: "User not authenticated" });
       }
 
-      // Get user's own configs and templates
+      // Get user's own configs
       const configs = await db.query.chatConfigs.findMany({
         where: and(
           showDeleted ? undefined : eq(chatConfigs.deleted, false),
-          eq(chatConfigs.userId, userId),
-          or(
-            eq(chatConfigs.isTemplate, false),
-            eq(chatConfigs.userId, userId)
-          )
+          eq(chatConfigs.userId, userId)
         ),
         orderBy: [desc(chatConfigs.createdAt)],
         with: {
