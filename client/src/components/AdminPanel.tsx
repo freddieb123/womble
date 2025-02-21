@@ -194,7 +194,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                 Add helpful instructions or context that will be shown to users.
               </p>
               <p className="text-xs text-gray-400">
-                Any responses will not be accessible to others, they will remain secure and private to you.
+                Any responses to this GPT will not be accessible to others, they will remain secure and private to you.
               </p>
             </div>
 
