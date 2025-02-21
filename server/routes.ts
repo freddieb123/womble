@@ -145,6 +145,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Remove auth for public access to chat configs
   app.get("/api/chat-configs/:id", async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.id);
@@ -342,7 +343,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Messages endpoints
-  app.get("/api/messages", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/messages", async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.query.configId as string);
       const sessionId = req.query.sessionId as string || crypto.randomUUID();
@@ -379,7 +380,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/messages", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/messages", async (req: Request, res: Response) => {
     try {
       const { content, config: configData } = req.body;
       const configId = parseInt(req.query.configId as string);
@@ -530,7 +531,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/upload-feedback", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/upload-feedback", async (req: Request, res: Response) => {
     try {
       const { configId, sessionId, fileContent, fileName, userName } = uploadFeedbackSchema.parse(req.body);
 
@@ -618,6 +619,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Update the quiz feedback endpoint to use quiz_responses table
+  // Remove auth for public quiz feedback
   app.post("/api/quiz-feedback", async (req: Request, res: Response) => {
     try {
       const { configId, sessionId, userName, questions, answers } = quizSubmissionSchema.parse(req.body);
