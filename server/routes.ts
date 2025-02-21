@@ -875,7 +875,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/conversations/:configId", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/conversations/:configId", async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.configId);
 
