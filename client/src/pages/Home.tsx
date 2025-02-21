@@ -287,18 +287,37 @@ export default function Home() {
     window.open(`${window.location.origin}/analysis?configId=${configToView.id}`, '_blank');
   };
 
-  const handleDuplicate = (configToDuplicate: ChatConfig) => {
-    setConfig({
-      title: `${configToDuplicate.title} (Copy)`,
-      type: configToDuplicate.type,
-      systemPrompt: configToDuplicate.systemPrompt,
-      userInstructions: configToDuplicate.userInstructions || "",
-      feedbackCriteria: configToDuplicate.feedbackCriteria || "",
-      temperature: 0.7,
-      maxTokens: 1000,
-      questions: configToDuplicate.questions || []
-    });
-    setIsCreateOpen(true);
+  const handleDuplicate = async (configToDuplicate: ChatConfig) => {
+    try {
+      // Fetch the full config including quiz questions if it's a quiz
+      let fullConfig = configToDuplicate;
+      if (configToDuplicate.type === 'quiz') {
+        const response = await fetch(`/api/chat-configs/${configToDuplicate.id}`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch full config");
+        }
+        fullConfig = await response.json();
+      }
+
+      setConfig({
+        title: `${fullConfig.title} (Copy)`,
+        type: fullConfig.type,
+        systemPrompt: fullConfig.systemPrompt,
+        userInstructions: fullConfig.userInstructions || "",
+        feedbackCriteria: fullConfig.feedbackCriteria || "",
+        temperature: 0.7,
+        maxTokens: 1000,
+        questions: fullConfig.questions || []
+      });
+      setIsCreateOpen(true);
+    } catch (error) {
+      console.error(error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to duplicate GPT",
+      });
+    }
   };
 
   const handleTemplateSelect = (template: ChatConfig) => {
@@ -355,7 +374,7 @@ export default function Home() {
       // Optionally show a toast notification here
     }
   };
-  
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
