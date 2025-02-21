@@ -190,7 +190,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                 className="resize-none"
                 rows={4}
               />
-              <p className="text-sm text-muted-foreground">
+              <p className="text-base text-gray-700 font-medium">
                 Add helpful instructions or context that will be shown to users.
               </p>
             </div>
