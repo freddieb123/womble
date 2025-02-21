@@ -7,7 +7,7 @@ import { eq, and, or, desc, count } from "drizzle-orm";
 import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
-import type { ChatCompletionMessageParam } from 'openai/resources';
+import type { ChatCompletionMessageParam } from 'openai/dist/resources/chat/completions';
 import chatConfigsRouter from './routes/chat-configs';
 
 const uploadFeedbackSchema = z.object({
@@ -82,27 +82,31 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/chat-configs", requireAuth, async (req: Request, res: Response) => {
     try {
       const showDeleted = req.query.showDeleted === 'true';
+      const showTemplates = req.query.showTemplates === 'true';
       const userId = req.user?.id;
 
       if (!userId) {
         return res.status(401).json({ error: "User not authenticated" });
       }
 
-      // Get user's own configs, excluding templates
-      // Get user's personal configs and all templates
-      const configs = await db.query.chatConfigs.findMany({
-        where: and(
+      let whereClause;
+      if (showTemplates) {
+        // For template gallery: show all templates (isTemplate = true)
+        whereClause = and(
           showDeleted ? undefined : eq(chatConfigs.deleted, false),
-          or(
-            and(
-              eq(chatConfigs.userId, userId),
-              eq(chatConfigs.isTemplate, false)
-            ),
-            and(
-              eq(chatConfigs.isTemplate, true)
-            )
-          )
-        ),
+          eq(chatConfigs.isTemplate, true)
+        );
+      } else {
+        // For homepage: show only user's own configs (both normal and templates)
+        whereClause = and(
+          showDeleted ? undefined : eq(chatConfigs.deleted, false),
+          eq(chatConfigs.userId, userId),
+          eq(chatConfigs.isTemplate, false)
+        );
+      }
+
+      const configs = await db.query.chatConfigs.findMany({
+        where: whereClause,
         orderBy: [desc(chatConfigs.createdAt)],
         with: {
           conversations: true,
@@ -111,12 +115,7 @@ export function registerRoutes(app: Express): Server {
         }
       });
 
-      // For homepage, only show user's own configs (both normal and templates)
-      const allConfigs = configs.filter(config => 
-        config.userId === userId
-      );
-
-      const configsWithCount = allConfigs.map(config => {
+      const configsWithCount = configs.map(config => {
         let responseCount;
         if (config.type === 'upload') {
           responseCount = config.uploads.length;
@@ -933,7 +932,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       const allBullets = feedbacks
-        .flatMap(feedback => feedback.bullets || [])
+        .flatMap((feedback: { bullets?: string[] }) => feedback.bullets || [])
         .filter(bullet => bullet);
 
       if (allBullets.length === 0) {

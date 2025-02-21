@@ -1,4 +1,3 @@
-
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,7 @@ import type { AdminConfig } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 interface Template extends AdminConfig {
   usageCount?: number;
@@ -15,13 +15,21 @@ interface Template extends AdminConfig {
 }
 
 interface Props {
-  templates: Template[];
   onSelectTemplate: (template: Template) => void;
   onStartFromScratch: () => void;
 }
 
-export default function TemplateGallery({ templates, onSelectTemplate, onStartFromScratch }: Props) {
+export default function TemplateGallery({ onSelectTemplate, onStartFromScratch }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
+
+  const { data: templates = [] } = useQuery<Template[]>({
+    queryKey: ["/api/chat-configs", { showTemplates: true }],
+    queryFn: async () => {
+      const res = await fetch("/api/chat-configs?showTemplates=true");
+      if (!res.ok) throw new Error("Failed to fetch templates");
+      return res.json();
+    }
+  });
 
   const filteredTemplates = templates.filter(template => 
     template.title.toLowerCase().includes(searchQuery.toLowerCase()) ||

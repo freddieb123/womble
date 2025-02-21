@@ -35,81 +35,104 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
-  const server = registerRoutes(app);
+const startServer = async (retryCount = 0) => {
+  try {
+    const server = registerRoutes(app);
 
-  // Global error handler with enhanced logging
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    // Global error handler with enhanced logging
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
 
-    console.error("Server Error:", {
-      status,
-      message,
-      stack: err.stack,
-      path: _req.path
+      console.error("Server Error:", {
+        status,
+        message,
+        stack: err.stack,
+        path: _req.path
+      });
+
+      res.status(status).json({ message });
     });
 
-    res.status(status).json({ message });
-  });
+    if (app.get("env") === "development") {
+      console.log("Starting server in development mode");
+      await setupVite(app, server);
+    } else {
+      console.log("Starting server in production mode");
+      try {
+        const rootDir = process.env.REPL_SLUG ? `/home/runner/${process.env.REPL_SLUG}` : process.cwd();
+        const distPath = path.join(rootDir, "dist", "public");
+        console.log("Serving static files from:", distPath);
 
-  if (app.get("env") === "development") {
-    console.log("Starting server in development mode");
-    await setupVite(app, server);
-  } else {
-    console.log("Starting server in production mode");
-    try {
-      // In production, Replit sets REPL_SLUG which we can use to construct the correct path
-      const rootDir = process.env.REPL_SLUG ? `/home/runner/${process.env.REPL_SLUG}` : process.cwd();
-      const distPath = path.join(rootDir, "dist", "public");
-      console.log("Serving static files from:", distPath);
+        if (!fs.existsSync(distPath)) {
+          console.error(`Error: Build directory not found at ${distPath}`);
+          console.error('Current directory contents:', fs.readdirSync(rootDir));
+          throw new Error('Build directory not found');
+        }
 
-      // Verify dist directory exists
-      if (!fs.existsSync(distPath)) {
-        console.error(`Error: Build directory not found at ${distPath}`);
-        console.error('Current directory contents:', fs.readdirSync(rootDir));
-        throw new Error('Build directory not found');
+        console.log('Dist directory contents:', fs.readdirSync(distPath));
+
+        app.use(express.static(distPath));
+
+        app.get('*', (req, res, next) => {
+          if (req.path.startsWith('/api')) {
+            return next();
+          }
+
+          const indexPath = path.join(distPath, 'index.html');
+          console.log(`Attempting to serve index.html from: ${indexPath}`);
+
+          if (!fs.existsSync(indexPath)) {
+            console.error(`Error: index.html not found at ${indexPath}`);
+            return res.status(404).send('index.html not found');
+          }
+
+          console.log(`Serving index.html for path: ${req.path}`);
+          res.sendFile(indexPath);
+        });
+      } catch (error) {
+        console.error("Error setting up static file serving:", error);
+        console.error("Complete error details:", {
+          name: error instanceof Error ? error.name : 'Unknown',
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          cwd: process.cwd()
+        });
+        app.get('*', (req, res) => {
+          res.status(500).send('Server configuration error');
+        });
       }
+    }
 
-      // Log the contents of the dist directory
-      console.log('Dist directory contents:', fs.readdirSync(distPath));
+    // Try to use the port from environment variable, or start with 5000 and increment if busy
+    const initialPort = parseInt(process.env.PORT || "5000");
+    const port = initialPort + retryCount;
 
-      app.use(express.static(distPath));
-
-      // Serve index.html for all non-API routes (SPA fallback)
-      app.get('*', (req, res, next) => {
-        if (req.path.startsWith('/api')) {
-          return next();
-        }
-
-        const indexPath = path.join(distPath, 'index.html');
-        console.log(`Attempting to serve index.html from: ${indexPath}`);
-
-        if (!fs.existsSync(indexPath)) {
-          console.error(`Error: index.html not found at ${indexPath}`);
-          return res.status(404).send('index.html not found');
-        }
-
-        console.log(`Serving index.html for path: ${req.path}`);
-        res.sendFile(indexPath);
+    try {
+      await new Promise((resolve, reject) => {
+        server.listen(port, "0.0.0.0")
+          .once('error', (err: any) => {
+            if (err.code === 'EADDRINUSE' && retryCount < 10) {
+              console.log(`Port ${port} is in use, trying port ${port + 1}`);
+              server.close();
+              resolve(startServer(retryCount + 1));
+            } else {
+              reject(err);
+            }
+          })
+          .once('listening', () => {
+            log(`Server running at http://0.0.0.0:${port} in ${app.get("env")} mode`);
+            resolve(server);
+          });
       });
     } catch (error) {
-      console.error("Error setting up static file serving:", error);
-      console.error("Complete error details:", {
-        name: error instanceof Error ? error.name : 'Unknown',
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        cwd: process.cwd()
-      });
-      // Instead of crashing, send a 500 error
-      app.get('*', (req, res) => {
-        res.status(500).send('Server configuration error');
-      });
+      console.error(`Failed to start server after ${retryCount} retries:`, error);
+      throw error;
     }
+  } catch (error) {
+    console.error('Failed to initialize server:', error);
+    process.exit(1);
   }
+};
 
-  const PORT = 5000;
-  server.listen(PORT, "0.0.0.0", () => {
-    log(`Server running at http://0.0.0.0:${PORT} in ${app.get("env")} mode`);
-  });
-})();
+startServer();
