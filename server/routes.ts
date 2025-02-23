@@ -97,13 +97,14 @@ export function registerRoutes(app: Express): Server {
 
       let whereClause;
       if (showTemplates) {
-        // For template gallery: show all templates (isTemplate = true)
+        // For template gallery: show only templates by the user
         whereClause = and(
           showDeleted ? undefined : eq(chatConfigs.deleted, false),
+          eq(chatConfigs.userId, userId),
           eq(chatConfigs.isTemplate, true)
         );
       } else {
-        // For homepage: show ALL user's configs (regardless of template status)
+        // For homepage: show all configs by the user (including templates)
         whereClause = and(
           showDeleted ? undefined : eq(chatConfigs.deleted, false),
           eq(chatConfigs.userId, userId)
@@ -154,6 +155,7 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: error.message });
     }
   });
+
 
   app.get("/api/chat-configs/:id", async (req: Request, res: Response) => {
     try {
@@ -1017,25 +1019,27 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/chat-configs/:id/template", requireAuth, async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.id);
-
       if (isNaN(configId)) {
         return res.status(400).json({ error: "Invalid config ID" });
       }
-
-      // Update the config to mark it as a template
       const { templateDescription } = req.body;
+      // Update the config to mark it as a template and ensure userId is preserved
       const updatedConfig = await db.update(chatConfigs)
         .set({
           isTemplate: true,
-          templateDescription: templateDescription || null
+          templateDescription: templateDescription || null,
+          // Optionally, you can reassign userId if needed:
+          // userId: req.user?.id
         })
-        .where(eq(chatConfigs.id, configId))
+        .where(and(
+          eq(chatConfigs.id, configId),
+          eq(chatConfigs.userId, req.user?.id)
+        ))
         .returning();
 
       if (!updatedConfig.length) {
         return res.status(404).json({ error: "Configuration not found" });
       }
-
       res.json(updatedConfig[0]);
     } catch (error: any) {
       console.error("Error saving config as template:", error);
