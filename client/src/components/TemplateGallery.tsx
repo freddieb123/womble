@@ -2,17 +2,11 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Plus, ArrowRight, Search } from "lucide-react";
-import type { AdminConfig } from "@/lib/types";
+import type { Template } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-
-interface Template extends AdminConfig {
-  usageCount?: number;
-  id: number;
-  isTemplate?: boolean;
-}
 
 interface Props {
   onSelectTemplate: (template: Template) => void;
@@ -75,7 +69,7 @@ export default function TemplateGallery({ onSelectTemplate, onStartFromScratch }
                       <CardTitle>{template.title}</CardTitle>
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                      <Badge className={template.type === 'chat' ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-purple-100 text-purple-800 hover:bg-purple-200'}>
+                      <Badge variant={template.type === 'chat' ? 'default' : template.type === 'upload' ? 'secondary' : 'outline'}>
                         {template.type}
                       </Badge>
                     </div>

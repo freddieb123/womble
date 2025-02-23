@@ -97,11 +97,10 @@ export function registerRoutes(app: Express): Server {
           eq(chatConfigs.isTemplate, true)
         );
       } else {
-        // For homepage: show only user's own configs (both normal and templates)
+        // For homepage: show ALL user's configs (both normal and templates)
         whereClause = and(
           showDeleted ? undefined : eq(chatConfigs.deleted, false),
-          eq(chatConfigs.userId, userId),
-          eq(chatConfigs.isTemplate, false)
+          eq(chatConfigs.userId, userId)
         );
       }
 
@@ -141,7 +140,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Remove auth for public access to chat configs
   app.get("/api/chat-configs/:id", async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.id);

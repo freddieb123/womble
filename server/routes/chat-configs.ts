@@ -1,6 +1,6 @@
 import { db } from "../../db";
 import { chatConfigs, quizQuestions } from "../../db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { Router } from "express";
 
 const router = Router();
@@ -9,6 +9,8 @@ router.get("/chat-configs/:id", async (req, res) => {
   try {
     console.log('Fetching chat config with ID:', req.params.id);
     const configId = parseInt(req.params.id);
+    console.log('User ID from request:', req.user?.id);
+
     const config = await db.query.chatConfigs.findFirst({
       where: eq(chatConfigs.id, configId),
       with: {
@@ -20,6 +22,7 @@ router.get("/chat-configs/:id", async (req, res) => {
     });
 
     if (!config) {
+      console.log('No config found for ID:', configId);
       return res.status(404).json({ error: "Configuration not found" });
     }
 

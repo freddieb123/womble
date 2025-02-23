@@ -32,6 +32,7 @@ import TemplateGallery from "@/components/TemplateGallery";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut } from "lucide-react";
 import QuizEditor from "@/components/QuizEditor";
+import type { Template } from "@/lib/types"; // Add this import
 
 type ChatConfig = {
   id: number;
@@ -56,6 +57,8 @@ type ChatConfig = {
     expectedAnswer: string;
     orderIndex: number;
   }>;
+  temperature?: number;
+  maxTokens?: number;
 };
 
 export default function Home() {
@@ -83,16 +86,17 @@ export default function Home() {
   const queryClient = useQueryClient();
 
   const { data: configs, isLoading } = useQuery<ChatConfig[]>({
-    queryKey: ['/api/chat-configs', showDeleted],
+    queryKey: ['/api/chat-configs', showDeleted, user?.id],
     queryFn: async () => {
-      const response = await fetch(`/api/chat-configs${showDeleted ? '?showDeleted=true' : ''}`);
+      const response = await fetch(`/api/chat-configs?userId=${user?.id}${showDeleted ? '&showDeleted=true' : ''}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch GPT');
+        throw new Error('Failed to fetch GPTs');
       }
       const data = await response.json();
       console.log('Fetched templates:', data.filter((c: ChatConfig) => c.isTemplate));
       return data;
-    }
+    },
+    enabled: !!user?.id // Only run query when user ID is available
   });
 
   const saveConfig = useMutation({
@@ -517,7 +521,7 @@ export default function Home() {
                       <div className="flex items-center gap-2">
                         <CardTitle>{config.title}</CardTitle>
                         <Badge
-                          variant={config.type === 'chat' ? 'custom-green' : config.type === 'upload' ? 'custom-purple' : 'custom-blue'}
+                          variant={config.type === 'chat' ? 'default' : config.type === 'upload' ? 'secondary' : 'outline'}
                           className={
                             config.type === 'chat' ? 'bg-green-100 text-green-800' :
                               config.type === 'upload' ? 'bg-purple-100 text-purple-800' :

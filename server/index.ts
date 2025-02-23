@@ -35,7 +35,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const startServer = async (retryCount = 0) => {
+const startServer = async () => {
   try {
     const server = registerRoutes(app);
 
@@ -70,64 +70,36 @@ const startServer = async (retryCount = 0) => {
           throw new Error('Build directory not found');
         }
 
-        console.log('Dist directory contents:', fs.readdirSync(distPath));
-
         app.use(express.static(distPath));
-
         app.get('*', (req, res, next) => {
           if (req.path.startsWith('/api')) {
             return next();
           }
-
-          const indexPath = path.join(distPath, 'index.html');
-          console.log(`Attempting to serve index.html from: ${indexPath}`);
-
-          if (!fs.existsSync(indexPath)) {
-            console.error(`Error: index.html not found at ${indexPath}`);
-            return res.status(404).send('index.html not found');
-          }
-
-          console.log(`Serving index.html for path: ${req.path}`);
-          res.sendFile(indexPath);
+          res.sendFile(path.join(distPath, 'index.html'));
         });
       } catch (error) {
         console.error("Error setting up static file serving:", error);
-        console.error("Complete error details:", {
-          name: error instanceof Error ? error.name : 'Unknown',
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          cwd: process.cwd()
-        });
         app.get('*', (req, res) => {
           res.status(500).send('Server configuration error');
         });
       }
     }
 
-    // Try to use the port from environment variable, or start with 5000 and increment if busy
-    const initialPort = parseInt(process.env.PORT || "5000");
-    const port = initialPort + retryCount;
+    // Always use port 5000 as required by .replit configuration
+    const port = 5000;
 
     try {
-      await new Promise((resolve, reject) => {
-        server.listen(port, "0.0.0.0")
-          .once('error', (err: any) => {
-            if (err.code === 'EADDRINUSE' && retryCount < 10) {
-              console.log(`Port ${port} is in use, trying port ${port + 1}`);
-              server.close();
-              resolve(startServer(retryCount + 1));
-            } else {
-              reject(err);
-            }
-          })
-          .once('listening', () => {
-            log(`Server running at http://0.0.0.0:${port} in ${app.get("env")} mode`);
-            resolve(server);
-          });
-      });
+      server.listen(port, "0.0.0.0")
+        .once('error', (err: any) => {
+          console.error(`Failed to start server on port ${port}:`, err);
+          process.exit(1);
+        })
+        .once('listening', () => {
+          log(`Server running at http://0.0.0.0:${port} in ${app.get("env")} mode`);
+        });
     } catch (error) {
-      console.error(`Failed to start server after ${retryCount} retries:`, error);
-      throw error;
+      console.error('Failed to start server:', error);
+      process.exit(1);
     }
   } catch (error) {
     console.error('Failed to initialize server:', error);

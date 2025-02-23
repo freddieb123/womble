@@ -1,3 +1,4 @@
+// Message related types
 export interface MessageContent {
   text: string;
   image: string | null;
@@ -22,19 +23,39 @@ export interface QuizQuestion {
   expectedAnswer: string;
 }
 
-export interface AdminConfig {
+// Base configuration type
+export interface BaseConfig {
   id?: number;
   title: string;
   type: 'chat' | 'upload' | 'quiz';
   systemPrompt: string;
-  userInstructions: string;
-  feedbackCriteria: string;
-  temperature: number;
-  maxTokens: number;
-  templateDescription?: string;
-  questions?: QuizQuestion[];
+  userInstructions: string | null;
+  feedbackCriteria: string | null;
+  temperature?: number;
+  maxTokens?: number;
 }
 
+// Admin specific configuration
+export interface AdminConfig extends BaseConfig {
+  questions?: QuizQuestion[];
+  isTemplate?: boolean;
+  templateDescription?: string;
+  deleted?: boolean;
+  deletedAt?: string | null;
+  conversationCount?: number;
+}
+
+// Template specific configuration
+export interface Template extends AdminConfig {
+  usageCount?: number;
+  id: number;
+  isTemplate: boolean;
+}
+
+// Badge variant types
+export type BadgeVariant = 'default' | 'secondary' | 'outline' | 'custom-green' | 'custom-purple' | 'custom-blue';
+
+// Feedback related types
 export interface Feedback {
   bullets: string[];
   score: number;
