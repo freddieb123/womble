@@ -85,8 +85,8 @@ export function registerRoutes(app: Express): Server {
       const showTemplates = req.query.showTemplates === 'true';
       const rawUserId = req.user?.id;
       console.log('GET /api/chat-configs - Raw user ID:', rawUserId, 'Type:', typeof rawUserId);
-      
-      const userId = typeof rawUserId === 'string' ? parseInt(rawUserId) : rawUserId;
+
+      const userId = typeof rawUserId === 'string' ? parseInt(rawUserId) : rawUserId; //Corrected line
       console.log('GET /api/chat-configs - Parsed user ID:', userId, 'Type:', typeof userId);
 
       console.log('GET /api/chat-configs - Query params:', {
@@ -652,11 +652,11 @@ export function registerRoutes(app: Express): Server {
 
       const feedbackPromises = answers.map(async ({ questionIndex, answer, expectedAnswer }) => {
         const prompt = `Compare the following answer to the expected answer and categorize it as either 'correct' (if it matches closely), 'almost' (if it's on the right track but not quite there), or 'incorrect' (if it's way off).
-        
+
         Question: ${questions[questionIndex].question}
         Expected Answer: ${expectedAnswer}
         User's Answer: ${answer}
-        
+
         Respond in exactly this format:
         {
           "status": "correct|almost|incorrect",
@@ -970,20 +970,20 @@ export function registerRoutes(app: Express): Server {
       }
 
       const prompt = `Analyze these feedback points and identify two key themes:
-      
+
     Feedback points:
     ${allBullets.map(bullet => `-${bullet}`).join('\n')}
-    
+
     Please provide exactly two themes:
     1. One positive theme highlighting what's being done well
     2. One constructive theme suggesting an area for improvement
-        
+
     Format your response exactly like this example:
     {
       "positive": "Learners consistently demonstrate strong engagement with the material",
       "constructive": "More emphasisneeded on practical application of concepts"
     }
-    
+
     Rules:
     - Each theme should be 1-2 sentences
     - Use third-person perspective (e.g., "learners" or "users", not "you")
