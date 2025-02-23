@@ -86,7 +86,7 @@ export function registerRoutes(app: Express): Server {
       const rawUserId = req.user?.id;
       console.log('GET /api/chat-configs - Raw user ID:', rawUserId, 'Type:', typeof rawUserId);
 
-      const userId = typeof rawUserId === 'string' ? parseInt(rawUserId) : rawUserId; //Corrected line
+      const userId = typeof rawUserId === 'string' ? parseInt(rawUserId, 10) : typeof rawUserId === 'number' ? rawUserId : null;
       console.log('GET /api/chat-configs - Parsed user ID:', userId, 'Type:', typeof userId);
 
       console.log('GET /api/chat-configs - Query params:', {
@@ -931,8 +931,7 @@ export function registerRoutes(app: Express): Server {
 
         res.json(uploadsWithMetadata);
       } else {
-        const conversationData = await db.query.conversations.findMany({
-          where: eq(conversations.configId, configId),
+        const conversationData = await db.query.conversations.findMany({          where: eq(conversations.configId, configId),
           orderBy: [desc(conversations.createdAt)]
         });
 
