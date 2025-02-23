@@ -83,7 +83,7 @@ export function registerRoutes(app: Express): Server {
     try {
       const showDeleted = req.query.showDeleted === 'true';
       const showTemplates = req.query.showTemplates === 'true';
-      const userId = req.user?.id;
+      const userId = typeof req.user?.id === 'string' ? parseInt(req.user.id) : req.user?.id;
 
       console.log('GET /api/chat-configs - Query params:', {
         showDeleted,
