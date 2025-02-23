@@ -18,6 +18,20 @@ router.post("/:id/template", async (req, res) => {
 
     console.log('Saving config as template:', { configId, userId, templateDescription });
 
+    // First fetch the current config
+    const currentConfig = await db.query.chatConfigs.findFirst({
+      where: and(
+        eq(chatConfigs.id, configId),
+        eq(chatConfigs.userId, userId)
+      )
+    });
+
+    console.log('Current config before template conversion:', currentConfig);
+
+    if (!currentConfig) {
+      return res.status(404).json({ error: "Configuration not found or unauthorized" });
+    }
+
     // Update config to be a template but maintain its user association
     const updatedConfig = await db.update(chatConfigs)
       .set({ 
@@ -34,7 +48,7 @@ router.post("/:id/template", async (req, res) => {
       return res.status(404).json({ error: "Configuration not found or unauthorized" });
     }
 
-    console.log('Updated config:', updatedConfig[0]);
+    console.log('Updated config after template conversion:', updatedConfig[0]);
     res.json(updatedConfig[0]);
   } catch (error) {
     console.error("Error saving as template:", error);
