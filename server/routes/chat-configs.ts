@@ -5,6 +5,49 @@ import { Router } from "express";
 
 const router = Router();
 
+// List all chat configs route - move this BEFORE the /:id routes
+router.get("/", async (req, res) => {
+  try {
+    const rawUserId = req.user?.id;
+    console.log('User ID from request:', rawUserId, 'Type:', typeof rawUserId);
+
+    // Ensure userId is properly converted to a number
+    const userId = typeof rawUserId === 'string' ? parseInt(rawUserId, 10) : typeof rawUserId === 'number' ? rawUserId : null;
+    console.log('Parsed user ID:', userId, 'Type:', typeof userId);
+
+    if (!userId || isNaN(userId)) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    const whereClause = and(
+      eq(chatConfigs.deleted, false),
+      eq(chatConfigs.userId, userId)
+    );
+    console.log('Constructed whereClause:', whereClause);
+
+    const configs = await db.query.chatConfigs.findMany({
+      where: whereClause,
+      with: {
+        quizQuestions: {
+          where: eq(quizQuestions.deleted, false),
+          orderBy: [quizQuestions.orderIndex],
+        }
+      }
+    });
+
+    console.log('Found configs:', configs.map(c => ({
+      id: c.id,
+      title: c.title,
+      userId: c.userId
+    })));
+    res.json(configs);
+  } catch (error) {
+    console.error("Error fetching chat configs:", error);
+    console.error("Error stack:", error.stack);
+    res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+  }
+});
+
 // Template route handler
 router.post("/:id/template", async (req, res) => {
   try {
@@ -56,7 +99,7 @@ router.post("/:id/template", async (req, res) => {
   }
 });
 
-// Single config fetch route
+// Single config fetch route - keep this AFTER the more specific routes
 router.get("/:id", async (req, res) => {
   try {
     console.log('Fetching chat config with ID:', req.params.id);

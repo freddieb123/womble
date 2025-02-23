@@ -8,7 +8,8 @@ import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam } from 'openai/dist/resources/chat/completions';
-import chatConfigsRouter from './routes/chat-configs';
+
+// Keep existing schema definitions...
 
 const uploadFeedbackSchema = z.object({
   configId: z.number(),
@@ -67,9 +68,6 @@ export function registerRoutes(app: Express): Server {
   // Set up authentication routes and middleware
   setupAuth(app);
 
-  // Register chat-configs routes
-  app.use('/api', chatConfigsRouter);
-
   // Middleware to check authentication for API routes
   const requireAuth = (req: any, res: any, next: any) => {
     if (!req.isAuthenticated()) {
@@ -78,42 +76,23 @@ export function registerRoutes(app: Express): Server {
     next();
   };
 
-  // Protect all chat config related routes
+  // Chat configs routes
   app.get("/api/chat-configs", requireAuth, async (req: Request, res: Response) => {
     try {
-      const showDeleted = req.query.showDeleted === 'true';
-      const showTemplates = req.query.showTemplates === 'true';
       const rawUserId = req.user?.id;
       console.log('GET /api/chat-configs - Raw user ID:', rawUserId, 'Type:', typeof rawUserId);
 
       const userId = typeof rawUserId === 'string' ? parseInt(rawUserId, 10) : typeof rawUserId === 'number' ? rawUserId : null;
       console.log('GET /api/chat-configs - Parsed user ID:', userId, 'Type:', typeof userId);
 
-      console.log('GET /api/chat-configs - Query params:', {
-        showDeleted,
-        showTemplates,
-        userId
-      });
-
       if (!userId) {
         return res.status(401).json({ error: "User not authenticated" });
       }
 
-      let whereClause;
-      if (showTemplates) {
-        // For template gallery: show only templates by the user
-        whereClause = and(
-          showDeleted ? undefined : eq(chatConfigs.deleted, false),
-          eq(chatConfigs.userId, userId),
-          eq(chatConfigs.isTemplate, true)
-        );
-      } else {
-        // For homepage: show all configs by the user (including templates)
-        whereClause = and(
-          showDeleted ? undefined : eq(chatConfigs.deleted, false),
-          eq(chatConfigs.userId, userId)
-        );
-      }
+      const whereClause = and(
+        eq(chatConfigs.deleted, false),
+        eq(chatConfigs.userId, userId)
+      );
 
       console.log('Constructed whereClause:', whereClause);
 
@@ -130,7 +109,6 @@ export function registerRoutes(app: Express): Server {
       console.log('Found configs:', configs.map(c => ({
         id: c.id,
         title: c.title,
-        isTemplate: c.isTemplate,
         userId: c.userId
       })));
 
@@ -169,7 +147,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: error.message });
     }
   });
-
 
   app.get("/api/chat-configs/:id", async (req: Request, res: Response) => {
     try {
@@ -652,11 +629,11 @@ export function registerRoutes(app: Express): Server {
 
       const feedbackPromises = answers.map(async ({ questionIndex, answer, expectedAnswer }) => {
         const prompt = `Compare the following answer to the expected answer and categorize it as either 'correct' (if it matches closely), 'almost' (if it's on the right track but not quite there), or 'incorrect' (if it's way off).
-
+        
         Question: ${questions[questionIndex].question}
         Expected Answer: ${expectedAnswer}
         User's Answer: ${answer}
-
+        
         Respond in exactly this format:
         {
           "status": "correct|almost|incorrect",
