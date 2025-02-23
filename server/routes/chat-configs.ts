@@ -5,11 +5,50 @@ import { Router } from "express";
 
 const router = Router();
 
-router.get("/chat-configs/:id", async (req, res) => {
+// Template route handler
+router.post("/:id/template", async (req, res) => {
+  try {
+    const configId = parseInt(req.params.id);
+    const { templateDescription } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    console.log('Saving config as template:', { configId, userId, templateDescription });
+
+    // Update config to be a template but maintain its user association
+    const updatedConfig = await db.update(chatConfigs)
+      .set({ 
+        isTemplate: true,
+        templateDescription
+      })
+      .where(and(
+        eq(chatConfigs.id, configId),
+        eq(chatConfigs.userId, userId)
+      ))
+      .returning();
+
+    if (!updatedConfig || updatedConfig.length === 0) {
+      return res.status(404).json({ error: "Configuration not found or unauthorized" });
+    }
+
+    console.log('Updated config:', updatedConfig[0]);
+    res.json(updatedConfig[0]);
+  } catch (error) {
+    console.error("Error saving as template:", error);
+    res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+  }
+});
+
+// Single config fetch route
+router.get("/:id", async (req, res) => {
   try {
     console.log('Fetching chat config with ID:', req.params.id);
     const configId = parseInt(req.params.id);
-    console.log('User ID from request:', req.user?.id);
+    const userId = req.user?.id;
+    console.log('User ID from request:', userId);
 
     const config = await db.query.chatConfigs.findFirst({
       where: eq(chatConfigs.id, configId),

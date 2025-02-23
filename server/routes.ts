@@ -85,6 +85,12 @@ export function registerRoutes(app: Express): Server {
       const showTemplates = req.query.showTemplates === 'true';
       const userId = req.user?.id;
 
+      console.log('GET /api/chat-configs - Query params:', {
+        showDeleted,
+        showTemplates,
+        userId
+      });
+
       if (!userId) {
         return res.status(401).json({ error: "User not authenticated" });
       }
@@ -97,12 +103,14 @@ export function registerRoutes(app: Express): Server {
           eq(chatConfigs.isTemplate, true)
         );
       } else {
-        // For homepage: show ALL user's configs (both normal and templates)
+        // For homepage: show ALL user's configs (regardless of template status)
         whereClause = and(
           showDeleted ? undefined : eq(chatConfigs.deleted, false),
           eq(chatConfigs.userId, userId)
         );
       }
+
+      console.log('Constructed whereClause:', whereClause);
 
       const configs = await db.query.chatConfigs.findMany({
         where: whereClause,
@@ -113,6 +121,13 @@ export function registerRoutes(app: Express): Server {
           quizResponses: true,
         }
       });
+
+      console.log('Found configs:', configs.map(c => ({
+        id: c.id,
+        title: c.title,
+        isTemplate: c.isTemplate,
+        userId: c.userId
+      })));
 
       const configsWithCount = configs.map(config => {
         let responseCount;
@@ -918,9 +933,7 @@ export function registerRoutes(app: Express): Server {
       console.error("[GET /api/conversations] Error:", error);
       res.status(500).json({ error: error.message });
     }
-  });
-
-  // Fix theme analysis syntax error
+  });  // Fix theme analysis syntax error
   app.post("/api/analyze-themes", requireAuth, async (req: Request, res: Response) => {
     try {
       const { feedbacks } = req.body;

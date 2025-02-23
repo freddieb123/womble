@@ -59,6 +59,7 @@ type ChatConfig = {
   }>;
   temperature?: number;
   maxTokens?: number;
+  userId?: number; //Added userId
 };
 
 export default function Home() {
@@ -93,7 +94,12 @@ export default function Home() {
         throw new Error('Failed to fetch GPTs');
       }
       const data = await response.json();
-      console.log('Fetched templates:', data.filter((c: ChatConfig) => c.isTemplate));
+      console.log('Fetched configs:', data.map(c => ({
+        id: c.id,
+        title: c.title,
+        isTemplate: c.isTemplate,
+        userId: c.userId
+      })));
       return data;
     },
     enabled: !!user?.id // Only run query when user ID is available
@@ -259,7 +265,7 @@ export default function Home() {
       queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
       setSavingAsTemplate(null);
       toast({
-        description: "GPT saved as public template successfully!",
+        description: "GPT saved as public template successfully! It will remain in your list and be available in the template gallery.",
       });
     },
     onError: (error: Error) => {
@@ -449,18 +455,18 @@ export default function Home() {
             </DialogTrigger>
             <DialogContent className="max-w-4xl">
               <TemplateGallery
+                onSelectTemplate={handleTemplateSelect}
+                onStartFromScratch={handleStartFromScratch}
                 templates={(configs?.filter(c => c.isTemplate) || []).map(template => ({
                   ...template,
-                  temperature: 0.7,
-                  maxTokens: 1000,
+                  temperature: template.temperature || 0.7,
+                  maxTokens: template.maxTokens || 1000,
                   usageCount: configs?.filter(c =>
                     !c.isTemplate &&
                     c.systemPrompt === template.systemPrompt &&
                     c.type === template.type
                   ).length || 0
                 }))}
-                onSelectTemplate={handleTemplateSelect}
-                onStartFromScratch={handleStartFromScratch}
               />
             </DialogContent>
           </Dialog>
