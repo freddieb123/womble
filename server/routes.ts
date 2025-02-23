@@ -83,7 +83,11 @@ export function registerRoutes(app: Express): Server {
     try {
       const showDeleted = req.query.showDeleted === 'true';
       const showTemplates = req.query.showTemplates === 'true';
-      const userId = typeof req.user?.id === 'string' ? parseInt(req.user.id) : req.user?.id;
+      const rawUserId = req.user?.id;
+      console.log('GET /api/chat-configs - Raw user ID:', rawUserId, 'Type:', typeof rawUserId);
+      
+      const userId = typeof rawUserId === 'string' ? parseInt(rawUserId) : rawUserId;
+      console.log('GET /api/chat-configs - Parsed user ID:', userId, 'Type:', typeof userId);
 
       console.log('GET /api/chat-configs - Query params:', {
         showDeleted,
@@ -149,9 +153,19 @@ export function registerRoutes(app: Express): Server {
         };
       });
 
+      console.log('GET /api/chat-configs - Sending response:', {
+        count: configsWithCount.length,
+        configs: configsWithCount.map(c => ({
+          id: c.id,
+          title: c.title,
+          type: c.type,
+          userId: c.userId
+        }))
+      });
       res.json(configsWithCount);
     } catch (error: any) {
       console.error("Error fetching chat configs:", error);
+      console.error("Error stack:", error.stack);
       res.status(500).json({ error: error.message });
     }
   });
