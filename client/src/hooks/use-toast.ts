@@ -125,7 +125,7 @@ function toast({ ...props }: Toast) {
       ...props,
       id,
       open: true,
-      duration: Infinity,
+      duration: 6000,
       onOpenChange: (open) => {
         if (!open) {
           dispatch({ type: "REMOVE_TOAST", toastId: id })
