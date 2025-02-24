@@ -420,8 +420,8 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-start mb-6">
-          <div className="flex flex-col items-start gap-4">
-            <div>
+          <div className="w-full flex flex-col items-center gap-4">
+            <div className="self-start">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative size-8 rounded-full">
@@ -445,7 +445,7 @@ export default function Home() {
                 
               </DropdownMenu>
             </div>
-            <h1 className="text-2xl font-bold text-blue-900">Admin Home</h1>
+            <h1 className="text-2xl font-bold text-blue-900 text-center">Admin Home</h1>
           </div>
           <Dialog open={isTemplateGalleryOpen} onOpenChange={setIsTemplateGalleryOpen}>
             <DialogTrigger asChild>
