@@ -152,6 +152,7 @@ export function registerRoutes(app: Express): Server {
     try {
       const configId = parseInt(req.params.id);
       const userId = req.user?.id;
+      console.log(userId)
 
       if (isNaN(configId)) {
         return res.status(400).json({ error: "Invalid config ID" });
