@@ -449,7 +449,7 @@ export default function Home() {
           </div>
           <Dialog open={isTemplateGalleryOpen} onOpenChange={setIsTemplateGalleryOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="bg-purple-600 hover:bg-purple-700">
                 <Plus className="h-4 w-4 mr-2" />
                 New GPT
               </Button>
