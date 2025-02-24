@@ -442,9 +442,10 @@ export default function Home() {
                     Logout
                   </DropdownMenuItem>
                 </DropdownMenuContent>
+                
               </DropdownMenu>
             </div>
-            <h1 className="text-2xl font-bold text-blue-900">Create and manage your GPTs - Trainer view</h1>
+            <h1 className="text-2xl font-bold text-blue-900">Admin Home</h1>
           </div>
           <Dialog open={isTemplateGalleryOpen} onOpenChange={setIsTemplateGalleryOpen}>
             <DialogTrigger asChild>
