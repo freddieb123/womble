@@ -68,14 +68,14 @@ export default function QuizResponseView({ config, responses }: Props) {
     return <div className="p-4 text-center text-gray-500">No questions found in this quiz</div>;
   }
 
-  // Calculate overall statistics
+  // Calculate overall statistics and sort by score (highest first)
   const overallStats = responses.map(response => {
     const score = calculateScore(response.feedback, config.questions!.length);
     return {
       userName: response.userName || 'Anonymous',
       ...score
     };
-  });
+  }).sort((a, b) => b.score - a.score); // Sort by score in descending order
 
   // Group all responses by question
   const questionResponses: Record<number, Array<{
