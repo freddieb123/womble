@@ -160,6 +160,11 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
       setShowNameModal(true);
       return;
     }
+    
+    // Show confirmation dialog
+    if (!window.confirm("Are you sure? You can only get feedback once so make sure you've finished.")) {
+      return;
+    }
 
     try {
       setUploadState(prev => ({ ...prev, isLoading: true, error: null }));
@@ -255,10 +260,14 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
         <Button
           className="w-full"
           size="lg"
-          disabled={!uploadState.file || uploadState.isLoading}
+          disabled={!uploadState.file || uploadState.isLoading || uploadState.feedback?.score !== undefined}
           onClick={getFeedback}
         >
-          {uploadState.isLoading ? "Analyzing..." : "Get Feedback"}
+          {uploadState.isLoading 
+            ? "Analyzing..." 
+            : uploadState.feedback?.score !== undefined 
+              ? "Feedback Received" 
+              : "Get Feedback"}
         </Button>
       </div>
 

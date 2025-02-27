@@ -393,6 +393,11 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
                             });
                             return;
                           }
+                          
+                          // Show confirmation dialog
+                          if (!window.confirm("Are you sure? You can only get feedback once so make sure you've finished.")) {
+                            return;
+                          }
 
                           const hasUserMessage = chatState.messages.some(m => m.role === 'user');
                           const hasAssistantMessage = chatState.messages.some(m => m.role === 'assistant');
@@ -436,10 +441,14 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
                           }
                         }}
                         variant="default"
-                        disabled={!hasEnoughMessages || isGettingFeedback}
+                        disabled={!hasEnoughMessages || isGettingFeedback || feedbackData.score !== undefined}
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                       >
-                        {isGettingFeedback ? "Analyzing conversation..." : "Get Feedback"}
+                        {isGettingFeedback 
+                          ? "Analyzing conversation..." 
+                          : feedbackData.score !== undefined 
+                            ? "Feedback Received" 
+                            : "Get Feedback"}
                       </Button>
                     </div>
                   </TooltipTrigger>
