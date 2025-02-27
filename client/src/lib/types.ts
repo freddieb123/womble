@@ -20,7 +20,7 @@ export interface ChatState {
 
 export interface QuizQuestion {
   question: string;
-  howToAssess: string;
+  expectedAnswer: string;
 }
 
 // Base configuration type

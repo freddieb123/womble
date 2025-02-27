@@ -22,7 +22,7 @@ const uploadFeedbackSchema = z.object({
 // Update the quiz question schema for better validation
 const quizQuestionSchema = z.object({
   question: z.string().min(1, "Question is required"),
-  howToAssess: z.string().min(1, "How to assess responses is required")
+  expectedAnswer: z.string().min(1, "Expected answer is required")
 });
 
 const chatConfigSchema = z.object({
@@ -47,12 +47,12 @@ const quizSubmissionSchema = z.object({
   userName: z.string(),
   questions: z.array(z.object({
     question: z.string(),
-    howToAssess: z.string()
+    expectedAnswer: z.string()
   })),
   answers: z.array(z.object({
     questionIndex: z.number(),
     answer: z.string(),
-    howToAssess: z.string()
+    expectedAnswer: z.string()
   }))
 });
 
@@ -177,7 +177,7 @@ export function registerRoutes(app: Express): Server {
         ...config,
         questions: config.type === 'quiz' && config.quizQuestions ? config.quizQuestions.map(q => ({
           question: q.question,
-          howToAssess: q.howToAssess
+          expectedAnswer: q.expectedAnswer
         })) : [],
         quizQuestions: undefined
       };
@@ -220,7 +220,7 @@ export function registerRoutes(app: Express): Server {
         const questionsToInsert = questions.map((q, index) => ({
           configId: newConfig[0].id,
           question: q.question,
-          howToAssess: q.howToAssess,
+          expectedAnswer: q.expectedAnswer,
           orderIndex: index,
           createdAt: new Date(),
           deleted: false
@@ -286,7 +286,7 @@ export function registerRoutes(app: Express): Server {
           const questionsToInsert = questions.map((q, index) => ({
             configId,
             question: q.question,
-            howToAssess: q.howToAssess,
+            expectedAnswer: q.expectedAnswer,
             orderIndex: index,
             createdAt: new Date(),
             deleted: false
