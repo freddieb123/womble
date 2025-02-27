@@ -260,12 +260,12 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
         <Button
           className="w-full"
           size="lg"
-          disabled={!uploadState.file || uploadState.isLoading || uploadState.feedback?.score !== undefined}
+          disabled={!uploadState.file || uploadState.isLoading || (uploadState.feedback && uploadState.feedback.score !== undefined)}
           onClick={getFeedback}
         >
           {uploadState.isLoading 
             ? "Analyzing..." 
-            : uploadState.feedback?.score !== undefined 
+            : (uploadState.feedback && uploadState.feedback.score !== undefined)
               ? "Feedback Received" 
               : "Get Feedback"}
         </Button>

@@ -41,7 +41,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [userRank, setUserRank] = useState<number>();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [feedbackData, setFeedbackData] = useState<{ bullets: string[], score: number | null, summary: string | null }>({ bullets: [], score: null, summary: null });
+  const [feedbackData, setFeedbackData] = useState<{ bullets: string[]; score?: number; summary?: string }>({ bullets: [] });
   const [isGettingHint, setIsGettingHint] = useState(false);
   const [isGettingFeedback, setIsGettingFeedback] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -393,7 +393,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
                             });
                             return;
                           }
-                          
+
                           // Show confirmation dialog
                           if (!window.confirm("Are you sure? You can only get feedback once so make sure you've finished.")) {
                             return;
@@ -444,10 +444,10 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
                         disabled={!hasEnoughMessages || isGettingFeedback || feedbackData.score !== undefined}
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                       >
-                        {isGettingFeedback 
-                          ? "Analyzing conversation..." 
-                          : feedbackData.score !== undefined 
-                            ? "Feedback Received" 
+                        {isGettingFeedback
+                          ? "Analyzing conversation..."
+                          : feedbackData.score !== undefined
+                            ? "Feedback Received"
                             : "Get Feedback"}
                       </Button>
                     </div>
