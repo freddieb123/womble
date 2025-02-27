@@ -1038,8 +1038,10 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/templates", requireAuth, async (req:Request, res: Response) => {
+  app.get("/api/templates", async (req:Request, res: Response) => {
     try {
+      // Only filter by isTemplate=true and deleted=false, not by userId
+      // This allows all users to see all public templates
       const templates = await db.query.chatConfigs.findMany({
         where: and(
           eq(chatConfigs.isTemplate, true),
@@ -1050,6 +1052,7 @@ export function registerRoutes(app: Express): Server {
           conversations: true,
           uploads: true,
           quizResponses: true,
+          user: true
         }
       });
 
@@ -1063,6 +1066,12 @@ export function registerRoutes(app: Express): Server {
           responseCount = template.conversations?.length || 0;
         }
 
+        // Include creator info while omitting sensitive data
+        const creator = template.user ? {
+          firstName: template.user.firstName,
+          lastName: template.user.lastName
+        } : null;
+
         return {
           id: template.id,
           title: template.title,
@@ -1073,7 +1082,10 @@ export function registerRoutes(app: Express): Server {
           createdAt: template.createdAt,
           isTemplate: true,
           templateDescription: template.templateDescription,
-          conversationCount: responseCount
+          conversationCount: responseCount,
+          creator: creator,
+          // Omit the full user object to avoid sending sensitive info
+          user: undefined
         };
       });
 

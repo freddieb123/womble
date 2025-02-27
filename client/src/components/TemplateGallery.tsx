@@ -17,9 +17,9 @@ export default function TemplateGallery({ onSelectTemplate, onStartFromScratch }
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: templates = [] } = useQuery<Template[]>({
-    queryKey: ["/api/chat-configs", { showTemplates: true }],
+    queryKey: ["/api/templates"],
     queryFn: async () => {
-      const res = await fetch("/api/chat-configs?showTemplates=true");
+      const res = await fetch("/api/templates");
       if (!res.ok) throw new Error("Failed to fetch templates");
       return res.json();
     }
@@ -84,6 +84,11 @@ export default function TemplateGallery({ onSelectTemplate, onStartFromScratch }
                       Preview Template
                       <ArrowRight className="h-4 w-4 ml-2" />
                     </Button>
+                    {template.creator && (
+                      <span className="text-xs text-muted-foreground">
+                        By: {template.creator.firstName || 'Anonymous'}
+                      </span>
+                    )}
                     {template.usageCount !== undefined && template.usageCount > 0 && (
                       <span className="text-xs text-muted-foreground">
                         {template.usageCount} {template.usageCount === 1 ? 'person is' : 'people are'} using this

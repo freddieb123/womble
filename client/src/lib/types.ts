@@ -74,3 +74,24 @@ export interface QuizFeedback {
   status: 'correct' | 'almost' | 'incorrect';
   feedback: string;
 }
+// Add or update the Template interface
+export interface Template {
+  id: number;
+  title: string;
+  type: 'chat' | 'upload' | 'quiz';
+  systemPrompt: string;
+  userInstructions?: string | null;
+  feedbackCriteria?: string | null;
+  createdAt: string;
+  isTemplate: boolean;
+  templateDescription?: string | null;
+  conversationCount?: number;
+  questions?: Array<{
+    question: string;
+    expectedAnswer: string;
+  }>;
+  creator?: {
+    firstName?: string | null;
+    lastName?: string | null;
+  } | null;
+}
