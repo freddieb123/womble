@@ -5,7 +5,7 @@ import { Plus, ArrowRight, Search } from "lucide-react";
 import type { Template } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 interface Props {
@@ -16,7 +16,7 @@ interface Props {
 export default function TemplateGallery({ onSelectTemplate, onStartFromScratch }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
 
-  const { data: templates = [] } = useQuery<Template[]>({
+  const { data: templates = [], refetch } = useQuery<Template[]>({
     queryKey: ["/api/templates"],
     queryFn: async () => {
       const res = await fetch("/api/templates");
@@ -24,6 +24,13 @@ export default function TemplateGallery({ onSelectTemplate, onStartFromScratch }
       return res.json();
     }
   });
+
+  // Effect to refetch templates when component becomes visible
+  useEffect(() => {
+    refetch();
+    // This effect has no dependencies, which means it will run every time
+    // the component renders/mounts - which happens when the modal opens
+  }, [refetch]);
 
   const filteredTemplates = templates.filter(template => 
     template.title.toLowerCase().includes(searchQuery.toLowerCase()) ||

@@ -442,12 +442,21 @@ export default function Home() {
                     Logout
                   </DropdownMenuItem>
                 </DropdownMenuContent>
-                
+
               </DropdownMenu>
             </div>
             <h1 className="text-2xl font-bold text-blue-900 text-center">Admin Home</h1>
           </div>
-          <Dialog open={isTemplateGalleryOpen} onOpenChange={setIsTemplateGalleryOpen}>
+          <Dialog 
+                    open={isTemplateGalleryOpen} 
+                    onOpenChange={(open) => {
+                      setIsTemplateGalleryOpen(open);
+                      // Force a refetch of the configs if the dialog is closing
+                      if (!open) {
+                        queryClient.invalidateQueries({ queryKey: ["/api/chat-configs"] });
+                      }
+                    }}
+                  >
             <DialogTrigger asChild>
               <Button className="bg-purple-800 hover:bg-purple-900">
                 <Plus className="h-4 w-4 mr-2" />
@@ -472,7 +481,12 @@ export default function Home() {
             </DialogContent>
           </Dialog>
 
-          <Dialog open={isCreateOpen} onOpenChange={handleCreateModalClose}>
+          <Dialog open={isCreateOpen} onOpenChange={(open) => {
+            handleCreateModalClose(open);
+            if (!open) {
+              queryClient.invalidateQueries({ queryKey: ["/api/chat-configs"] });
+            }
+          }}>
             <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
               <DialogHeader>
                 <DialogTitle>Create New GPT</DialogTitle>
@@ -505,7 +519,12 @@ export default function Home() {
                   <p className="text-gray-600 max-w-md mb-8">
                     Start getting bespoke formative feedback to your participants. You can create quizzes, give feedback on screenshots of documents or create practice conversations.
                   </p>
-                  <Dialog open={isTemplateGalleryOpen} onOpenChange={setIsTemplateGalleryOpen}>
+                  <Dialog open={isTemplateGalleryOpen} onOpenChange={(open) => {
+                    setIsTemplateGalleryOpen(open);
+                    if (!open) {
+                      queryClient.invalidateQueries({ queryKey: ["/api/chat-configs"] });
+                    }
+                  }}>
                     <Button 
                       size="lg"
                       onClick={() => setIsTemplateGalleryOpen(true)}
@@ -596,7 +615,12 @@ export default function Home() {
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      <Dialog open={editingConfig?.id === config.id} onOpenChange={(open) => !open && setEditingConfig(null)}>
+                      <Dialog open={editingConfig?.id === config.id} onOpenChange={(open) => {
+                        if (!open) {
+                          setEditingConfig(null);
+                          queryClient.invalidateQueries({ queryKey: ["/api/chat-configs"] });
+                        }
+                      }}>
                         <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
                           <DialogHeader>
                             <DialogTitle>Edit GPT</DialogTitle>
@@ -730,7 +754,12 @@ export default function Home() {
       </div>
       <AlertDialog
         open={deletingConfig !== null}
-        onOpenChange={(open) => !open && setDeletingConfig(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeletingConfig(null);
+            queryClient.invalidateQueries({ queryKey: ["/api/chat-configs"] });
+          }
+        }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -753,7 +782,12 @@ export default function Home() {
       </AlertDialog>
       <AlertDialog
         open={savingAsTemplate !== null}
-        onOpenChange={(open) => !open && setSavingAsTemplate(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSavingAsTemplate(null);
+            queryClient.invalidateQueries({ queryKey: ["/api/chat-configs"] });
+          }
+        }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
