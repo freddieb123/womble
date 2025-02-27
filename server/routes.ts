@@ -307,7 +307,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/chat-hint", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/chat-hint", async (req: Request, res: Response) => {
     try {
       const { feedbackCriteria, userInstructions, messages } = req.body;
 
