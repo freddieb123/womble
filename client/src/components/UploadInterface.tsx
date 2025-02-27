@@ -258,15 +258,17 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
 
       <div className="mt-4">
         <Button
-          className="w-full"
+          className={`w-full ${(uploadState.feedback && uploadState.feedback.score !== undefined) ? 'bg-green-600 hover:bg-green-700' : ''}`}
           size="lg"
-          disabled={!uploadState.file || uploadState.isLoading || (uploadState.feedback && uploadState.feedback.score !== undefined)}
-          onClick={getFeedback}
+          disabled={!uploadState.file || uploadState.isLoading}
+          onClick={(uploadState.feedback && uploadState.feedback.score !== undefined) 
+            ? () => setFeedbackOpen(true) 
+            : getFeedback}
         >
           {uploadState.isLoading 
             ? "Analyzing..." 
             : (uploadState.feedback && uploadState.feedback.score !== undefined)
-              ? "Feedback Received" 
+              ? "View Feedback" 
               : "Get Feedback"}
         </Button>
       </div>

@@ -441,13 +441,14 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
                           }
                         }}
                         variant="default"
-                        disabled={!hasEnoughMessages || isGettingFeedback || feedbackData.score !== undefined}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                        disabled={!hasEnoughMessages || isGettingFeedback}
+                        className={`w-full ${feedbackData.score !== undefined ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
+                        onClick={feedbackData.score !== undefined ? () => setFeedbackOpen(true) : undefined}
                       >
                         {isGettingFeedback
                           ? "Analyzing conversation..."
                           : feedbackData.score !== undefined
-                            ? "Feedback Received"
+                            ? "View Feedback"
                             : "Get Feedback"}
                       </Button>
                     </div>
