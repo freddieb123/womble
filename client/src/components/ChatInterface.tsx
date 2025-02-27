@@ -375,75 +375,77 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
                   <TooltipTrigger asChild>
                     <div className="flex-1">
                       <Button
-                        onClick={async () => {
-                          if (!config.feedbackCriteria) {
-                            toast({
-                              variant: "destructive",
-                              title: "Error",
-                              description: "No feedback criteria specified for this chat configuration.",
-                            });
-                            return;
-                          }
+                        onClick={feedbackData.score !== undefined 
+                          ? () => setFeedbackOpen(true) 
+                          : async () => {
+                              if (!config.feedbackCriteria) {
+                                toast({
+                                  variant: "destructive",
+                                  title: "Error",
+                                  description: "No feedback criteria specified for this chat configuration.",
+                                });
+                                return;
+                              }
 
-                          if (chatState.messages.length === 0) {
-                            toast({
-                              variant: "destructive",
-                              title: "No Messages",
-                              description: "Please have a conversation first before requesting feedback.",
-                            });
-                            return;
-                          }
+                              if (chatState.messages.length === 0) {
+                                toast({
+                                  variant: "destructive",
+                                  title: "No Messages",
+                                  description: "Please have a conversation first before requesting feedback.",
+                                });
+                                return;
+                              }
 
-                          // Show confirmation dialog
-                          if (!window.confirm("Are you sure? You can only get feedback once so make sure you've finished.")) {
-                            return;
-                          }
+                              // Show confirmation dialog
+                              if (!window.confirm("Are you sure? You can only get feedback once so make sure you've finished.")) {
+                                return;
+                              }
 
-                          const hasUserMessage = chatState.messages.some(m => m.role === 'user');
-                          const hasAssistantMessage = chatState.messages.some(m => m.role === 'assistant');
-                          if (!hasUserMessage || !hasAssistantMessage) {
-                            toast({
-                              variant: "destructive",
-                              title: "Incomplete Conversation",
-                              description: "Please complete at least one exchange before requesting feedback.",
-                            });
-                            return;
-                          }
+                              const hasUserMessage = chatState.messages.some(m => m.role === 'user');
+                              const hasAssistantMessage = chatState.messages.some(m => m.role === 'assistant');
+                              if (!hasUserMessage || !hasAssistantMessage) {
+                                toast({
+                                  variant: "destructive",
+                                  title: "Incomplete Conversation",
+                                  description: "Please complete at least one exchange before requesting feedback.",
+                                });
+                                return;
+                              }
 
-                          try {
-                            setIsGettingFeedback(true);
-                            const response = await fetch("/api/chat-feedback", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({
-                                configId: config.id,
-                                sessionId,
-                                messages: chatState.messages,
-                                type: config.type
-                              }),
-                            });
+                              try {
+                                setIsGettingFeedback(true);
+                                const response = await fetch("/api/chat-feedback", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({
+                                    configId: config.id,
+                                    sessionId,
+                                    messages: chatState.messages,
+                                    type: config.type
+                                  }),
+                                });
 
-                            if (!response.ok) {
-                              throw new Error(await response.text());
+                                if (!response.ok) {
+                                  throw new Error(await response.text());
+                                }
+
+                                const { bullets, score, summary } = await response.json();
+                                setFeedbackData({ bullets, score, summary });
+                                setFeedbackOpen(true);
+                              } catch (error) {
+                                toast({
+                                  variant: "destructive",
+                                  title: "Error",
+                                  description: error instanceof Error ? error.message : "Failed to get feedback",
+                                });
+                              } finally {
+                                setIsGettingFeedback(false);
+                              }
                             }
-
-                            const { bullets, score, summary } = await response.json();
-                            setFeedbackData({ bullets, score, summary });
-                            setFeedbackOpen(true);
-                          } catch (error) {
-                            toast({
-                              variant: "destructive",
-                              title: "Error",
-                              description: error instanceof Error ? error.message : "Failed to get feedback",
-                            });
-                          } finally {
-                            setIsGettingFeedback(false);
-                          }
-                        }}
+                        }
                         variant="default"
                         disabled={!hasEnoughMessages || isGettingFeedback}
                         className={`w-full ${feedbackData.score !== undefined ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
-                        onClick={feedbackData.score !== undefined ? () => setFeedbackOpen(true) : undefined}
                       >
                         {isGettingFeedback
                           ? "Analyzing conversation..."
