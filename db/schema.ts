@@ -30,7 +30,7 @@ export const quizQuestions = pgTable("quiz_questions", {
   id: serial("id").primaryKey(),
   configId: integer("config_id").notNull().references(() => chatConfigs.id),
   question: text("question").notNull(),
-  expectedAnswer: text("expected_answer").notNull(),
+  howToAssess: text("how_to_assess").notNull(),
   orderIndex: integer("order_index").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   deleted: boolean("deleted").default(false).notNull(),

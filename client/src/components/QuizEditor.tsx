@@ -15,7 +15,7 @@ export default function QuizEditor({ config, onConfigChange }: Props) {
   // Ensure questions array exists
   const questions = config.questions || [];
 
-  const handleQuestionChange = (index: number, field: 'question' | 'expectedAnswer', value: string) => {
+  const handleQuestionChange = (index: number, field: 'question' | 'howToAssess', value: string) => {
     const newQuestions = [...questions];
     newQuestions[index] = {
       ...newQuestions[index],
@@ -30,7 +30,7 @@ export default function QuizEditor({ config, onConfigChange }: Props) {
   const addQuestion = () => {
     onConfigChange({
       ...config,
-      questions: [...questions, { question: '', expectedAnswer: '' }]
+      questions: [...questions, { question: '', howToAssess: '' }]
     });
   };
 
