@@ -629,7 +629,7 @@ export function registerRoutes(app: Express): Server {
 
 
       const feedbackPromises = answers.map(async ({ questionIndex, answer, expectedAnswer }) => {
-        const prompt = `Compare the following answer to the expected answer and categorize it as either 'correct' (if it matches closely), 'almost' (if it's on the right track but not quite there), or 'incorrect' (if it's way off).
+        const prompt = `Use the information in the 'expected' answer field to categorize it as either 'correct' (if it matches closely), 'almost' (if it's on the right track but not quite there), or 'incorrect' (if it's way off). You should not directly compare to the expected answer, but use the information to inform your assessment. For example if the expected answer includes 'Any one of the following answers' you are not looking for that exact text in the answer, you are using that as instructions on how to assess the answer.  If in doubt, be generous in your assessment. Don't assume that more detail is necessarily more correct however.
         
         Question: ${questions[questionIndex].question}
         Expected Answer: ${expectedAnswer}
