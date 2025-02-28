@@ -21,12 +21,19 @@ export default function LandingPage() {
             <a href="#pricing" className="font-medium text-gray-600 hover:text-primary">Pricing</a>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/auth?mode=login">
-              <Button variant="outline" className="hidden md:inline-flex">Log In</Button>
-            </Link>
-            <Link href="/auth?mode=register">
-              <Button className="bg-primary hover:bg-primary/90">Get Started</Button>
-            </Link>
+            <Button 
+              variant="outline" 
+              className="hidden md:inline-flex" 
+              onClick={() => window.location.href = "/auth?mode=login"}
+            >
+              Log In
+            </Button>
+            <Button 
+              className="bg-primary hover:bg-primary/90" 
+              onClick={() => window.location.href = "/auth?mode=register"}
+            >
+              Get Started
+            </Button>
           </div>
         </div>
       </nav>
@@ -43,22 +50,24 @@ export default function LandingPage() {
                 Leverage AI to generate dynamic quizzes, personalized learning experiences, and detailed performance analytics.
               </p>
               <div className="mt-10 flex flex-col sm:flex-row gap-4">
-                <Link href="/auth?mode=register">
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ 
-                      type: "spring", 
-                      stiffness: 400, 
-                      damping: 10, 
-                      delay: 0.3 
-                    }}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ 
+                    type: "spring", 
+                    stiffness: 400, 
+                    damping: 10, 
+                    delay: 0.3 
+                  }}
+                >
+                  <Button 
+                    size="lg" 
+                    className="bg-primary hover:bg-primary/90 w-full sm:w-auto"
+                    onClick={() => window.location.href = "/auth?mode=register"}
                   >
-                    <Button size="lg" className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
-                      Start Creating
-                    </Button>
-                  </motion.div>
-                </Link>
+                    Start Creating
+                  </Button>
+                </motion.div>
                 <a href="#how-it-works">
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -297,9 +306,13 @@ export default function LandingPage() {
                   <span className="text-gray-600">Access to templates</span>
                 </li>
               </ul>
-              <Link href="/auth?mode=register">
-                <Button variant="outline" className="w-full">Sign Up Free</Button>
-              </Link>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => window.location.href = "/auth?mode=register"}
+              >
+                Sign Up Free
+              </Button>
             </div>
             
             {/* Pro Plan */}
@@ -331,9 +344,12 @@ export default function LandingPage() {
                   <span className="text-gray-600">Team collaboration</span>
                 </li>
               </ul>
-              <Link href="/auth?mode=register">
-                <Button className="w-full bg-primary hover:bg-primary/90">Get Started</Button>
-              </Link>
+              <Button 
+                className="w-full bg-primary hover:bg-primary/90"
+                onClick={() => window.location.href = "/auth?mode=register"}
+              >
+                Get Started
+              </Button>
             </div>
             
             {/* Enterprise Plan */}
@@ -362,9 +378,13 @@ export default function LandingPage() {
                   <span className="text-gray-600">Custom branding</span>
                 </li>
               </ul>
-              <Link href="/auth?mode=register">
-                <Button variant="outline" className="w-full">Contact Sales</Button>
-              </Link>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => window.location.href = "/auth?mode=register"}
+              >
+                Contact Sales
+              </Button>
             </div>
           </div>
         </div>
@@ -455,26 +475,28 @@ export default function LandingPage() {
             Join thousands of educators and organizations using QuizAI to create engaging, effective learning experiences.
           </p>
           <div className="mt-10">
-            <Link href="/auth?mode=register">
-              <motion.div
-                initial={{ opacity: 0, y: 25 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ 
-                  type: "spring", 
-                  stiffness: 400, 
-                  damping: 8, 
-                  delay: 0.2 
-                }}
-                whileHover={{ 
-                  scale: 1.05, 
-                  transition: { duration: 0.2 } 
-                }}
+            <motion.div
+              initial={{ opacity: 0, y: 25 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ 
+                type: "spring", 
+                stiffness: 400, 
+                damping: 8, 
+                delay: 0.2 
+              }}
+              whileHover={{ 
+                scale: 1.05, 
+                transition: { duration: 0.2 } 
+              }}
+            >
+              <Button 
+                size="lg" 
+                className="bg-primary hover:bg-primary/90"
+                onClick={() => window.location.href = "/auth?mode=register"}
               >
-                <Button size="lg" className="bg-primary hover:bg-primary/90">
-                  Get Started for Free
-                </Button>
-              </motion.div>
-            </Link>
+                Get Started for Free
+              </Button>
+            </motion.div>
           </div>
         </div>
       </section>
