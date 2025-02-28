@@ -9,7 +9,6 @@ import { useQuery } from "@tanstack/react-query";
 import type { AdminConfig, UploadState, Feedback, Message } from "@/lib/types";
 import UserNameModal from "./UserNameModal";
 import LeaderboardModal from "./LeaderboardModal";
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 
 
 interface Props {
@@ -39,7 +38,6 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [userRank, setUserRank] = useState<number>();
-  const [isConfirmingFeedback, setIsConfirmingFeedback] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -164,7 +162,8 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
       return;
     }
 
-    setIsConfirmingFeedback(true);
+    // Skip confirmation and directly get feedback
+    confirmFeedback();
   };
 
   const confirmFeedback = async () => {
@@ -323,20 +322,7 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
         maxScore={10}
         onRefresh={fetchLeaderboard}
       />
-      <AlertDialog open={isConfirmingFeedback} onOpenChange={setIsConfirmingFeedback}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Feedback Request</AlertDialogTitle>
-          </AlertDialogHeader>
-          <AlertDialogDescription>
-            Are you sure you want to get feedback? This will end your upload session.
-          </AlertDialogDescription>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setIsConfirmingFeedback(false)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmFeedback}>Confirm</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Confirmation modal removed */}
     </div>
   );
 }
