@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Brain, Zap, Award, Users, Server, Database, BarChart } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function LandingPage() {
   return (
@@ -43,14 +44,36 @@ export default function LandingPage() {
               </p>
               <div className="mt-10 flex flex-col sm:flex-row gap-4">
                 <Link href="/auth?mode=register">
-                  <Button size="lg" className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
-                    Start Creating
-                  </Button>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ 
+                      type: "spring", 
+                      stiffness: 400, 
+                      damping: 10, 
+                      delay: 0.3 
+                    }}
+                  >
+                    <Button size="lg" className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
+                      Start Creating
+                    </Button>
+                  </motion.div>
                 </Link>
                 <a href="#how-it-works">
-                  <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                    See How It Works
-                  </Button>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ 
+                      type: "spring", 
+                      stiffness: 400, 
+                      damping: 10, 
+                      delay: 0.5 
+                    }}
+                  >
+                    <Button size="lg" variant="outline" className="w-full sm:w-auto">
+                      See How It Works
+                    </Button>
+                  </motion.div>
                 </a>
               </div>
               <div className="mt-8 flex items-center gap-2 text-gray-600">
@@ -358,7 +381,13 @@ export default function LandingPage() {
           </div>
           
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+            <motion.div 
+              className="bg-white p-6 rounded-lg shadow-sm border border-gray-100"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.5 }}
+              whileHover={{ y: -5, transition: { duration: 0.2 } }}
+            >
               <div className="flex items-center mb-4">
                 <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-primary font-bold">
                   JD
@@ -371,9 +400,15 @@ export default function LandingPage() {
               <p className="text-gray-600">
                 "QuizAI has transformed how I assess my students. The AI-generated questions are high-quality and save me hours of preparation time."
               </p>
-            </div>
+            </motion.div>
             
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+            <motion.div 
+              className="bg-white p-6 rounded-lg shadow-sm border border-gray-100"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              whileHover={{ y: -5, transition: { duration: 0.2 } }}
+            >
               <div className="flex items-center mb-4">
                 <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold">
                   MS
@@ -386,9 +421,15 @@ export default function LandingPage() {
               <p className="text-gray-600">
                 "The analytics provided by QuizAI help me identify knowledge gaps in my team and tailor training accordingly. It's been invaluable for our L&D department."
               </p>
-            </div>
+            </motion.div>
             
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+            <motion.div 
+              className="bg-white p-6 rounded-lg shadow-sm border border-gray-100"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.5 }}
+              whileHover={{ y: -5, transition: { duration: 0.2 } }}
+            >
               <div className="flex items-center mb-4">
                 <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold">
                   AJ
@@ -401,7 +442,7 @@ export default function LandingPage() {
               <p className="text-gray-600">
                 "My students love the interactive nature of the quizzes and the immediate feedback. I've seen a significant improvement in engagement and retention."
               </p>
-            </div>
+            </motion.div>
           </div>
         </div>
       </section>
@@ -415,9 +456,24 @@ export default function LandingPage() {
           </p>
           <div className="mt-10">
             <Link href="/auth?mode=register">
-              <Button size="lg" className="bg-primary hover:bg-primary/90">
-                Get Started for Free
-              </Button>
+              <motion.div
+                initial={{ opacity: 0, y: 25 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ 
+                  type: "spring", 
+                  stiffness: 400, 
+                  damping: 8, 
+                  delay: 0.2 
+                }}
+                whileHover={{ 
+                  scale: 1.05, 
+                  transition: { duration: 0.2 } 
+                }}
+              >
+                <Button size="lg" className="bg-primary hover:bg-primary/90">
+                  Get Started for Free
+                </Button>
+              </motion.div>
             </Link>
           </div>
         </div>
