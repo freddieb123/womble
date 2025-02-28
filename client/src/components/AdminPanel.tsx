@@ -191,7 +191,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                     systemPrompt: e.target.value
                   })
                 }
-                placeholder="Enter system prompt..."
+                placeholder="Act as a..."
                 className="resize-none"
                 rows={6}
               />
