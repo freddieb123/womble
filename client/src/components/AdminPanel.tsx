@@ -227,8 +227,6 @@ import { Button } from "./ui/button";
 import QuizQuestionList from "./QuizQuestionList";
 import type { AdminConfig, QuizQuestion } from "@/lib/types";
 
-export default AdminPanel;
-
 interface TypeButtonProps {
   type: "chat" | "upload" | "quiz";
   currentType: string;
@@ -256,7 +254,7 @@ interface Props {
   onConfigChange: (config: AdminConfig) => void;
 }
 
-function AdminPanel({ config, onConfigChange }: Props) {
+export default function AdminPanel({ config, onConfigChange }: Props) {
   const handleChange = (field: keyof AdminConfig, value: any) => {
     onConfigChange({ ...config, [field]: value });
   };
