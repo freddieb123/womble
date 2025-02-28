@@ -631,6 +631,27 @@ export function registerRoutes(app: Express): Server {
       const feedbackPromises = answers.map(async ({ questionIndex, answer, expectedAnswer }) => {
         const prompt = `Use the information in the 'expected' answer field to categorize it as either 'correct' (if it matches closely), 'almost' (if it's on the right track but not quite there), or 'incorrect' (if it's way off). You should not directly compare to the expected answer, but use the information to inform your assessment. For example if the expected answer includes 'Any one of the following answers' you are not looking for that exact text in the answer, you are using that as instructions on how to assess the answer.  If in doubt, be generous in your assessment. Don't assume that more detail is necessarily more correct however.
         
+        Here are some examples of how to assess answers:
+        
+        Example 1:
+        Question: What is the capital of France?
+        Expected Answer: Paris
+        User's Answer: paris
+        Assessment: "correct" (The answer is correct despite capitalization differences)
+        
+        Example 2:
+        Question: Name three primary colors.
+        Expected Answer: Any three of: red, blue, yellow
+        User's Answer: Red and Blue 
+        Assessment: "almost" (The answer contains two correct primary colors but is missing one)
+        
+        Example 3:
+        Question: What programming language is commonly used for web development?
+        Expected Answer: Any of: JavaScript, Python, PHP, Ruby, Java
+        User's Answer: C++
+        Assessment: "incorrect" (While C++ can be used for web development, it's not commonly used compared to the expected answers)
+        
+        Now assess the user's answer:
         Question: ${questions[questionIndex].question}
         Expected Answer: ${expectedAnswer}
         User's Answer: ${answer}
