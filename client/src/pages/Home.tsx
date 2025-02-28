@@ -74,7 +74,7 @@ export default function Home() {
   const [config, setConfig] = useState<AdminConfig>({
     title: "",
     type: "chat",
-    systemPrompt: "You are a helpful AI assistant.",
+    systemPrompt: "Act as a...",
     userInstructions: "",
     feedbackCriteria: "",
     temperature: 0.7,
@@ -136,7 +136,7 @@ export default function Home() {
       setConfig({
         title: "",
         type: "chat",
-        systemPrompt: "You are a helpful AI assistant.",
+        systemPrompt: "Act as a...",
         userInstructions: "",
         feedbackCriteria: "",
         temperature: 0.7,
@@ -377,7 +377,7 @@ export default function Home() {
     setConfig({
       title: "",
       type: "chat",
-      systemPrompt: "You are a helpful AI assistant.",
+      systemPrompt: "Act as a...",
       userInstructions: "",
       feedbackCriteria: "",
       temperature: 0.7,
