@@ -82,6 +82,7 @@ export default function Home() {
     questions: []
   });
   const [savingAsTemplate, setSavingAsTemplate] = useState<ChatConfig | null>(null);
+  const [searchTerm, setSearchTerm] = useState(''); // Added searchTerm state
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -416,6 +417,11 @@ export default function Home() {
     );
   }
 
+  const filteredConfigs = configs?.filter(config =>
+    config.title.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
+
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
@@ -446,6 +452,17 @@ export default function Home() {
               </DropdownMenu>
             </div>
             <h1 className="text-2xl font-bold text-blue-900 text-center">Admin Home</h1>
+            {configs && configs.length > 4 && ( // Conditionally render search bar
+              <div className="w-full mt-4">
+                <input
+                  type="text"
+                  placeholder="Search GPTs..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            )}
           </div>
           <Dialog 
                     open={isTemplateGalleryOpen} 
@@ -507,7 +524,7 @@ export default function Home() {
 
         <ScrollArea className="h-[calc(100vh-12rem)]">
             <div className="space-y-4">
-              {(!configs || configs.length === 0) ? (
+              {(!filteredConfigs || filteredConfigs.length === 0) ? (
                 <div className="flex flex-col items-center justify-center h-[60vh] text-center">
                   <div className="w-48 h-48 mb-6 relative">
                     <svg viewBox="0 0 24 24" fill="none" className="w-full h-full text-blue-100">
@@ -536,7 +553,7 @@ export default function Home() {
                   </Dialog>
                 </div>
               ) : (
-                configs.map((config) => (
+                filteredConfigs.map((config) => (
               <Card
                 key={config.id}
                 className={`p-6 ${config.deleted ? 'opacity-60' : ''}`}
