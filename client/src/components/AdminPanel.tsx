@@ -78,7 +78,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
             `}
             onClick={() => handleTypeChange('chat')}
           >
-            Chat
+            Conversation
           </button>
           <button
             type="button"
