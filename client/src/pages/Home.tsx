@@ -350,7 +350,7 @@ export default function Home() {
     }
   };
 
-  const handleTemplateSelect = async (template: ChatConfig) => {
+  const handleTemplateSelect = async (template: Template) => {
     try {
       // Fetch the full config including quiz questions if it's a quiz
       let fullConfig = template;
