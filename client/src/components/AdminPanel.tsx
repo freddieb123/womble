@@ -2,7 +2,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2 } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AdminConfig } from "@/lib/types";
 import { useEffect } from "react";
 
@@ -22,6 +21,17 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
       });
     }
   }, [config.type]);
+
+  const handleTypeChange = (newType: 'chat' | 'upload' | 'quiz') => {
+    onConfigChange({
+      ...config,
+      type: newType,
+      // Preserve questions if switching back to quiz type
+      questions: newType === 'quiz'
+        ? (config.questions?.length ? config.questions : [{ question: "", expectedAnswer: "" }])
+        : undefined,
+    });
+  };
 
   const handleAddQuestion = () => {
     const newQuestions = [
@@ -45,7 +55,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
 
   const handleQuestionChange = (index: number, field: 'question' | 'expectedAnswer', value: string) => {
     if (!config.questions) return;
-    const newQuestions = config.questions.map((q, i) => 
+    const newQuestions = config.questions.map((q, i) =>
       i === index ? { ...q, [field]: value } : q
     );
     onConfigChange({
@@ -56,6 +66,43 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
 
   return (
     <div className="space-y-6">
+      {/* Segmented control for "Type" */}
+      <div className="space-y-1">
+       
+        <div className="inline-flex items-center justify-start space-x-px rounded-md border overflow-hidden">
+          <button
+            type="button"
+            disabled={isEditMode}
+            className={`px-4 py-2 text-sm font-medium focus:outline-none
+              ${config.type === 'chat' ? "bg-green-200 text-green-900" : "bg-white text-gray-700"}
+            `}
+            onClick={() => handleTypeChange('chat')}
+          >
+            Chat
+          </button>
+          <button
+            type="button"
+            disabled={isEditMode}
+            className={`px-4 py-2 text-sm font-medium focus:outline-none
+              ${config.type === 'upload' ? "bg-green-200 text-green-900" : "bg-white text-gray-700"}
+            `}
+            onClick={() => handleTypeChange('upload')}
+          >
+            Upload
+          </button>
+          <button
+            type="button"
+            disabled={isEditMode}
+            className={`px-4 py-2 text-sm font-medium focus:outline-none
+              ${config.type === 'quiz' ? "bg-green-200 text-green-900" : "bg-white text-gray-700"}
+            `}
+            onClick={() => handleTypeChange('quiz')}
+          >
+            Quiz
+          </button>
+        </div>
+      </div>
+
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="title">Title</Label>
@@ -63,87 +110,60 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
             id="title"
             type="text"
             value={config.title}
-            onChange={(e) => onConfigChange({
-              ...config,
-              title: e.target.value
-            })}
+            onChange={(e) =>
+              onConfigChange({
+                ...config,
+                title: e.target.value
+              })
+            }
             placeholder="Give your quiz a memorable title"
             className="w-full px-3 py-2 border rounded-md"
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="type">Type</Label>
-          <Select
-            value={config.type}
-            onValueChange={(value) => {
-              const newType = value as 'chat' | 'upload' | 'quiz';
-              onConfigChange({
-                ...config,
-                type: newType,
-                // Preserve questions if switching back to quiz type
-                questions: newType === 'quiz' ? 
-                  (config.questions?.length ? config.questions : [{ question: "", expectedAnswer: "" }]) : 
-                  undefined
-              });
-            }}
-            disabled={isEditMode}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="chat">Chat</SelectItem>
-              <SelectItem value="upload">Upload</SelectItem>
-              <SelectItem value="quiz">Quiz</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-sm text-muted-foreground">
-            Choose between a chat-based, upload-based, or quiz-based interface.
-          </p>
-        </div>
-
+        {/* Quiz section */}
         {config.type === 'quiz' && (
           <div className="space-y-4 border rounded-lg p-4">
             <h3 className="text-lg font-semibold mb-4">Quiz Questions</h3>
-            {Array.isArray(config.questions) && config.questions.map((question, index) => (
-              <div key={index} className="space-y-4 mb-6 pb-6 border-b last:border-b-0">
-                <div className="flex justify-between items-center">
-                  <h4 className="font-medium">Question {index + 1}</h4>
-                  {Array.isArray(config.questions) && config.questions.length > 1 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemoveQuestion(index)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
+            {Array.isArray(config.questions) &&
+              config.questions.map((question, index) => (
+                <div key={index} className="space-y-4 mb-6 pb-6 border-b last:border-b-0">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-medium">Question {index + 1}</h4>
+                    {Array.isArray(config.questions) && config.questions.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveQuestion(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor={`question-${index}`}>Question Text</Label>
-                  <Textarea
-                    id={`question-${index}`}
-                    value={question.question}
-                    onChange={(e) => handleQuestionChange(index, 'question', e.target.value)}
-                    placeholder="Enter your question..."
-                    rows={2}
-                  />
-                </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`question-${index}`}>Question Text</Label>
+                    <Textarea
+                      id={`question-${index}`}
+                      value={question.question}
+                      onChange={(e) => handleQuestionChange(index, 'question', e.target.value)}
+                      placeholder="Enter your question..."
+                      rows={2}
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor={`answer-${index}`}>Expected Answer</Label>
-                  <Textarea
-                    id={`answer-${index}`}
-                    value={question.expectedAnswer}
-                    onChange={(e) => handleQuestionChange(index, 'expectedAnswer', e.target.value)}
-                    placeholder="Enter the expected answer..."
-                    rows={3}
-                  />
+                  <div className="space-y-2">
+                    <Label htmlFor={`answer-${index}`}>Expected Answer</Label>
+                    <Textarea
+                      id={`answer-${index}`}
+                      value={question.expectedAnswer}
+                      onChange={(e) => handleQuestionChange(index, 'expectedAnswer', e.target.value)}
+                      placeholder="Enter the expected answer..."
+                      rows={3}
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
 
             <Button
               type="button"
@@ -157,6 +177,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
           </div>
         )}
 
+        {/* Chat / Upload shared fields */}
         {config.type !== 'quiz' && (
           <>
             <div className="space-y-2">
@@ -164,10 +185,12 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               <Textarea
                 id="system-prompt"
                 value={config.systemPrompt}
-                onChange={(e) => onConfigChange({
-                  ...config,
-                  systemPrompt: e.target.value
-                })}
+                onChange={(e) =>
+                  onConfigChange({
+                    ...config,
+                    systemPrompt: e.target.value
+                  })
+                }
                 placeholder="Enter system prompt..."
                 className="resize-none"
                 rows={6}
@@ -182,10 +205,12 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               <Textarea
                 id="user-instructions"
                 value={config.userInstructions}
-                onChange={(e) => onConfigChange({
-                  ...config,
-                  userInstructions: e.target.value
-                })}
+                onChange={(e) =>
+                  onConfigChange({
+                    ...config,
+                    userInstructions: e.target.value
+                  })
+                }
                 placeholder="Enter instructions for users..."
                 className="resize-none"
                 rows={4}
@@ -200,10 +225,12 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               <Textarea
                 id="feedback-criteria"
                 value={config.feedbackCriteria}
-                onChange={(e) => onConfigChange({
-                  ...config,
-                  feedbackCriteria: e.target.value
-                })}
+                onChange={(e) =>
+                  onConfigChange({
+                    ...config,
+                    feedbackCriteria: e.target.value
+                  })
+                }
                 placeholder="Enter criteria for providing feedback to users..."
                 className="resize-none"
                 rows={4}
@@ -215,129 +242,6 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
           </>
         )}
       </div>
-    </div>
-  );
-}
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { useState, useEffect } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "./ui/button";
-import QuizQuestionList from "./QuizQuestionList";
-import type { AdminConfig, QuizQuestion } from "@/lib/types";
-
-interface TypeButtonProps {
-  type: "chat" | "upload" | "quiz";
-  currentType: string;
-  onClick: (type: "chat" | "upload" | "quiz") => void;
-  label: string;
-}
-
-const TypeButton = ({ type, currentType, onClick, label }: TypeButtonProps) => {
-  const isActive = type === currentType;
-  
-  return (
-    <Button
-      type="button"
-      variant={isActive ? "default" : "outline"}
-      className={`flex-1 ${isActive ? "bg-blue-600 hover:bg-blue-700" : ""}`}
-      onClick={() => onClick(type)}
-    >
-      {label}
-    </Button>
-  );
-};
-
-interface Props {
-  config: AdminConfig;
-  onConfigChange: (config: AdminConfig) => void;
-}
-
-export default function AdminPanel({ config, onConfigChange }: Props) {
-  const handleChange = (field: keyof AdminConfig, value: any) => {
-    onConfigChange({ ...config, [field]: value });
-  };
-
-  const handleQuestionChange = (questions: QuizQuestion[]) => {
-    onConfigChange({ ...config, questions });
-  };
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <Label htmlFor="title">Title</Label>
-        <Input
-          id="title"
-          value={config.title}
-          onChange={(e) => handleChange("title", e.target.value)}
-          placeholder="Give your GPT a memorable title"
-        />
-      </div>
-
-      <div>
-        <Label>Type</Label>
-        <div className="flex gap-2 mt-2">
-          <TypeButton 
-            type="chat" 
-            currentType={config.type} 
-            onClick={(type) => handleChange("type", type)}
-            label="Chat" 
-          />
-          <TypeButton 
-            type="upload" 
-            currentType={config.type} 
-            onClick={(type) => handleChange("type", type)}
-            label="Upload" 
-          />
-          <TypeButton 
-            type="quiz" 
-            currentType={config.type} 
-            onClick={(type) => handleChange("type", type)}
-            label="Quiz" 
-          />
-        </div>
-      </div>
-
-      <div>
-        <Label htmlFor="systemPrompt">System Prompt</Label>
-        <Textarea
-          id="systemPrompt"
-          value={config.systemPrompt}
-          onChange={(e) => handleChange("systemPrompt", e.target.value)}
-          placeholder="Instructions for the AI model"
-          className="h-32"
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="userInstructions">User Instructions (optional)</Label>
-        <Textarea
-          id="userInstructions"
-          value={config.userInstructions || ""}
-          onChange={(e) => handleChange("userInstructions", e.target.value)}
-          placeholder="Instructions that will be shown to users"
-          className="h-24"
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="feedbackCriteria">Feedback Criteria (optional)</Label>
-        <Textarea
-          id="feedbackCriteria"
-          value={config.feedbackCriteria || ""}
-          onChange={(e) => handleChange("feedbackCriteria", e.target.value)}
-          placeholder="Criteria to evaluate user responses"
-          className="h-24"
-        />
-      </div>
-
-      {config.type === 'quiz' && (
-        <QuizQuestionList 
-          questions={config.questions || []} 
-          onChange={handleQuestionChange} 
-        />
-      )}
     </div>
   );
 }
