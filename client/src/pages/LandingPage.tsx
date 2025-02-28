@@ -1,9 +1,11 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Brain, Zap, Award, Users, Server, Database, BarChart } from "lucide-react";
+import { CheckCircle, Brain, Zap, Award, Users, Server, Database, BarChart, LogOut } from "lucide-react";
 import { motion } from "framer-motion";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function LandingPage() {
+  const { user, logoutMutation } = useAuth();
   return (
     <div className="min-h-screen flex flex-col">
       {/* Navigation */}
@@ -21,19 +23,40 @@ export default function LandingPage() {
             <a href="#pricing" className="font-medium text-gray-600 hover:text-primary">Pricing</a>
           </div>
           <div className="flex items-center gap-4">
-            <Button 
-              variant="outline" 
-              className="hidden md:inline-flex" 
-              onClick={() => window.location.href = "/auth?mode=login"}
-            >
-              Log In
-            </Button>
-            <Button 
-              className="bg-primary hover:bg-primary/90" 
-              onClick={() => window.location.href = "/auth?mode=register"}
-            >
-              Get Started
-            </Button>
+            {user ? (
+              <>
+                <Button 
+                  variant="outline" 
+                  className="hidden md:inline-flex" 
+                  onClick={() => window.location.href = "/dashboard"}
+                >
+                  Dashboard
+                </Button>
+                <Button 
+                  className="bg-red-500 hover:bg-red-600 flex items-center gap-2" 
+                  onClick={() => logoutMutation.mutate()}
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Logout</span>
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button 
+                  variant="outline" 
+                  className="hidden md:inline-flex" 
+                  onClick={() => window.location.href = "/auth?mode=login"}
+                >
+                  Log In
+                </Button>
+                <Button 
+                  className="bg-primary hover:bg-primary/90" 
+                  onClick={() => window.location.href = "/auth?mode=register"}
+                >
+                  Get Started
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -63,9 +86,9 @@ export default function LandingPage() {
                   <Button 
                     size="lg" 
                     className="bg-primary hover:bg-primary/90 w-full sm:w-auto"
-                    onClick={() => window.location.href = "/auth?mode=register"}
+                    onClick={() => window.location.href = user ? "/dashboard" : "/auth?mode=register"}
                   >
-                    Start Creating
+                    {user ? "Go to Dashboard" : "Start Creating"}
                   </Button>
                 </motion.div>
                 <a href="#how-it-works">

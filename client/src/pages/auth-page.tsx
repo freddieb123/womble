@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,10 +29,22 @@ export default function AuthPage() {
     },
   });
 
+  // Check if user is already authenticated
   if (user) {
-    console.log("User is authenticated, redirecting to home");
-    return <Redirect to="/" />;
+    console.log("User is authenticated, redirecting to dashboard");
+    return <Redirect to="/dashboard" />;
   }
+  
+  // Set login/register mode based on URL parameter
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const mode = searchParams.get('mode');
+    if (mode === 'register') {
+      setIsLogin(false);
+    } else if (mode === 'login') {
+      setIsLogin(true);
+    }
+  }, []);
 
   const onSubmit = (data: AuthForm) => {
     if (isLogin) {
