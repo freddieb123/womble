@@ -42,7 +42,7 @@ export default function LandingPage() {
                 Leverage AI to generate dynamic quizzes, personalized learning experiences, and detailed performance analytics.
               </p>
               <div className="mt-10 flex flex-col sm:flex-row gap-4">
-                <Link href="/auth">
+                <Link href="/auth?mode=register">
                   <Button size="lg" className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
                     Start Creating
                   </Button>
@@ -274,7 +274,7 @@ export default function LandingPage() {
                   <span className="text-gray-600">Access to templates</span>
                 </li>
               </ul>
-              <Link href="/auth">
+              <Link href="/auth?mode=register">
                 <Button variant="outline" className="w-full">Sign Up Free</Button>
               </Link>
             </div>
@@ -308,7 +308,7 @@ export default function LandingPage() {
                   <span className="text-gray-600">Team collaboration</span>
                 </li>
               </ul>
-              <Link href="/auth">
+              <Link href="/auth?mode=register">
                 <Button className="w-full bg-primary hover:bg-primary/90">Get Started</Button>
               </Link>
             </div>
@@ -339,7 +339,7 @@ export default function LandingPage() {
                   <span className="text-gray-600">Custom branding</span>
                 </li>
               </ul>
-              <Link href="/auth">
+              <Link href="/auth?mode=register">
                 <Button variant="outline" className="w-full">Contact Sales</Button>
               </Link>
             </div>
