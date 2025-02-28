@@ -17,6 +17,20 @@ import MessageBubble from "./MessageBubble";
 import UserNameModal from "./UserNameModal";
 import LeaderboardModal from "./LeaderboardModal";
 import type { Message, ChatState, AdminConfig, MessageContent } from "@/lib/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+
 
 interface Props {
   config: AdminConfig;
@@ -280,6 +294,78 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
     return () => clearTimeout(timeout);
   }, [chatState.messages, showNameModal]);
 
+  const handleGetFeedback = async () => {
+    setIsConfirmingFeedback(true);
+  };
+
+  const confirmFeedback = async () => {
+    setIsConfirmingFeedback(false);
+    setIsGettingFeedback(true);
+    try {
+      const hasUserMessage = chatState.messages.some(m => m.role === 'user');
+      const hasAssistantMessage = chatState.messages.some(m => m.role === 'assistant');
+      if (!hasUserMessage || !hasAssistantMessage) {
+        toast({
+          variant: "destructive",
+          title: "Incomplete Conversation",
+          description: "Please complete at least one exchange before requesting feedback.",
+        });
+        return;
+      }
+
+      if (!config.feedbackCriteria) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "No feedback criteria specified for this chat configuration.",
+        });
+        return;
+      }
+
+      if (chatState.messages.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "No Messages",
+          description: "Please have a conversation first before requesting feedback.",
+        });
+        return;
+      }
+
+
+      const response = await fetch("/api/chat-feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          configId: config.id,
+          sessionId,
+          messages: chatState.messages,
+          type: config.type
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const { bullets, score, summary } = await response.json();
+      setFeedbackData({ bullets, score, summary });
+      setFeedbackOpen(true);
+    } catch (error) {
+      console.error("Error getting feedback:", error);
+      toast({
+        title: "Error",
+        description: "Failed to get feedback. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGettingFeedback(false);
+    }
+  };
+
+  const cancelFeedback = () => {
+    setIsConfirmingFeedback(false);
+  };
+
   return (
     <div className="flex flex-col h-[600px]">
       {config.userInstructions && !isViewOnly && (
@@ -378,71 +464,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
                       <Button
                         onClick={feedbackData.score !== undefined 
                           ? () => setFeedbackOpen(true) 
-                          : async () => {
-                              if (!config.feedbackCriteria) {
-                                toast({
-                                  variant: "destructive",
-                                  title: "Error",
-                                  description: "No feedback criteria specified for this chat configuration.",
-                                });
-                                return;
-                              }
-
-                              if (chatState.messages.length === 0) {
-                                toast({
-                                  variant: "destructive",
-                                  title: "No Messages",
-                                  description: "Please have a conversation first before requesting feedback.",
-                                });
-                                return;
-                              }
-
-                              // Show confirmation dialog
-                              if (!window.confirm("Are you sure? You can only get feedback once so make sure you've finished.")) {
-                                return;
-                              }
-
-                              const hasUserMessage = chatState.messages.some(m => m.role === 'user');
-                              const hasAssistantMessage = chatState.messages.some(m => m.role === 'assistant');
-                              if (!hasUserMessage || !hasAssistantMessage) {
-                                toast({
-                                  variant: "destructive",
-                                  title: "Incomplete Conversation",
-                                  description: "Please complete at least one exchange before requesting feedback.",
-                                });
-                                return;
-                              }
-
-                              try {
-                                setIsGettingFeedback(true);
-                                const response = await fetch("/api/chat-feedback", {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({
-                                    configId: config.id,
-                                    sessionId,
-                                    messages: chatState.messages,
-                                    type: config.type
-                                  }),
-                                });
-
-                                if (!response.ok) {
-                                  throw new Error(await response.text());
-                                }
-
-                                const { bullets, score, summary } = await response.json();
-                                setFeedbackData({ bullets, score, summary });
-                                setFeedbackOpen(true);
-                              } catch (error) {
-                                toast({
-                                  variant: "destructive",
-                                  title: "Error",
-                                  description: error instanceof Error ? error.message : "Failed to get feedback",
-                                });
-                              } finally {
-                                setIsGettingFeedback(false);
-                              }
-                            }
+                          : handleGetFeedback
                         }
                         variant="default"
                         disabled={!hasEnoughMessages || isGettingFeedback}
@@ -515,6 +537,20 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
         maxScore={10}
         onRefresh={fetchLeaderboard}
       />
+      <AlertDialog open={isConfirmingFeedback} onOpenChange={setIsConfirmingFeedback}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Feedback Request</AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogDescription>
+            Are you sure you want to get feedback? This will end your conversation.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelFeedback}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmFeedback}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
