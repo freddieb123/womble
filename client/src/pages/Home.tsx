@@ -453,10 +453,11 @@ export default function Home() {
             </div>
             <h1 className="text-2xl font-bold text-blue-900 text-center">Admin Home</h1>
             {configs && configs.length > 4 && ( // Conditionally render search bar
-              <div className="max-w-4xl mx-auto w-full mt-4">
-                <input
-                  type="text"
-                  placeholder="Search GPTs..."
+              <div className="mt-4 flex justify-center">
+                <div className="w-full max-w-[872px] px-4">
+                  <input
+                    type="text"
+                    placeholder="Search GPTs..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
