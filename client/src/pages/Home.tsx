@@ -598,17 +598,7 @@ export default function Home() {
           <div className={`flex-1 transition-all duration-300 ${isFolderPanelPinned ? 'ml-0' : 'ml-0'}`}>
             <div className="flex items-center mb-4 justify-between">
               <div className="flex items-center">
-                <div className="mr-4">
-                  {showDeleted ? (
-                    <Button variant="outline" size="sm" onClick={() => setShowDeleted(false)}>
-                      Show Active GPTs
-                    </Button>
-                  ) : (
-                    <Button variant="outline" size="sm" onClick={() => setShowDeleted(true)}>
-                      Show Deleted GPTs
-                    </Button>
-                  )}
-                </div>
+                {/* Removed show/hide deleted button as requested */}
               </div>
             </div>
             
