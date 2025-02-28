@@ -426,8 +426,12 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-start mb-6">
-          <div className="w-full flex flex-col items-center gap-4">
-            <div className="self-start">
+          <div className="w-full flex flex-row justify-between items-center gap-4">
+            <div>
+              {/* Left side content would go here */}
+            </div>
+            <div className="flex items-center gap-2">
+              {/* New GPT button would be here */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative size-8 rounded-full">
