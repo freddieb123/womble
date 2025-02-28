@@ -9,6 +9,8 @@ import { useQuery } from "@tanstack/react-query";
 import type { AdminConfig, UploadState, Feedback, Message } from "@/lib/types";
 import UserNameModal from "./UserNameModal";
 import LeaderboardModal from "./LeaderboardModal";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+
 
 interface Props {
   config: AdminConfig;
@@ -37,6 +39,7 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [userRank, setUserRank] = useState<number>();
+  const [isConfirmingFeedback, setIsConfirmingFeedback] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -160,12 +163,12 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
       setShowNameModal(true);
       return;
     }
-    
-    // Show confirmation dialog
-    if (!window.confirm("Are you sure? You can only get feedback once so make sure you've finished.")) {
-      return;
-    }
 
+    setIsConfirmingFeedback(true);
+  };
+
+  const confirmFeedback = async () => {
+    setIsConfirmingFeedback(false);
     try {
       setUploadState(prev => ({ ...prev, isLoading: true, error: null }));
       const response = await fetch("/api/upload-feedback", {
@@ -261,14 +264,14 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
           className={`w-full ${(uploadState.feedback && uploadState.feedback.score !== undefined) ? 'bg-green-600 hover:bg-green-700' : ''}`}
           size="lg"
           disabled={!uploadState.file || uploadState.isLoading}
-          onClick={(uploadState.feedback && uploadState.feedback.score !== undefined) 
-            ? () => setFeedbackOpen(true) 
+          onClick={(uploadState.feedback && uploadState.feedback.score !== undefined)
+            ? () => setFeedbackOpen(true)
             : getFeedback}
         >
-          {uploadState.isLoading 
-            ? "Analyzing..." 
+          {uploadState.isLoading
+            ? "Analyzing..."
             : (uploadState.feedback && uploadState.feedback.score !== undefined)
-              ? "View Feedback" 
+              ? "View Feedback"
               : "Get Feedback"}
         </Button>
       </div>
@@ -320,6 +323,20 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
         maxScore={10}
         onRefresh={fetchLeaderboard}
       />
+      <AlertDialog open={isConfirmingFeedback} onOpenChange={setIsConfirmingFeedback}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Feedback Request</AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogDescription>
+            Are you sure you want to get feedback? This will end your upload session.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsConfirmingFeedback(false)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmFeedback}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
