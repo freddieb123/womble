@@ -405,6 +405,10 @@ export default function Home() {
     }
   };
 
+  const navigateToLanding = () => {
+    window.location.href = "/";
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
@@ -424,7 +428,13 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center mb-4">
+          <button onClick={navigateToLanding} className="flex items-center text-primary hover:text-primary/80 transition-colors">
+            <img src="/womble-logo.png" alt="Womble Logo" className="h-10 w-10 mr-2" />
+            <span className="text-2xl font-bold">Womble</span>
+          </button>
+        </div>
         <div className="flex justify-between items-start mb-6">
           <div className="w-full flex flex-col items-center gap-4">
             <div className="self-start">
@@ -451,7 +461,7 @@ export default function Home() {
 
               </DropdownMenu>
             </div>
-            <h1 className="text-2xl font-bold text-blue-900 text-center">Admin Home</h1>
+            <h1 className="text-2xl font-bold text-blue-900 text-center">Womble Admin Home</h1>
             {configs && configs.length > 4 && ( // Conditionally render search bar
               <div className="max-w-4xl mx-auto w-full mt-4">
                 <input

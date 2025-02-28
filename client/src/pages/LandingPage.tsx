@@ -13,8 +13,8 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center">
             <span className="text-2xl font-bold text-primary flex items-center">
-              <Brain className="h-8 w-8 mr-2" />
-              QuizAI
+              <img src="/womble-logo.png" alt="Womble Logo" className="h-10 w-10 mr-2" />
+              Womble
             </span>
           </div>
           <div className="hidden md:flex items-center gap-8">
@@ -67,7 +67,7 @@ export default function LandingPage() {
           <div className="flex flex-col md:flex-row items-center gap-12">
             <div className="md:w-1/2">
               <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight">
-                Create AI-Powered Quizzes for Enhanced Learning
+                Womble: AI-Powered Learning for Everyone
               </h1>
               <p className="mt-6 text-xl text-gray-600">
                 Leverage AI to generate dynamic quizzes, personalized learning experiences, and detailed performance analytics.
@@ -302,7 +302,7 @@ export default function LandingPage() {
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Simple, Transparent Pricing</h2>
             <p className="mt-4 text-xl text-gray-600 max-w-3xl mx-auto">
-              Choose the plan that's right for you
+              Choose the Womble plan that's right for you
             </p>
           </div>
           
@@ -570,7 +570,7 @@ export default function LandingPage() {
           </div>
           
           <div className="mt-12 pt-8 border-t border-gray-800 text-center text-gray-400">
-            <p>© {new Date().getFullYear()} QuizAI. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} Womble. All rights reserved.</p>
           </div>
         </div>
       </footer>
