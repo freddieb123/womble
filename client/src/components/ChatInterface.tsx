@@ -432,7 +432,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={pastedImage ? "Add a message (optional) and press send..." : "Type your message or paste an image..."}
+                placeholder={pastedImage ? "Add a message (optional) and press send..." : "Type your message..."}
                 className="flex-1"
                 disabled={sendMessage.isPending || showNameModal}
                 ref={inputRef}
