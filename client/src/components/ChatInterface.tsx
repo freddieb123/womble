@@ -43,6 +43,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
   const inputRef = useRef<HTMLInputElement>(null);
   const [feedbackData, setFeedbackData] = useState<{ bullets: string[]; score?: number; summary?: string }>({ bullets: [] });
   const [isGettingHint, setIsGettingHint] = useState(false);
+  const [isConfirmingFeedback, setIsConfirmingFeedback] = useState(false); // Added state
   const [isGettingFeedback, setIsGettingFeedback] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
