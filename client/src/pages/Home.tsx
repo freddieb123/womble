@@ -453,7 +453,7 @@ export default function Home() {
             </div>
             <h1 className="text-2xl font-bold text-blue-900 text-center">Admin Home</h1>
             {configs && configs.length > 4 && ( // Conditionally render search bar
-              <div className="w-full mt-4">
+              <div className="max-w-4xl mx-auto w-full mt-4">
                 <input
                   type="text"
                   placeholder="Search GPTs..."
