@@ -215,9 +215,9 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                 className="resize-none"
                 rows={4}
               />
-              <div className="text-base text-gray-700 font-medium mt-2">
+                 <p className="text-sm text-muted-foreground">
                 Add helpful instructions or context that will be shown to users.
-              </div>
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -235,9 +235,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                 className="resize-none"
                 rows={4}
               />
-              <div className="text-sm text-muted-foreground">
-                Specify criteria that will be used to assess and provide feedback.
-              </div>
+             
             </div>
           </>
         )}
