@@ -184,7 +184,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               <Label htmlFor="system-prompt">System Prompt</Label>
               <Textarea
                 id="system-prompt"
-                value={config.systemPrompt}
+                value={config.systemPrompt || ''}
                 onChange={(e) =>
                   onConfigChange({
                     ...config,
