@@ -218,3 +218,126 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
     </div>
   );
 }
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useState, useEffect } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "./ui/button";
+import QuizQuestionList from "./QuizQuestionList";
+import type { AdminConfig, QuizQuestion } from "@/lib/types";
+
+interface TypeButtonProps {
+  type: "chat" | "upload" | "quiz";
+  currentType: string;
+  onClick: (type: "chat" | "upload" | "quiz") => void;
+  label: string;
+}
+
+const TypeButton = ({ type, currentType, onClick, label }: TypeButtonProps) => {
+  const isActive = type === currentType;
+  
+  return (
+    <Button
+      type="button"
+      variant={isActive ? "default" : "outline"}
+      className={`flex-1 ${isActive ? "bg-blue-600 hover:bg-blue-700" : ""}`}
+      onClick={() => onClick(type)}
+    >
+      {label}
+    </Button>
+  );
+};
+
+interface Props {
+  config: AdminConfig;
+  onConfigChange: (config: AdminConfig) => void;
+}
+
+export default function AdminPanel({ config, onConfigChange }: Props) {
+  const handleChange = (field: keyof AdminConfig, value: any) => {
+    onConfigChange({ ...config, [field]: value });
+  };
+
+  const handleQuestionChange = (questions: QuizQuestion[]) => {
+    onConfigChange({ ...config, questions });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <Label htmlFor="title">Title</Label>
+        <Input
+          id="title"
+          value={config.title}
+          onChange={(e) => handleChange("title", e.target.value)}
+          placeholder="Give your GPT a memorable title"
+        />
+      </div>
+
+      <div>
+        <Label>Type</Label>
+        <div className="flex gap-2 mt-2">
+          <TypeButton 
+            type="chat" 
+            currentType={config.type} 
+            onClick={(type) => handleChange("type", type)}
+            label="Chat" 
+          />
+          <TypeButton 
+            type="upload" 
+            currentType={config.type} 
+            onClick={(type) => handleChange("type", type)}
+            label="Upload" 
+          />
+          <TypeButton 
+            type="quiz" 
+            currentType={config.type} 
+            onClick={(type) => handleChange("type", type)}
+            label="Quiz" 
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="systemPrompt">System Prompt</Label>
+        <Textarea
+          id="systemPrompt"
+          value={config.systemPrompt}
+          onChange={(e) => handleChange("systemPrompt", e.target.value)}
+          placeholder="Instructions for the AI model"
+          className="h-32"
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="userInstructions">User Instructions (optional)</Label>
+        <Textarea
+          id="userInstructions"
+          value={config.userInstructions || ""}
+          onChange={(e) => handleChange("userInstructions", e.target.value)}
+          placeholder="Instructions that will be shown to users"
+          className="h-24"
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="feedbackCriteria">Feedback Criteria (optional)</Label>
+        <Textarea
+          id="feedbackCriteria"
+          value={config.feedbackCriteria || ""}
+          onChange={(e) => handleChange("feedbackCriteria", e.target.value)}
+          placeholder="Criteria to evaluate user responses"
+          className="h-24"
+        />
+      </div>
+
+      {config.type === 'quiz' && (
+        <QuizQuestionList 
+          questions={config.questions || []} 
+          onChange={handleQuestionChange} 
+        />
+      )}
+    </div>
+  );
+}
