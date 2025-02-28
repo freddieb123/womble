@@ -458,10 +458,11 @@ export default function Home() {
                   <input
                     type="text"
                     placeholder="Search GPTs..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                />
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -482,20 +483,7 @@ export default function Home() {
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-4xl">
-              <TemplateGallery
-                onSelectTemplate={handleTemplateSelect}
-                onStartFromScratch={handleStartFromScratch}
-                templates={(configs?.filter(c => c.isTemplate) || []).map(template => ({
-                  ...template,
-                  temperature: template.temperature || 0.7,
-                  maxTokens: template.maxTokens || 1000,
-                  usageCount: configs?.filter(c =>
-                    !c.isTemplate &&
-                    c.systemPrompt === template.systemPrompt &&
-                    c.type === template.type
-                  ).length || 0
-                }))}
-              />
+              <TemplateGallery />
             </DialogContent>
           </Dialog>
 
