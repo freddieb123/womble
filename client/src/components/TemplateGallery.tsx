@@ -11,32 +11,26 @@ import { useQuery } from "@tanstack/react-query";
 interface Props {
   onSelectTemplate: (template: Template) => void;
   onStartFromScratch: () => void;
-  templates?: Template[];
 }
 
-export default function TemplateGallery({ onSelectTemplate, onStartFromScratch, templates: providedTemplates }: Props) {
+export default function TemplateGallery({ onSelectTemplate, onStartFromScratch }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
 
-  const { data: fetchedTemplates = [], refetch } = useQuery<Template[]>({
+  const { data: templates = [], refetch } = useQuery<Template[]>({
     queryKey: ["/api/templates"],
     queryFn: async () => {
       const res = await fetch("/api/templates");
       if (!res.ok) throw new Error("Failed to fetch templates");
       return res.json();
-    },
-    enabled: !providedTemplates // Only fetch if templates aren't provided as prop
+    }
   });
-
-  // Use provided templates if available, otherwise use fetched templates
-  const templates = providedTemplates || fetchedTemplates;
 
   // Effect to refetch templates when component becomes visible
   useEffect(() => {
-    if (!providedTemplates) {
-      refetch();
-    }
-    // Only refetch if templates aren't provided as prop
-  }, [refetch, providedTemplates]);
+    refetch();
+    // This effect has no dependencies, which means it will run every time
+    // the component renders/mounts - which happens when the modal opens
+  }, [refetch]);
 
   const filteredTemplates = templates.filter(template => 
     template.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
