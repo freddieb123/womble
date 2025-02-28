@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,8 @@ import TemplateGallery from "@/components/TemplateGallery";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut } from "lucide-react";
 import QuizEditor from "@/components/QuizEditor";
-import type { Template } from "@/lib/types"; // Add this import
+import type { Template } from "@/lib/types";
+import FolderPanel, { FolderItem } from "@/components/FolderPanel";
 
 type ChatConfig = {
   id: number;
@@ -82,6 +83,25 @@ export default function Home() {
     questions: []
   });
   const [savingAsTemplate, setSavingAsTemplate] = useState<ChatConfig | null>(null);
+  const [folders, setFolders] = useState<FolderItem[]>(() => {
+    // Try to load folders from localStorage
+    const savedFolders = localStorage.getItem('gpt-folders');
+    return savedFolders ? JSON.parse(savedFolders) : [];
+  });
+  
+  // Store folder-gpt relationships in localStorage
+  const [gptFolderMap, setGptFolderMap] = useState<Record<number, string>>(() => {
+    const savedMap = localStorage.getItem('gpt-folder-map');
+    return savedMap ? JSON.parse(savedMap) : {};
+  });
+  
+  const [isFolderPanelCollapsed, setIsFolderPanelCollapsed] = useState(() => {
+    return localStorage.getItem('folder-panel-collapsed') === 'true';
+  });
+  
+  const [isFolderPanelPinned, setIsFolderPanelPinned] = useState(() => {
+    return localStorage.getItem('folder-panel-pinned') !== 'false'; // Default to pinned
+  });
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -94,7 +114,7 @@ export default function Home() {
         throw new Error('Failed to fetch GPTs');
       }
       const data = await response.json();
-      console.log('Fetched configs:', data.map(c => ({
+      console.log('Fetched configs:', data.map((c: ChatConfig) => ({
         id: c.id,
         title: c.title,
         isTemplate: c.isTemplate,
@@ -403,6 +423,62 @@ export default function Home() {
       // Optionally show a toast notification here
     }
   };
+  
+  // Save folders to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('gpt-folders', JSON.stringify(folders));
+  }, [folders]);
+
+  // Save gptFolderMap to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('gpt-folder-map', JSON.stringify(gptFolderMap));
+  }, [gptFolderMap]);
+
+  // Save folder panel states
+  useEffect(() => {
+    localStorage.setItem('folder-panel-collapsed', String(isFolderPanelCollapsed));
+  }, [isFolderPanelCollapsed]);
+  
+  useEffect(() => {
+    localStorage.setItem('folder-panel-pinned', String(isFolderPanelPinned));
+  }, [isFolderPanelPinned]);
+  
+  // Handle folder changes
+  const handleFoldersChange = (newFolders: FolderItem[]) => {
+    setFolders(newFolders);
+  };
+  
+  // Handle assigning a GPT to a folder
+  const handleGptFolderChange = (gptId: number, folderId: string | null) => {
+    // Update the mapping
+    setGptFolderMap(prev => {
+      const newMap = {...prev};
+      
+      if (folderId) {
+        newMap[gptId] = folderId;
+      } else {
+        delete newMap[gptId];
+      }
+      
+      return newMap;
+    });
+    
+    // Update folder contents
+    setFolders(prev => {
+      return prev.map(folder => {
+        if (folder.id === folderId) {
+          // Add to this folder if not already there
+          if (!folder.gptIds.includes(gptId)) {
+            return { ...folder, gptIds: [...folder.gptIds, gptId] };
+          }
+        } else {
+          // Remove from other folders
+          return { ...folder, gptIds: folder.gptIds.filter(id => id !== gptId) };
+        }
+        return folder;
+      });
+    });
+  };
 
   if (isLoading) {
     return (
@@ -418,7 +494,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-start mb-6">
           <div className="w-full flex flex-col items-center gap-4">
             <div className="self-start">
@@ -505,8 +581,39 @@ export default function Home() {
           </Dialog>
         </div>
 
-        <ScrollArea className="h-[calc(100vh-12rem)]">
-            <div className="space-y-4">
+        <div className="flex">
+          {/* Folder Panel */}
+          <FolderPanel
+            gptItems={configs || []}
+            onGptFolderChange={handleGptFolderChange}
+            isPinned={isFolderPanelPinned}
+            onPinChange={setIsFolderPanelPinned}
+            isCollapsed={isFolderPanelCollapsed}
+            onCollapseChange={setIsFolderPanelCollapsed}
+            folders={folders}
+            onFoldersChange={handleFoldersChange}
+          />
+
+          {/* Content Area */}
+          <div className={`flex-1 transition-all duration-300 ${isFolderPanelPinned ? 'ml-0' : 'ml-0'}`}>
+            <div className="flex items-center mb-4 justify-between">
+              <div className="flex items-center">
+                <div className="mr-4">
+                  {showDeleted ? (
+                    <Button variant="outline" size="sm" onClick={() => setShowDeleted(false)}>
+                      Show Active GPTs
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" onClick={() => setShowDeleted(true)}>
+                      Show Deleted GPTs
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <ScrollArea className="h-[calc(100vh-14rem)]">
+              <div className="space-y-4 pr-4">
               {(!configs || configs.length === 0) ? (
                 <div className="flex flex-col items-center justify-center h-[60vh] text-center">
                   <div className="w-48 h-48 mb-6 relative">
@@ -823,6 +930,8 @@ export default function Home() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+    </div>
     </div>
   );
 }
