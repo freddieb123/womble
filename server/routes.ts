@@ -318,7 +318,7 @@ export function registerRoutes(app: Express): Server {
       const prompt = `Based on these criteria:\n${feedbackCriteria}\n\nAnd these instructions:\n${userInstructions || 'No specific instructions'}\n\nAnalyze the current conversation and provide a helpful hint for the user to improve their responses. Keep the hint concise and specific. \nWrite the hint straight out - don't include "Hint:" at the beginning of your response.\n Limit the response to 2 sentences.`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-4o",
         messages: [
           {
             role: "system",
@@ -330,7 +330,7 @@ export function registerRoutes(app: Express): Server {
           }
         ],
         temperature: 0.7,
-        max_tokens: 200,
+        max_tokens: 2000,
       });
 
       const hint = completion.choices[0]?.message?.content;
@@ -570,7 +570,7 @@ export function registerRoutes(app: Express): Server {
             ]
           }
         ],
-        max_tokens: 1000,
+        max_tokens: 5000,
       });
 
       const response = completion.choices[0]?.message?.content;
@@ -632,24 +632,30 @@ export function registerRoutes(app: Express): Server {
         const prompt = `Use the information in the 'expected' answer field to categorize it as either 'correct' (if it matches closely), 'almost' (if it's on the right track but not quite there), or 'incorrect' (if it's way off). You should not directly compare to the expected answer, but use the information to inform your assessment. For example if the expected answer includes 'Any one of the following answers' you are not looking for that exact text in the answer, you are using that as instructions on how to assess the answer.  If in doubt, be generous in your assessment. Don't assume that more detail is necessarily more correct however.
         
         Here are some examples of how to assess answers:
-        
+
         Example 1:
         Question: What is the capital of France?
         Expected Answer: Paris
         User's Answer: paris
-        Assessment: "correct" (The answer is correct despite capitalization differences)
-        
+        Assessment: "correct" (The answer is correct despite   capitalization differences)
+
         Example 2:
-        Question: Name three primary colors.
-        Expected Answer: Any three of: red, blue, yellow
+        Question: Name two primary colors.
+        Expected Answer: Any two of: red, blue, yellow
         User's Answer: Red and Blue 
-        Assessment: "almost" (The answer contains two correct primary colors but is missing one)
-        
+        Assessment: "correct" (The answer contains two correct primary colors)
+
         Example 3:
         Question: What programming language is commonly used for web development?
         Expected Answer: Any of: JavaScript, Python, PHP, Ruby, Java
         User's Answer: C++
         Assessment: "incorrect" (While C++ can be used for web development, it's not commonly used compared to the expected answers)
+
+        Example 4:
+        Question: What’s the difference between OKRs and KPIs?
+        Expected Answer: OKR's are timebound and aimed at achieving an objective whereas KPIs are measuring the health of the business or product over time (even if you're not doing any specific work to change the KPI at any point)
+        User's Answer: OKRs are targets to be hit (often a single time bound target that can be achieved) - e.g. "launch a website by February" or "reach 1 million users by June" KPIs are longer term performance related targets - e.g. maintain 98% up-time
+        Assessment: "correct" (For longer answers like this one, if the user has the general gist then mark as correct)
         
         Now assess the user's answer:
         Question: ${questions[questionIndex].question}
@@ -804,7 +810,7 @@ export function registerRoutes(app: Express): Server {
       ).join('\n');
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-4o",
         messages: [
           {
             role: "system",
@@ -816,7 +822,7 @@ export function registerRoutes(app: Express): Server {
           }
         ],
         temperature: 0.7,
-        max_tokens: 1000,
+        max_tokens: 5000,
       });
 
       const response = completion.choices[0]?.message?.content;
@@ -978,18 +984,20 @@ export function registerRoutes(app: Express): Server {
 
     Format your response exactly like this example:
     {
-      "positive": "Learners consistently demonstrate strong engagement with the material",
-      "constructive": "More emphasisneeded on practical application of concepts"
+      "positive": "Participants consistently demonstrate strong engagement with the material",
+      "constructive": "More emphasis is needed on practical application of concepts"
     }
 
     Rules:
     - Each theme should be 1-2 sentences
     - Use third-person perspective (e.g., "learners" or "users", not "you")
     - Be specific and actionable
+    - Ensure the themes are framed as plural (i.e. Participants) 
+    - When referring to the users, ALWAYS use'participants'
     - Base themes on patterns across multiple feedback points when possible`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-4o",
         messages: [
           {
             role: "system",
@@ -1001,7 +1009,7 @@ export function registerRoutes(app: Express): Server {
           }
         ],
         temperature: 0.7,
-        max_tokens: 500,
+        max_tokens: 5000,
       });
 
       const response = completion.choices[0]?.message?.content;
