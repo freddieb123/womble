@@ -162,12 +162,11 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
       return;
     }
 
-    // Skip confirmation and directly get feedback
-    confirmFeedback();
+    // Proceed directly to feedback
+    handleFeedbackRequest();
   };
 
-  const confirmFeedback = async () => {
-    setIsConfirmingFeedback(false);
+  const handleFeedbackRequest = async () => {
     try {
       setUploadState(prev => ({ ...prev, isLoading: true, error: null }));
       const response = await fetch("/api/upload-feedback", {
