@@ -431,7 +431,7 @@ export default function Home() {
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center mb-4">
           <button onClick={navigateToLanding} className="flex items-center text-primary hover:text-primary/80 transition-colors">
-            <img src="/womble-logo-icon.png" alt="Womble Logo" className="h-10 w-10 mr-2" /> {/* Changed logo here */}
+            <img src="/womble-logo.png" alt="Womble Logo" className="h-10 w-10 mr-2" />
             <span className="text-2xl font-bold">Womble</span>
           </button>
         </div>
