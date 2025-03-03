@@ -62,17 +62,21 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-b from-blue-50 to-white py-20 px-4 md:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row items-center gap-12">
-            <div className="md:w-1/2">
-              <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight">
-                Womble: AI-Powered Learning for Everyone
+      <section className="py-20 px-4 md:px-8 bg-white">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col lg:flex-row items-center gap-12">
+            <div className="lg:w-1/2 space-y-8">
+              <div className="flex items-center gap-4 mb-6">
+                <img src="/womble-logo-icon.png" alt="Womble Logo" className="h-12 w-12" />
+                <h1 className="text-3xl font-bold text-gray-900">Womble</h1>
+              </div>
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900">
+                Create AI-Powered Learning <span className="text-primary">Quizzes</span> in Seconds
               </h1>
-              <p className="mt-6 text-xl text-gray-600">
-                Leverage AI to generate dynamic quizzes, personalized learning experiences, and detailed performance analytics.
+              <p className="text-xl text-gray-600">
+                Engage learners with interactive quizzes, get instant feedback, and track progress with artificial intelligence.
               </p>
-              <div className="mt-10 flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col sm:flex-row gap-4">
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -138,7 +142,7 @@ export default function LandingPage() {
               Everything you need to create, manage, and analyze AI-powered interactive quizzes
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-3 gap-10">
             <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm">
               <div className="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center mb-6">
@@ -149,7 +153,7 @@ export default function LandingPage() {
                 Create high-quality quiz questions with AI assistance, saving time and ensuring educational value.
               </p>
             </div>
-            
+
             <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm">
               <div className="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center mb-6">
                 <Zap className="h-6 w-6 text-green-600" />
@@ -159,7 +163,7 @@ export default function LandingPage() {
                 Create interactive quizzes with various question types and difficulty levels to engage learners.
               </p>
             </div>
-            
+
             <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm">
               <div className="h-12 w-12 rounded-lg bg-purple-100 flex items-center justify-center mb-6">
                 <BarChart className="h-6 w-6 text-purple-600" />
@@ -169,7 +173,7 @@ export default function LandingPage() {
                 Track student progress and identify areas for improvement with detailed analytics.
               </p>
             </div>
-            
+
             <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm">
               <div className="h-12 w-12 rounded-lg bg-orange-100 flex items-center justify-center mb-6">
                 <Users className="h-6 w-6 text-orange-600" />
@@ -179,7 +183,7 @@ export default function LandingPage() {
                 Enable teams to learn together with shared quizzes and leaderboards to foster friendly competition.
               </p>
             </div>
-            
+
             <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm">
               <div className="h-12 w-12 rounded-lg bg-red-100 flex items-center justify-center mb-6">
                 <Award className="h-6 w-6 text-red-600" />
@@ -189,7 +193,7 @@ export default function LandingPage() {
                 Provide learners with immediate, intelligent feedback to enhance the learning process.
               </p>
             </div>
-            
+
             <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm">
               <div className="h-12 w-12 rounded-lg bg-gray-100 flex items-center justify-center mb-6">
                 <Database className="h-6 w-6 text-gray-600" />
@@ -212,10 +216,10 @@ export default function LandingPage() {
               Create, share and analyze AI-powered quizzes in just a few simple steps
             </p>
           </div>
-          
+
           <div className="relative">
             <div className="hidden md:block absolute left-1/2 top-0 h-full w-0.5 bg-gray-200 -translate-x-1/2"></div>
-            
+
             <div className="space-y-16 relative">
               <div className="flex flex-col md:flex-row gap-8 items-center">
                 <div className="md:w-1/2 order-2 md:order-1">
@@ -241,7 +245,7 @@ export default function LandingPage() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex flex-col md:flex-row gap-8 items-center">
                 <div className="md:w-1/2 order-2">
                   <div className="relative">
@@ -266,7 +270,7 @@ export default function LandingPage() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex flex-col md:flex-row gap-8 items-center">
                 <div className="md:w-1/2 order-2 md:order-1">
                   <div className="relative">
@@ -305,7 +309,7 @@ export default function LandingPage() {
               Choose the Womble plan that's right for you
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-3 gap-8">
             {/* Free Plan */}
             <div className="border border-gray-200 rounded-xl p-8 bg-white relative">
@@ -337,7 +341,7 @@ export default function LandingPage() {
                 Sign Up Free
               </Button>
             </div>
-            
+
             {/* Pro Plan */}
             <div className="border-2 border-primary rounded-xl p-8 bg-white relative shadow-lg">
               <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-primary text-white px-4 py-1 rounded-full text-sm font-medium">
@@ -374,7 +378,7 @@ export default function LandingPage() {
                 Get Started
               </Button>
             </div>
-            
+
             {/* Enterprise Plan */}
             <div className="border border-gray-200 rounded-xl p-8 bg-white relative">
               <h3 className="text-xl font-bold text-gray-900">Enterprise</h3>
@@ -422,7 +426,7 @@ export default function LandingPage() {
               Educators and organizations love our AI-powered quiz platform
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-3 gap-8">
             <motion.div 
               className="bg-white p-6 rounded-lg shadow-sm border border-gray-100"
@@ -444,7 +448,7 @@ export default function LandingPage() {
                 "QuizAI has transformed how I assess my students. The AI-generated questions are high-quality and save me hours of preparation time."
               </p>
             </motion.div>
-            
+
             <motion.div 
               className="bg-white p-6 rounded-lg shadow-sm border border-gray-100"
               initial={{ opacity: 0, y: 30 }}
@@ -465,7 +469,7 @@ export default function LandingPage() {
                 "The analytics provided by QuizAI help me identify knowledge gaps in my team and tailor training accordingly. It's been invaluable for our L&D department."
               </p>
             </motion.div>
-            
+
             <motion.div 
               className="bg-white p-6 rounded-lg shadow-sm border border-gray-100"
               initial={{ opacity: 0, y: 30 }}
@@ -537,7 +541,7 @@ export default function LandingPage() {
                 AI-powered quiz platform for enhanced learning experiences.
               </p>
             </div>
-            
+
             <div>
               <h3 className="text-lg font-semibold mb-4">Product</h3>
               <ul className="space-y-2">
@@ -547,7 +551,7 @@ export default function LandingPage() {
                 <li><a href="#" className="text-gray-400 hover:text-white">Integrations</a></li>
               </ul>
             </div>
-            
+
             <div>
               <h3 className="text-lg font-semibold mb-4">Resources</h3>
               <ul className="space-y-2">
@@ -557,7 +561,7 @@ export default function LandingPage() {
                 <li><a href="#" className="text-gray-400 hover:text-white">Support</a></li>
               </ul>
             </div>
-            
+
             <div>
               <h3 className="text-lg font-semibold mb-4">Company</h3>
               <ul className="space-y-2">
@@ -568,7 +572,7 @@ export default function LandingPage() {
               </ul>
             </div>
           </div>
-          
+
           <div className="mt-12 pt-8 border-t border-gray-800 text-center text-gray-400">
             <p>© {new Date().getFullYear()} Womble. All rights reserved.</p>
           </div>
