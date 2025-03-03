@@ -13,7 +13,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center">
             <span className="text-2xl font-bold text-primary flex items-center">
-              <img src="/womble-logo.png" alt="Womble Logo" className="h-10 w-10 mr-2" />
+              <img src="/womble-logo-new.png" alt="Womble Logo" className="h-10 w-10 mr-2" />
               Womble
             </span>
           </div>
