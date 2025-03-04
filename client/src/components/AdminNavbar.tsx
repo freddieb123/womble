@@ -30,10 +30,19 @@ export default function AdminNavbar({
   const getInitials = (): string => {
     if (!user) return "U";
     
-    const firstName = user.firstName || "";
-    const lastName = user.lastName || "";
+    // If there's a firstName, use initials from firstName and lastName
+    if (user.firstName) {
+      const firstName = user.firstName || "";
+      const lastName = user.lastName || "";
+      return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
+    } 
     
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
+    // Otherwise use the first letter of the email
+    if (user.email) {
+      return user.email.charAt(0).toUpperCase();
+    }
+    
+    return "U"; // Fallback for any other case
   };
 
   return (
