@@ -33,6 +33,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut } from "lucide-react";
 import QuizEditor from "@/components/QuizEditor";
 import type { Template } from "@/lib/types"; // Add this import
+import AdminNavbar from "@/components/AdminNavbar";
 
 type ChatConfig = {
   id: number;
