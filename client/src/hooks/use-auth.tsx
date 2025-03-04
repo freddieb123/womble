@@ -116,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast({
         description: "Registered successfully",
       });
-      setLocation("/");
+      setLocation("/dashboard");
     },
     onError: (error: Error) => {
       toast({
@@ -161,7 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const user = await res.json();
       console.log("Backend authentication successful");
       queryClient.setQueryData(["/api/user"], user);
-      setLocation("/");
+      setLocation("/dashboard");
     } catch (error) {
       console.error("Google sign-in error:", {
         code: error instanceof Error ? (error as any).code : 'unknown',

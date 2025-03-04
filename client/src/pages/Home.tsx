@@ -441,14 +441,7 @@ export default function Home() {
           </div>
         )}
         
-        {/* Toggle to show deleted GPTs */}
-        <div className="flex items-center justify-end mb-4 space-x-2">
-          <span className="text-sm text-gray-600">Show deleted</span>
-          <Switch
-            checked={showDeleted}
-            onCheckedChange={setShowDeleted}
-          />
-        </div>
+        {/* Toggle removed as requested */}
         
         {/* Main Content */}
         <ScrollArea className="h-[calc(100vh-12rem)]">
