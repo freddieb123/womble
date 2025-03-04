@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/user"], user);
       // Toast removed for successful login
-      setLocation("/");
+      setLocation("/dashboard");
     },
     onError: (error: Error) => {
       // Toast removed for login/logout errors
