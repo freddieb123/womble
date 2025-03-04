@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Copy, ExternalLink, MoreVertical, BarChart2, Trash2, ArrowUpCircle, Flag, Share2 } from "lucide-react";
+import { Plus, Pencil, Copy, MoreVertical, BarChart2, Trash2, ArrowUpCircle, Flag, Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
@@ -25,14 +25,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import TemplateGallery from "@/components/TemplateGallery";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { LogOut } from "lucide-react";
 import QuizEditor from "@/components/QuizEditor";
-import type { Template } from "@/lib/types"; // Add this import
+import type { Template } from "@/lib/types";
 import AdminNavbar from "@/components/AdminNavbar";
 
 type ChatConfig = {
@@ -60,7 +57,7 @@ type ChatConfig = {
   }>;
   temperature?: number;
   maxTokens?: number;
-  userId?: number; //Added userId
+  userId?: number;
 };
 
 export default function Home() {
@@ -83,7 +80,7 @@ export default function Home() {
     questions: []
   });
   const [savingAsTemplate, setSavingAsTemplate] = useState<ChatConfig | null>(null);
-  const [searchTerm, setSearchTerm] = useState(''); // Added searchTerm state
+  const [searchTerm, setSearchTerm] = useState('');
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -96,7 +93,7 @@ export default function Home() {
         throw new Error('Failed to fetch GPTs');
       }
       const data = await response.json();
-      console.log('Fetched configs:', data.map(c => ({
+      console.log('Fetched configs:', data.map((c: ChatConfig) => ({
         id: c.id,
         title: c.title,
         isTemplate: c.isTemplate,
@@ -104,7 +101,7 @@ export default function Home() {
       })));
       return data;
     },
-    enabled: !!user?.id // Only run query when user ID is available
+    enabled: !!user?.id
   });
 
   const saveConfig = useMutation({
@@ -301,7 +298,6 @@ export default function Home() {
 
   const handleDuplicate = async (configToDuplicate: ChatConfig) => {
     try {
-      // Fetch the full config including quiz questions if it's a quiz
       let fullConfig = configToDuplicate;
       if (configToDuplicate.type === 'quiz') {
         const response = await fetch(`/api/chat-configs/${configToDuplicate.id}`);
@@ -334,7 +330,6 @@ export default function Home() {
 
   const handleTemplateSelect = async (template: ChatConfig) => {
     try {
-      // Fetch the full config including quiz questions if it's a quiz
       let fullConfig = template;
       if (template.type === 'quiz') {
         const response = await fetch(`/api/chat-configs/${template.id}`);
@@ -389,20 +384,16 @@ export default function Home() {
     setIsCreateOpen(true);
   };
 
-
   const handleEditConfig = async (configToEdit: ChatConfig) => {
     try {
-      // Fetch the full config including quiz questions
       const response = await fetch(`/api/chat-configs/${configToEdit.id}`);
       if (!response.ok) {
         throw new Error("Failed to fetch full config");
       }
       const fullConfig: ChatConfig = await response.json();
-      // Set the editing config with full details (including questions)
       setEditingConfig(fullConfig);
     } catch (error) {
       console.error(error);
-      // Optionally show a toast notification here
     }
   };
 
@@ -426,366 +417,346 @@ export default function Home() {
     config.title.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center mb-4">
-          <button onClick={navigateToLanding} className="flex items-center text-primary hover:text-primary/80 transition-colors">
-            <img src="/womble-logo-new.png" alt="Womble Logo" className="h-10 w-10 mr-2" />
-            <span className="text-2xl font-bold">Womble</span>
-          </button>
-        </div>
-        <div className="flex justify-between items-start mb-6">
-          <div className="w-full flex flex-col items-center gap-4">
-            <div className="self-start">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative size-8 rounded-full">
-                    <Avatar className="size-8 shadow-md">
-                      <AvatarFallback className="bg-blue-900 text-white">
-                        {user?.firstName
-                          ? user.firstName[0].toUpperCase()
-                          : user?.email
-                            ? user.email[0].toUpperCase()
-                            : '✓'}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => logoutMutation.mutate()}>
-                    <LogOut className="mr-2 size-4" />
-                    Logout
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-
-              </DropdownMenu>
-            </div>
-            <h1 className="text-2xl font-bold text-blue-900 text-center">Womble Admin Home</h1>
-            {configs && configs.length > 4 && ( // Conditionally render search bar
-              <div className="max-w-4xl mx-auto w-full mt-4">
-                <input
-                  type="text"
-                  placeholder="Search GPTs..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            )}
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+      {/* Admin Navbar */}
+      <AdminNavbar 
+        title="Admin Home" 
+        showNewButton={true}
+        newButtonText="New GPT"
+        onNewButtonClick={() => setIsTemplateGalleryOpen(true)}
+      />
+      
+      <div className="max-w-7xl mx-auto p-4 md:p-8">
+        {/* Search Bar */}
+        {configs && configs.length > 4 && (
+          <div className="max-w-4xl mx-auto w-full mt-4 mb-6">
+            <input
+              type="text"
+              placeholder="Search GPTs..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            />
           </div>
-          <Dialog 
-                    open={isTemplateGalleryOpen} 
-                    onOpenChange={(open) => {
-                      setIsTemplateGalleryOpen(open);
-                      // Force a refetch of the configs if the dialog is closing
-                      if (!open) {
-                        queryClient.invalidateQueries({ queryKey: ["/api/chat-configs"] });
-                      }
-                    }}
-                  >
-            <DialogTrigger asChild>
-              <Button className="bg-purple-800 hover:bg-purple-900">
-                <Plus className="h-4 w-4 mr-2" />
-                New GPT
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl">
-              <TemplateGallery
-                onSelectTemplate={handleTemplateSelect}
-                onStartFromScratch={handleStartFromScratch}
-                templates={(configs?.filter(c => c.isTemplate) || []).map(template => ({
-                  ...template,
-                  temperature: template.temperature || 0.7,
-                  maxTokens: template.maxTokens || 1000,
-                  usageCount: configs?.filter(c =>
-                    !c.isTemplate &&
-                    c.systemPrompt === template.systemPrompt &&
-                    c.type === template.type
-                  ).length || 0
-                }))}
-              />
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={isCreateOpen} onOpenChange={(open) => {
-            handleCreateModalClose(open);
-            if (!open) {
-              queryClient.invalidateQueries({ queryKey: ["/api/chat-configs"] });
-            }
-          }}>
-            <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
-              <DialogHeader>
-                <DialogTitle>Create New GPT</DialogTitle>
-              </DialogHeader>
-              <ScrollArea className="flex-1 -mx-6 px-6">
-                <div className="py-4">
-                  <AdminPanel config={config} onConfigChange={setConfig} />
+        )}
+        
+        {/* Toggle to show deleted GPTs */}
+        <div className="flex items-center justify-end mb-4 space-x-2">
+          <span className="text-sm text-gray-600">Show deleted</span>
+          <Switch
+            checked={showDeleted}
+            onCheckedChange={setShowDeleted}
+          />
+        </div>
+        
+        {/* Main Content */}
+        <ScrollArea className="h-[calc(100vh-12rem)]">
+          <div className="space-y-4">
+            {(!filteredConfigs || filteredConfigs.length === 0) ? (
+              <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+                <div className="w-48 h-48 mb-6 relative">
+                  <svg viewBox="0 0 24 24" fill="none" className="w-full h-full text-blue-100">
+                    <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2"/>
+                    <path d="M12 8V12L14.5 14.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
                 </div>
-              </ScrollArea>
-              <div className="pt-4 border-t flex justify-end">
-                <Button onClick={() => saveConfig.mutate()} disabled={saveConfig.isPending}>
-                  Save GPT
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">Get Started with GPTs</h2>
+                <p className="text-gray-600 max-w-md mb-8">
+                  Start getting bespoke formative feedback to your participants. You can create quizzes, give feedback on screenshots of documents or create practice conversations.
+                </p>
+                <Button 
+                  size="lg"
+                  onClick={() => setIsTemplateGalleryOpen(true)}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create your first GPT
                 </Button>
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <ScrollArea className="h-[calc(100vh-12rem)]">
-            <div className="space-y-4">
-              {(!filteredConfigs || filteredConfigs.length === 0) ? (
-                <div className="flex flex-col items-center justify-center h-[60vh] text-center">
-                  <div className="w-48 h-48 mb-6 relative">
-                    <svg viewBox="0 0 24 24" fill="none" className="w-full h-full text-blue-100">
-                      <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2"/>
-                      <path d="M12 8V12L14.5 14.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                    </svg>
-                  </div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-4">Get Started with GPTs</h2>
-                  <p className="text-gray-600 max-w-md mb-8">
-                    Start getting bespoke formative feedback to your participants. You can create quizzes, give feedback on screenshots of documents or create practice conversations.
-                  </p>
-                  <Dialog open={isTemplateGalleryOpen} onOpenChange={(open) => {
-                    setIsTemplateGalleryOpen(open);
-                    if (!open) {
-                      queryClient.invalidateQueries({ queryKey: ["/api/chat-configs"] });
-                    }
-                  }}>
-                    <Button 
-                      size="lg"
-                      onClick={() => setIsTemplateGalleryOpen(true)}
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create your first GPT
-                    </Button>
-                  </Dialog>
-                </div>
-              ) : (
-                filteredConfigs.map((config) => (
-              <Card
-                key={config.id}
-                className={`p-6 ${config.deleted ? 'opacity-60' : ''}`}
-              >
-                <CardHeader className="pb-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <CardTitle>{config.title}</CardTitle>
-                        <Badge
-                          variant={config.type === 'chat' ? 'default' : config.type === 'upload' ? 'secondary' : 'outline'}
-                          className={
-                            config.type === 'chat' ? 'bg-green-100 text-green-800' :
-                              config.type === 'upload' ? 'bg-purple-100 text-purple-800' :
-                                'bg-blue-100 text-blue-800'
-                          }
-                        >
-                          {config.type === 'chat' ? 'conversation' :
-                            config.type === 'upload' ? 'upload' : 'quiz'}
-                        </Badge>
-                        {config.isTemplate && (
-                          <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 flex items-center gap-1">
-                            <Flag className="h-3 w-3" />
-                            Public Template
-                          </Badge>
-                        )}
-                      </div>
-                      <CardDescription>
-                        Created on: {new Date(config.createdAt).toLocaleDateString()}
-                        {config.deleted && config.deletedAt && (
-                          <span className="text-red-500 ml-2">
-                            (Deleted on: {new Date(config.deletedAt).toLocaleDateString()})
-                          </span>
-                        )}
-                      </CardDescription>
-                    </div>
-                    <div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {!config.deleted ? (
-                            <>
-                              <DropdownMenuItem onClick={() => handleEditConfig(config)}>
-                                <Pencil className="h-4 w-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDuplicate(config)}>
-                                <Copy className="h-4 w-4 mr-2" />
-                                Duplicate
-                              </DropdownMenuItem>
-                              {!config.isTemplate && (
-                                <DropdownMenuItem onClick={() => setSavingAsTemplate(config)}>
-                                  <Flag className="h-4 w-4 mr-2" />
-                                  Save as Public Template
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem
-                                className="text-red-600"
-                                onClick={() => setDeletingConfig(config)}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </>
-                          ) : (
-                            <DropdownMenuItem
-                              onClick={() => restoreConfig.mutate(config)}
-                            >
-                              <ArrowUpCircle className="h-4 w-4 mr-2" />
-                              Restore
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                      <Dialog open={editingConfig?.id === config.id} onOpenChange={(open) => {
-                        if (!open) {
-                          setEditingConfig(null);
-                          queryClient.invalidateQueries({ queryKey: ["/api/chat-configs"] });
-                        }
-                      }}>
-                        <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
-                          <DialogHeader>
-                            <DialogTitle>Edit GPT</DialogTitle>
-                            <DialogDescription>
-                              Modify your GPT configuration below.
-                            </DialogDescription>
-                          </DialogHeader>
-                          {editingConfig && (
-                            <>
-                              <ScrollArea className="flex-1 -mx-6 px-6">
-                                <div className="py-4">
-                                  {editingConfig.type === 'quiz' ? (
-                                    <QuizEditor
-                                      config={{
-                                        title: editingConfig.title,
-                                        type: editingConfig.type,
-                                        systemPrompt: editingConfig.systemPrompt,
-                                        userInstructions: editingConfig.userInstructions || "",
-                                        feedbackCriteria: editingConfig.feedbackCriteria || "",
-                                        temperature: 0.7,
-                                        maxTokens: 1000,
-                                        questions: editingConfig.questions || []
-                                      }}
-                                      onConfigChange={(updatedConfig) => {
-                                        console.log('QuizEditor onConfigChange called with:', updatedConfig);
-                                        console.log('Current editingConfig:', editingConfig);
-                                        setEditingConfig(prev => {
-                                          const updated = prev ? {
-                                            ...prev,
-                                            title: updatedConfig.title,
-                                            questions: updatedConfig.questions
-                                          } : null;
-                                          console.log('Updated editingConfig:', updated);
-                                          return updated;
-                                        });
-                                      }}
-                                    />
-                                  ) : (
-                                    <AdminPanel
-                                      config={{
-                                        title: editingConfig.title,
-                                        type: editingConfig.type,
-                                        systemPrompt: editingConfig.systemPrompt,
-                                        userInstructions: editingConfig.userInstructions || "",
-                                        feedbackCriteria: editingConfig.feedbackCriteria || "",
-                                        temperature: 0.7,
-                                        maxTokens: 1000,
-                                        questions: editingConfig.questions || []
-                                      }}
-                                      onConfigChange={(updatedConfig) => {
-                                        setEditingConfig({
-                                          ...editingConfig,
-                                          title: updatedConfig.title,
-                                          type: updatedConfig.type,
-                                          systemPrompt: updatedConfig.systemPrompt,
-                                          userInstructions: updatedConfig.userInstructions || null,
-                                          feedbackCriteria: updatedConfig.feedbackCriteria || null,
-                                          questions: updatedConfig.questions || []
-                                        });
-                                      }}
-                                      isEditMode={true}
-                                    />
-                                  )}
-                                </div>
-                              </ScrollArea>
-                              <div className="pt-4 border-t flex justify-end">
-                                <Button
-                                  onClick={() => editingConfig && updateConfig.mutate(editingConfig)}
-                                  disabled={updateConfig.isPending}
-                                >
-                                  Update GPT
-                                </Button>
-                              </div>
-                            </>
-                          )}
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      {config.type === 'quiz' ? (
-                        <>
-                        </>
-                      ) : (
-                        <>
-                          <h3 className="font-semibold mb-1">System Prompt</h3>
-                          <p className="text-sm text-gray-600">
-                            {config.systemPrompt.split(' ').slice(0, 30).join(' ')}
-                            {config.systemPrompt.split(' ').length > 30 ? '...' : ''}
-                          </p>
-                        </>
-                      )}
-                    </div>
-                    {config.userInstructions && (
+            ) : (
+              filteredConfigs.map((config) => (
+                <Card
+                  key={config.id}
+                  className={`p-6 ${config.deleted ? 'opacity-60' : ''}`}
+                >
+                  <CardHeader className="pb-4">
+                    <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="font-semibold mb-1">User Instructions</h3>
-                        <p className="text-sm text-gray-600">{config.userInstructions}</p>
+                        <div className="flex items-center gap-2">
+                          <CardTitle>{config.title}</CardTitle>
+                          <Badge
+                            variant={config.type === 'chat' ? 'default' : config.type === 'upload' ? 'secondary' : 'outline'}
+                            className={
+                              config.type === 'chat' ? 'bg-green-100 text-green-800' :
+                                config.type === 'upload' ? 'bg-purple-100 text-purple-800' :
+                                  'bg-blue-100 text-blue-800'
+                            }
+                          >
+                            {config.type === 'chat' ? 'conversation' :
+                              config.type === 'upload' ? 'upload' : 'quiz'}
+                          </Badge>
+                          {config.isTemplate && (
+                            <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 flex items-center gap-1">
+                              <Flag className="h-3 w-3" />
+                              Public Template
+                            </Badge>
+                          )}
+                        </div>
+                        <CardDescription>
+                          Created on: {new Date(config.createdAt).toLocaleDateString()}
+                          {config.deleted && config.deletedAt && (
+                            <span className="text-red-500 ml-2">
+                              (Deleted on: {new Date(config.deletedAt).toLocaleDateString()})
+                            </span>
+                          )}
+                        </CardDescription>
                       </div>
-                    )}
-                    <div className="flex justify-between items-center">
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={() => handleCopyLink(config.id)}>
-                          <Share2 className="h-4 w-4 mr-2" />
-                          Share GPT
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => handleViewFeedback(config)}
-                          disabled={config.type === 'chat' ? (!config.feedbackCriteria || config.conversationCount === 0) : config.conversationCount === 0}
-                        >
-                          <BarChart2 className="h-4 w-4 mr-2" />
-                          <span className="md:hidden">View Feedback</span>
-                          <span className="hidden md:inline">View Current Feedback</span>
-                        </Button>
+                      <div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="icon">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {!config.deleted ? (
+                              <>
+                                <DropdownMenuItem onClick={() => handleEditConfig(config)}>
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDuplicate(config)}>
+                                  <Copy className="h-4 w-4 mr-2" />
+                                  Duplicate
+                                </DropdownMenuItem>
+                                {!config.isTemplate && (
+                                  <DropdownMenuItem onClick={() => setSavingAsTemplate(config)}>
+                                    <Flag className="h-4 w-4 mr-2" />
+                                    Save as Public Template
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem
+                                  className="text-red-600"
+                                  onClick={() => setDeletingConfig(config)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </>
+                            ) : (
+                              <DropdownMenuItem
+                                onClick={() => restoreConfig.mutate(config)}
+                              >
+                                <ArrowUpCircle className="h-4 w-4 mr-2" />
+                                Restore
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
-                      <span className="hidden md:inline text-sm text-muted-foreground">
-                        {config.conversationCount} submission{config.conversationCount !== 1 ? 's' : ''}
-                      </span>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-                ))
-              )}
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div>
+                        {config.type === 'quiz' ? (
+                          <>
+                            <h3 className="font-semibold mb-1">Quiz Questions</h3>
+                            <p className="text-sm text-gray-600">
+                              {config.questions?.length || 0} questions configured
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <h3 className="font-semibold mb-1">System Prompt</h3>
+                            <p className="text-sm text-gray-600">
+                              {config.systemPrompt.split(' ').slice(0, 30).join(' ')}
+                              {config.systemPrompt.split(' ').length > 30 ? '...' : ''}
+                            </p>
+                          </>
+                        )}
+                      </div>
+                      {config.userInstructions && (
+                        <div>
+                          <h3 className="font-semibold mb-1">User Instructions</h3>
+                          <p className="text-sm text-gray-600">{config.userInstructions}</p>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center">
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={() => handleCopyLink(config.id)}>
+                            <Share2 className="h-4 w-4 mr-2" />
+                            Share GPT
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleViewFeedback(config)}
+                            disabled={config.type === 'chat' ? (!config.feedbackCriteria || config.conversationCount === 0) : config.conversationCount === 0}
+                          >
+                            <BarChart2 className="h-4 w-4 mr-2" />
+                            <span className="md:hidden">View Feedback</span>
+                            <span className="hidden md:inline">View Current Feedback</span>
+                          </Button>
+                        </div>
+                        <span className="hidden md:inline text-sm text-muted-foreground">
+                          {config.conversationCount} submission{config.conversationCount !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+
+      {/* Template Gallery Dialog */}
+      <Dialog 
+        open={isTemplateGalleryOpen} 
+        onOpenChange={(open) => {
+          setIsTemplateGalleryOpen(open);
+          if (!open) {
+            queryClient.invalidateQueries({ queryKey: ["/api/chat-configs"] });
+          }
+        }}
+      >
+        <DialogContent className="max-w-4xl">
+          <TemplateGallery
+            onSelectTemplate={handleTemplateSelect}
+            onStartFromScratch={handleStartFromScratch}
+            templates={(configs?.filter(c => c.isTemplate) || []).map(template => ({
+              ...template,
+              temperature: template.temperature || 0.7,
+              maxTokens: template.maxTokens || 1000,
+              usageCount: configs?.filter(c =>
+                !c.isTemplate &&
+                c.systemPrompt === template.systemPrompt &&
+                c.type === template.type
+              ).length || 0
+            }))}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Create GPT Dialog */}
+      <Dialog 
+        open={isCreateOpen} 
+        onOpenChange={(open) => {
+          handleCreateModalClose(open);
+          if (!open) {
+            queryClient.invalidateQueries({ queryKey: ["/api/chat-configs"] });
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Create New GPT</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="py-4">
+              <AdminPanel config={config} onConfigChange={setConfig} />
             </div>
           </ScrollArea>
-      </div>
+          <div className="pt-4 border-t flex justify-end">
+            <Button onClick={() => saveConfig.mutate()} disabled={saveConfig.isPending}>
+              Save GPT
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit GPT Dialog */}
+      {editingConfig && (
+        <Dialog 
+          open={editingConfig !== null} 
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingConfig(null);
+              queryClient.invalidateQueries({ queryKey: ["/api/chat-configs"] });
+            }
+          }}
+        >
+          <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Edit GPT</DialogTitle>
+              <DialogDescription>
+                Modify your GPT configuration below.
+              </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="flex-1 -mx-6 px-6">
+              <div className="py-4">
+                {editingConfig.type === 'quiz' ? (
+                  <QuizEditor
+                    config={{
+                      title: editingConfig.title,
+                      type: editingConfig.type,
+                      systemPrompt: editingConfig.systemPrompt,
+                      userInstructions: editingConfig.userInstructions || "",
+                      feedbackCriteria: editingConfig.feedbackCriteria || "",
+                      temperature: 0.7,
+                      maxTokens: 1000,
+                      questions: editingConfig.questions || []
+                    }}
+                    onConfigChange={(updatedConfig) => {
+                      setEditingConfig(prev => {
+                        const updated = prev ? {
+                          ...prev,
+                          title: updatedConfig.title,
+                          questions: updatedConfig.questions
+                        } : null;
+                        return updated;
+                      });
+                    }}
+                  />
+                ) : (
+                  <AdminPanel
+                    config={{
+                      title: editingConfig.title,
+                      type: editingConfig.type,
+                      systemPrompt: editingConfig.systemPrompt,
+                      userInstructions: editingConfig.userInstructions || "",
+                      feedbackCriteria: editingConfig.feedbackCriteria || "",
+                      temperature: 0.7,
+                      maxTokens: 1000,
+                      questions: editingConfig.questions || []
+                    }}
+                    onConfigChange={(updatedConfig) => {
+                      setEditingConfig({
+                        ...editingConfig,
+                        title: updatedConfig.title,
+                        type: updatedConfig.type,
+                        systemPrompt: updatedConfig.systemPrompt,
+                        userInstructions: updatedConfig.userInstructions || null,
+                        feedbackCriteria: updatedConfig.feedbackCriteria || null,
+                        questions: updatedConfig.questions || []
+                      });
+                    }}
+                    isEditMode={true}
+                  />
+                )}
+              </div>
+            </ScrollArea>
+            <div className="pt-4 border-t flex justify-end">
+              <Button
+                onClick={() => editingConfig && updateConfig.mutate(editingConfig)}
+                disabled={updateConfig.isPending}
+              >
+                Update GPT
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Delete Confirmation Dialog */}
       <AlertDialog
         open={deletingConfig !== null}
         onOpenChange={(open) => {
           if (!open) {
             setDeletingConfig(null);
-            queryClient.invalidateQueries({ queryKey: ["/api/chat-configs"] });
           }
         }}
       >
@@ -800,57 +771,53 @@ export default function Home() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
               onClick={() => deletingConfig && deleteConfig.mutate(deletingConfig)}
+              className="bg-red-600 hover:bg-red-700"
             >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <AlertDialog
+
+      {/* Save as Template Dialog */}
+      <Dialog
         open={savingAsTemplate !== null}
         onOpenChange={(open) => {
           if (!open) {
             setSavingAsTemplate(null);
-            queryClient.invalidateQueries({ queryKey: ["/api/chat-configs"] });
           }
         }}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Save as Public Template?</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-4">
-              <p>This will make "{savingAsTemplate?.title}" available as a public template for other users.</p>
-              <div className="space-y-2">
-                <label htmlFor="templateDescription" className="text-sm font-medium">
-                  Template Description (Required)
-                </label>
-                <textarea
-                  id="templateDescription"
-                  className="w-full min-h-[100px] px-3 py-2 text-sm rounded-md border border-input bg-transparent"
-                  placeholder="Describe what this template is for and how it can be used..."
-                  value={savingAsTemplate?.templateDescription || ""}
-                  onChange={(e) =>
-                    setSavingAsTemplate(prev =>
-                      prev ? { ...prev, templateDescription: e.target.value } : null
-                    )
-                  }
-                />
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save as Public Template</DialogTitle>
+            <DialogDescription>
+              Public templates are available to all users. Please provide a description for this template.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            <textarea
+              className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows={4}
+              placeholder="Describe what this template is for and how it should be used..."
+              value={savingAsTemplate?.templateDescription || ''}
+              onChange={(e) => savingAsTemplate && setSavingAsTemplate({
+                ...savingAsTemplate,
+                templateDescription: e.target.value
+              })}
+            />
+          </div>
+          <div className="flex justify-end mt-4">
+            <Button 
               onClick={() => savingAsTemplate && saveAsTemplate.mutate(savingAsTemplate)}
-              disabled={!savingAsTemplate?.templateDescription?.trim()}
+              disabled={!savingAsTemplate?.templateDescription || saveAsTemplate.isPending}
             >
-              Confirm
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              Save as Template
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
