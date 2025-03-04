@@ -10,13 +10,15 @@ interface AdminNavbarProps {
   showNewButton?: boolean;
   newButtonText?: string;
   newButtonLink?: string;
+  onNewButtonClick?: () => void;
 }
 
 export default function AdminNavbar({ 
   title, 
   showNewButton = true, 
   newButtonText = "New GPT", 
-  newButtonLink = "/admin/new" 
+  newButtonLink = "#",
+  onNewButtonClick
 }: AdminNavbarProps) {
   const { user, logoutMutation } = useAuth();
   
@@ -50,12 +52,22 @@ export default function AdminNavbar({
           {/* New GPT Button and User Profile - Right aligned */}
           <div className="flex items-center gap-4">
             {showNewButton && (
-              <Link href={newButtonLink}>
-                <Button className="bg-purple-600 hover:bg-purple-700">
+              newButtonLink === "#" && onNewButtonClick ? (
+                <Button 
+                  className="bg-purple-600 hover:bg-purple-700" 
+                  onClick={onNewButtonClick}
+                >
                   <Plus className="h-5 w-5 mr-2" />
                   {newButtonText}
                 </Button>
-              </Link>
+              ) : (
+                <Link href={newButtonLink}>
+                  <Button className="bg-purple-600 hover:bg-purple-700">
+                    <Plus className="h-5 w-5 mr-2" />
+                    {newButtonText}
+                  </Button>
+                </Link>
+              )
             )}
             
             {/* User Profile */}
@@ -68,10 +80,6 @@ export default function AdminNavbar({
                 </Avatar>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem className="cursor-pointer">
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
-                </DropdownMenuItem>
                 <DropdownMenuItem className="cursor-pointer" onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Logout</span>
