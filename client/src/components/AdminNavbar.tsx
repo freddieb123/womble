@@ -51,8 +51,8 @@ export default function AdminNavbar({
         <div className="flex justify-between items-center">
           {/* Logo and Name - Left aligned */}
           <div className="flex items-center gap-2">
-            <img src="/womble-logo-new.png" alt="Womble Logo" className="h-8 w-8" />
-            <span className="text-xl font-bold text-primary">Womble</span>
+            <img src="/Womble_new_logo_full.png" alt="Womble Logo" className="h-14 w-29" />
+            <span className="text-xl font-bold text-primary"></span>
           </div>
           
           {/* Page Title - Center aligned */}
