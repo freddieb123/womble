@@ -139,8 +139,8 @@ export default function LandingPage() {
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur opacity-30"></div>
                 <div className="bg-white p-6 rounded-lg shadow-xl relative">
                   <img 
-                    src="https://placehold.co/600x400/e9f0fd/1a56db?text=AI-Powered+Quiz+Platform" 
-                    alt="Quiz Platform Demo" 
+                    src="/images/conversation-demo.png" 
+                    alt="Conversation Demo" 
                     className="rounded-md w-full"
                   />
                 </div>
@@ -216,8 +216,8 @@ export default function LandingPage() {
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur opacity-20"></div>
                     <div className="bg-white p-4 rounded-lg shadow-md relative">
                       <img 
-                        src="https://placehold.co/500x300/e9f0fd/1a56db?text=Create+Quiz" 
-                        alt="Create Quiz" 
+                        src="/images/create-activity.png" 
+                        alt="Create Activity" 
                         className="rounded-md w-full"
                       />
                     </div>
@@ -266,8 +266,8 @@ export default function LandingPage() {
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur opacity-20"></div>
                     <div className="bg-white p-4 rounded-lg shadow-md relative">
                       <img 
-                        src="https://placehold.co/500x300/e9f0fd/1a56db?text=Review+Results" 
-                        alt="Review Results" 
+                        src="/images/analysis-demo.png" 
+                        alt="Conversation Analysis" 
                         className="rounded-md w-full"
                       />
                     </div>
