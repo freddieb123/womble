@@ -91,7 +91,7 @@ export default function LandingPage() {
                 Timely, bespoke feedback.
               </h1>
               <p className="mt-6 text-xl text-gray-600">
-                Built by teachers, for teachers. Leverage AI in your sessions to give high quality formative feedback to your particpants and yourself.
+                Built by teachers, for teachers. Leverage AI in your sessions to give high quality formative feedback to your particpants.
               </p>
               <div className="mt-10 flex flex-col sm:flex-row gap-4">
                 <motion.div
@@ -407,7 +407,7 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-
+      <!--
       {/* Testimonials */}
       <section className="py-20 px-4 md:px-8 bg-gray-50">
         <div className="max-w-7xl mx-auto">
@@ -484,6 +484,7 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+        -->
 
       {/* CTA Section */}
       <section className="py-20 px-4 md:px-8 bg-white">
@@ -526,8 +527,8 @@ export default function LandingPage() {
             <div>
               <div className="flex items-center">
                 <span className="text-2xl font-bold text-primary flex items-center">
-                  <img src="/womble-logo-new.png" alt="Womble Logo" className="h-10 w-10 mr-2" />
-                  Womble
+                  <img src="/Womble_new_logo_full.png" alt="Womble Logo" className="h-14 w-29 mr-2" />
+                  
                 </span>
               </div>
             </div>
