@@ -21,8 +21,8 @@ export default function AdminHeader({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <img src="/womble-logo-new.png" alt="Womble Logo" className="h-8 w-8" />
-            <span className="text-xl font-bold text-primary">Womble</span>
+            <img src="/Womble_new_logo_full.png" alt="Womble Logo" className="h-8 w-8" />
+            <span className="text-xl font-bold text-primary"></span>
           </div>
           
           <h1 className="text-2xl font-bold text-primary">{title}</h1>

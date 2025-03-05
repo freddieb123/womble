@@ -13,8 +13,8 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center">
             <span className="text-2xl font-bold text-primary flex items-center">
-              <img src="/womble-logo-new.png" alt="Womble Logo" className="h-10 w-10 mr-2" />
-              Womble
+              <img src="/Womble_new_logo_full.png" alt="Womble Logo" className="h-20 w-50 mr-2" />
+              
             </span>
           </div>
           <div className="hidden md:flex items-center gap-8">
@@ -70,7 +70,7 @@ export default function LandingPage() {
                 Timely, bespoke feedback.
               </h1>
               <p className="mt-6 text-xl text-gray-600">
-                Built by teachers, for teachers. Get high quality formative feedback to your particpants and yourself to supercharge your live sessions.
+                Built by teachers, for teachers. Leverage AI in your sessions to give high quality formative feedback to your particpants and yourself.
               </p>
               <div className="mt-10 flex flex-col sm:flex-row gap-4">
                 <motion.div
