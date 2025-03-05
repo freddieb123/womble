@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle, Brain, Zap, Award, Users, Server, Database, BarChart, LogOut } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"; // Added import
 
 export default function LandingPage() {
   const { user, logoutMutation } = useAuth();
@@ -14,7 +15,7 @@ export default function LandingPage() {
           <div className="flex items-center">
             <span className="text-2xl font-bold text-primary flex items-center">
               <img src="/Womble_new_logo_full.png" alt="Womble Logo" className="h-20 w-50 mr-2" />
-              
+
             </span>
           </div>
           <div className="hidden md:flex items-center gap-8">
@@ -138,7 +139,7 @@ export default function LandingPage() {
               Get great feedback to all your participants, every time.
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-3 gap-10">
             <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm">
               <div className="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center mb-6">
@@ -149,7 +150,7 @@ export default function LandingPage() {
                 Each of your particpants gets bespoke feedback based on their responses and your assessment criteria.
               </p>
             </div>
-            
+
             <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm">
               <div className="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center mb-6">
                 <Award className="h-6 w-6 text-blue-600" />
@@ -159,7 +160,7 @@ export default function LandingPage() {
                 Participants can see how they compare to others in the live session.
               </p>
             </div>
-            
+
             <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm">
               <div className="h-12 w-12 rounded-lg bg-purple-100 flex items-center justify-center mb-6">
                 <Brain className="h-6 w-6 text-purple-600" />
@@ -169,8 +170,8 @@ export default function LandingPage() {
                 Get insights that help you adapt your session on the fly.
               </p>
             </div>
-            
-         
+
+
           </div>
         </div>
       </section>
@@ -184,10 +185,10 @@ export default function LandingPage() {
               Create and share activities with a magic wand (and a few clicks).
             </p>
           </div>
-          
+
           <div className="relative">
             <div className="hidden md:block absolute left-1/2 top-0 h-full w-0.5 bg-gray-200 -translate-x-1/2"></div>
-            
+
             <div className="space-y-16 relative">
               <div className="flex flex-col md:flex-row gap-8 items-center">
                 <div className="md:w-1/2 order-2 md:order-1">
@@ -213,7 +214,7 @@ export default function LandingPage() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex flex-col md:flex-row gap-8 items-center">
                 <div className="md:w-1/2 order-2">
                   <div className="relative">
@@ -238,7 +239,7 @@ export default function LandingPage() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex flex-col md:flex-row gap-8 items-center">
                 <div className="md:w-1/2 order-2 md:order-1">
                   <div className="relative">
@@ -277,7 +278,7 @@ export default function LandingPage() {
               Choose the Womble plan that's right for you
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-3 gap-8">
             {/* Free Plan */}
             <div className="border border-gray-200 rounded-xl p-8 bg-white relative">
@@ -313,7 +314,7 @@ export default function LandingPage() {
                 Sign Up Free
               </Button>
             </div>
-            
+
             {/* Pro Plan */}
             <div className="border-2 border-primary rounded-xl p-8 bg-white relative shadow-lg">
               <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-primary text-white px-4 py-1 rounded-full text-sm font-medium">
@@ -350,7 +351,7 @@ export default function LandingPage() {
                 Get Started
               </Button>
             </div>
-            
+
             {/* Enterprise Plan */}
             <div className="border border-gray-200 rounded-xl p-8 bg-white relative">
               <h3 className="text-xl font-bold text-gray-900">Enterprise</h3>
@@ -368,12 +369,12 @@ export default function LandingPage() {
                   <CheckCircle className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
                   <span className="text-gray-600">Template sharing with the team</span>
                 </li>
-               
+
                 <li className="flex items-start">
                   <CheckCircle className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
                   <span className="text-gray-600">Dedicated support</span>
                 </li>
-                
+
               </ul>
               <Button 
                 variant="outline" 
@@ -396,7 +397,7 @@ export default function LandingPage() {
               Educators and organizations love our AI-powered quiz platform
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-3 gap-8">
             <motion.div 
               className="bg-white p-6 rounded-lg shadow-sm border border-gray-100"
@@ -418,7 +419,7 @@ export default function LandingPage() {
                 "QuizAI has transformed how I assess my students. The AI-generated questions are high-quality and save me hours of preparation time."
               </p>
             </motion.div>
-            
+
             <motion.div 
               className="bg-white p-6 rounded-lg shadow-sm border border-gray-100"
               initial={{ opacity: 0, y: 30 }}
@@ -439,7 +440,7 @@ export default function LandingPage() {
                 "The analytics provided by QuizAI help me identify knowledge gaps in my team and tailor training accordingly. It's been invaluable for our L&D department."
               </p>
             </motion.div>
-            
+
             <motion.div 
               className="bg-white p-6 rounded-lg shadow-sm border border-gray-100"
               initial={{ opacity: 0, y: 30 }}
@@ -510,30 +511,30 @@ export default function LandingPage() {
                 </span>
               </div>
             </div>
-            
+
             <div>
               <h3 className="text-lg font-semibold mb-4"></h3>
               <ul className="space-y-2">
-                
+
               </ul>
             </div>
-            
+
             <div>
               <h3 className="text-lg font-semibold mb-4"></h3>
               <ul className="space-y-2">
-             
+
               </ul>
             </div>
-            
+
             <div>
               <h3 className="text-lg font-semibold mb-4">Company</h3>
               <ul className="space-y-2">
                 <li><a href="#" className="text-gray-400 hover:text-white">Contact Us</a></li>
-                
+
               </ul>
             </div>
           </div>
-          
+
           <div className="mt-12 pt-8 border-t border-gray-800 text-center text-gray-400">
             <p>© {new Date().getFullYear()} Womble. All rights reserved.</p>
           </div>
