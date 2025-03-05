@@ -13,8 +13,30 @@ export default function LandingPage() {
       <nav className="border-b bg-white py-4 px-4 md:px-8">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center">
-            <span className="text-2xl font-bold text-primary flex items-center">
-              <img src="/Womble_new_logo_full.png" alt="Womble Logo" className="h-20 w-50 mr-2" />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <span className="text-2xl font-bold text-primary flex items-center cursor-pointer">
+                  <img src="/Womble_new_logo_full.png" alt="Womble Logo" className="h-20 w-50 mr-2" />
+                </span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-72 p-3">
+                <div className="space-y-2">
+                  <h4 className="font-bold">Womble</h4>
+                  <p className="text-sm">
+                    <span className="font-italic text-muted-foreground">noun</span>
+                    <br />
+                    A fictional animal inhabiting Wimbledon Common in London, characterized as clearing up litter.
+                  </p>
+                  <p className="text-sm">
+                    <span className="font-italic text-muted-foreground">verb (informal)</span>
+                    <br />
+                    Wander in a casual or relaxed way.
+                    <br />
+                    <span className="italic">"once we'd arrived back in Cambridge, we wombled quietly home"</span>
+                  </p>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             </span>
           </div>
