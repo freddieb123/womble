@@ -37,8 +37,6 @@ export default function LandingPage() {
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
-
-            </span>
           </div>
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="font-medium text-gray-600 hover:text-primary">Features</a>
