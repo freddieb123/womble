@@ -407,8 +407,8 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-      <!--
-      {/* Testimonials */}
+      {/* 
+      Testimonials */}
       <section className="py-20 px-4 md:px-8 bg-gray-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
