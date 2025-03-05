@@ -1019,10 +1019,31 @@ export function registerRoutes(app: Express): Server {
 
       let themes;
       try {
-        themes = JSON.parse(response);
+        // First try to parse as is
+        try {
+          themes = JSON.parse(response);
+        } catch (initialParseError) {
+          // If direct parsing fails, try to extract JSON from the text response
+          const jsonMatch = response.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            try {
+              themes = JSON.parse(jsonMatch[0]);
+            } catch (extractedParseError) {
+              console.error("Error parsing extracted JSON:", extractedParseError);
+              throw new Error("Failed to parse extracted JSON");
+            }
+          } else {
+            console.error("Error parsing OpenAI response and couldn't extract JSON:", initialParseError);
+            throw new Error("Failed to parse theme analysis response");
+          }
+        }
       } catch (parseError) {
         console.error("Error parsing OpenAI response:", parseError);
-        throw new Error("Failed to parse theme analysis response");
+        // Return a fallback object instead of throwing
+        return {
+          positive: "Error analyzing themes",
+          constructive: "Error analyzing themes"
+        };
       }
 
       res.json(themes);
