@@ -982,7 +982,7 @@ export function registerRoutes(app: Express): Server {
     1. One positive theme highlighting what's being done well
     2. One constructive theme suggesting an area for improvement
 
-    Format your response exactly like this example:
+    Format your response EXACTLY like this example:
     {
       "positive": "Participants consistently demonstrate strong engagement with the material",
       "constructive": "More emphasis is needed on practical application of concepts"
@@ -994,7 +994,8 @@ export function registerRoutes(app: Express): Server {
     - Be specific and actionable
     - Ensure the themes are framed as plural (i.e. Participants) 
     - When referring to the users, ALWAYS use'participants'
-    - Base themes on patterns across multiple feedback points when possible`;
+    - Base themes on patterns across multiple feedback points when possible
+    - REMEMBER TO FORMAT THE RESPONSE IN JSON AS ABOVE`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o",
@@ -1013,6 +1014,7 @@ export function registerRoutes(app: Express): Server {
       });
 
       const response = completion.choices[0]?.message?.content;
+      console.log(response)
       if (!response) {
         throw new Error("Failed to get response from OpenAI");
       }
