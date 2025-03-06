@@ -9,12 +9,6 @@ export const users = pgTable("users", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  isSubscribed: boolean("is_subscribed").default(false).notNull(),
-  stripeCustomerId: text("stripe_customer_id"),
-  stripeSubscriptionId: text("stripe_subscription_id"),
-  subscriptionStatus: text("subscription_status"),
-  subscriptionTier: text("subscription_tier"),
-  subscriptionExpiresAt: timestamp("subscription_expires_at"),
 });
 
 export const chatConfigs = pgTable("chat_configs", {
