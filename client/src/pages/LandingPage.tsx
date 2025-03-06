@@ -286,6 +286,31 @@ export default function LandingPage() {
                   </div>
                 </div>
               </div>
+
+              <div className="flex flex-col md:flex-row gap-8 items-center">
+                <div className="md:w-1/2 order-2">
+                  <div className="relative">
+                    <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur opacity-20"></div>
+                    <div className="bg-white p-4 rounded-lg shadow-md relative">
+                      <img 
+                        src="/images/top_image.png" 
+                        alt="Improve Teaching" 
+                        className="rounded-md w-full"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="md:w-1/2 order-1 relative">
+                  <div className="md:pl-8">
+                    <div className="flex items-center justify-center mb-4">
+                      <h3 className="text-2xl font-bold text-gray-900 mr-3">4. Improve Your Teaching</h3>
+                    </div>
+                    <p className="mt-4 text-gray-600 md:text-left text-center">
+                      Use insights from participant data to refine your teaching strategies and create more effective learning experiences.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
