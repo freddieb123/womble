@@ -551,6 +551,12 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      <div className="mt-auto py-2 text-center text-xs text-gray-400">
+        <a href="https://womble.co" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600">
+          This page is powered by Womble.co
+        </a>
+      </div>
     </div>
   );
 }
