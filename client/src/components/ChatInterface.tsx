@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Lightbulb, Info, X, Trophy } from "lucide-react";
+import { Send, Lightbulb, Info, X, Trophy, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -27,6 +27,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -59,6 +64,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
   const [isGettingHint, setIsGettingHint] = useState(false);
   const [isConfirmingFeedback, setIsConfirmingFeedback] = useState(false); // Added state
   const [isGettingFeedback, setIsGettingFeedback] = useState(false);
+  const [instructionsOpen, setInstructionsOpen] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -136,7 +142,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
         b.score - a.score
       );
 
-      const userRankIndex = sortedEntries.findIndex(entry => entry.isCurrentUser);
+      const userRankIndex = sortedEntries.findIndex((entry: LeaderboardEntry) => entry.isCurrentUser);
       if (userRankIndex !== -1) {
         setUserRank(userRankIndex + 1);
       }
@@ -369,13 +375,23 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
   return (
     <div className="flex flex-col h-[600px]">
       {config.userInstructions && !isViewOnly && (
-        <Alert className="mb-4">
-          <Info className="h-4 w-4" />
-          <AlertDescription>
-            <div className="font-semibold text-lg mb-2">{config.title}</div>
-            <pre className="font-sans whitespace-pre-wrap">{config.userInstructions}</pre>
-          </AlertDescription>
-        </Alert>
+        <Collapsible open={instructionsOpen} onOpenChange={setInstructionsOpen} className="mb-4">
+          <Alert className="mb-0 border-b-0 rounded-b-none relative">
+            <CollapsibleTrigger className="absolute inset-0 w-full h-full cursor-pointer flex items-center justify-end pr-4">
+              <span className="sr-only">{instructionsOpen ? 'Hide instructions' : 'Show instructions'}</span>
+              <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform ${instructionsOpen ? 'transform rotate-180' : ''}`} />
+            </CollapsibleTrigger>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              <div className="font-semibold text-lg mb-0 pr-8">{config.title}</div>
+            </AlertDescription>
+          </Alert>
+          <CollapsibleContent>
+            <div className="border border-t-0 border-muted rounded-t-none rounded-b-lg p-4 bg-muted/20">
+              <pre className="font-sans whitespace-pre-wrap text-sm">{config.userInstructions}</pre>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       )}
       {isViewOnly && userName && (
         <div className="p-4 border-b bg-blue-50">
