@@ -224,10 +224,10 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <div className="md:w-1/2 order-1 md:order-2 relative">
-                  <div className="hidden md:flex absolute -left-12 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-primary text-white items-center justify-center font-bold text-xl shadow-lg">1</div>
+                  
                   <div className="md:pl-8">
-                    <div className="md:hidden flex h-10 w-10 rounded-full bg-primary text-white items-center justify-center font-bold text-xl shadow-lg mb-4 mx-auto">1</div>
-                    <h3 className="text-2xl font-bold text-gray-900 md:text-left text-center">Create Your Activity</h3>
+                    <div className="md:hidden flex h-10 w-10 rounded-full bg-primary text-white items-center justify-center font-bold text-xl shadow-lg mb-4 mx-auto"></div>
+                    <h3 className="text-2xl font-bold text-gray-900 md:text-left text-center">1. Create Your Activity</h3>
                     <p className="mt-4 text-gray-600 md:text-left text-center">
                       Activity types include quizzes, screenshot uploads and practice conversations.
                     </p>
@@ -252,11 +252,11 @@ export default function LandingPage() {
                   {/* Removed the original number on the left */}
                   <div className="md:pl-8">
                     <div className="flex items-center justify-center mb-4">
-                      <h3 className="text-2xl font-bold text-gray-900 mr-3">Share with your Participants</h3>
-                      <div className="flex h-10 w-10 rounded-full bg-primary text-white items-center justify-center font-bold text-xl shadow-lg">2</div>
+                      <h3 className="text-2xl font-bold text-gray-900 mr-3">2. Share with your Participants</h3>
+                      
                     </div>
                     <p className="mt-4 text-gray-600 md:text-left text-center">
-                      Generate a unique link to share in the chat for each session your run.
+                      Generate a unique link to share in the chat for each session your run. Participants can get hints and feedback.
                     </p>
                   </div>
                 </div>
@@ -276,10 +276,10 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <div className="md:w-1/2 order-1 md:order-2 relative">
-                  <div className="hidden md:flex absolute -left-12 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-primary text-white items-center justify-center font-bold text-xl shadow-lg">3</div>
+                  
                   <div className="md:pl-8">
                     <div className="md:hidden flex h-10 w-10 rounded-full bg-primary text-white items-center justify-center font-bold text-xl shadow-lg mb-4 mx-auto">3</div>
-                    <h3 className="text-2xl font-bold text-gray-900 md:text-left text-center">Analyse Results</h3>
+                    <h3 className="text-2xl font-bold text-gray-900 md:text-left text-center">3. Analyse Results</h3>
                     <p className="mt-4 text-gray-600 md:text-left text-center">
                       Review key feedback themes to inform your session.
                     </p>
@@ -289,6 +289,9 @@ export default function LandingPage() {
             </div>
           </div>
         </div>
+        
+
+        
       </section>
 
       {/* Pricing Section */}
@@ -482,7 +485,7 @@ export default function LandingPage() {
           </div>
 
           <div className="mt-12 pt-8 border-t border-gray-800 text-center text-gray-400">
-            <p>© {new Date().getFullYear()} Womble. All rights reserved.</p>
+            <p>Made with ❤️ by Uncle Bulgaria.</p>
           </div>
         </div>
       </footer>
