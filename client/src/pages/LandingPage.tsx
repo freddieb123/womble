@@ -279,7 +279,7 @@ export default function LandingPage() {
                   
                   <div className="md:pl-8">
                     <div className="md:hidden flex h-10 w-10 rounded-full bg-primary text-white items-center justify-center font-bold text-xl shadow-lg mb-4 mx-auto">3</div>
-                    <h3 className="text-2xl font-bold text-gray-900 md:text-left text-center">3. Analyse Results</h3>
+                    <h3 className="text-2xl font-bold text-gray-900 md:text-left text-center">3. Your particpants get feedback</h3>
                     <p className="mt-4 text-gray-600 md:text-left text-center">
                       Review key feedback themes to inform your session.
                     </p>
@@ -293,7 +293,7 @@ export default function LandingPage() {
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur opacity-20"></div>
                     <div className="bg-white p-4 rounded-lg shadow-md relative">
                       <img 
-                        src="/images/top_image.png" 
+                        src="/images/3 screenshot.png" 
                         alt="Improve Teaching" 
                         className="rounded-md w-full"
                       />
@@ -303,10 +303,10 @@ export default function LandingPage() {
                 <div className="md:w-1/2 order-1 relative">
                   <div className="md:pl-8">
                     <div className="flex items-center justify-center mb-4">
-                      <h3 className="text-2xl font-bold text-gray-900 mr-3">4. Improve Your Teaching</h3>
+                        <h3 className="text-2xl font-bold text-gray-900 md:text-left">4. You get a class analysis</h3>
                     </div>
                     <p className="mt-4 text-gray-600 md:text-left text-center">
-                      Use insights from participant data to refine your teaching strategies and create more effective learning experiences.
+                      Review key feedback themes to inform your session.
                     </p>
                   </div>
                 </div>
