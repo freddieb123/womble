@@ -249,10 +249,12 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <div className="md:w-1/2 order-1 relative">
-                  <div className="hidden md:flex absolute -left-12 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-primary text-white items-center justify-center font-bold text-xl shadow-lg">2</div>
+                  {/* Removed the original number on the left */}
                   <div className="md:pl-8">
-                    <div className="md:hidden flex h-10 w-10 rounded-full bg-primary text-white items-center justify-center font-bold text-xl shadow-lg mb-4 mx-auto">2</div>
-                    <h3 className="text-2xl font-bold text-gray-900 md:text-left text-center">Share with your Participants</h3>
+                    <div className="flex items-center justify-center mb-4">
+                      <h3 className="text-2xl font-bold text-gray-900 mr-3">Share with your Participants</h3>
+                      <div className="flex h-10 w-10 rounded-full bg-primary text-white items-center justify-center font-bold text-xl shadow-lg">2</div>
+                    </div>
                     <p className="mt-4 text-gray-600 md:text-left text-center">
                       Generate a unique link to share in the chat for each session your run.
                     </p>
