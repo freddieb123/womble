@@ -378,14 +378,14 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
         <Collapsible open={instructionsOpen} onOpenChange={setInstructionsOpen} className="mb-4">
           <div className={`border rounded-lg ${instructionsOpen ? 'rounded-b-none border-b-0' : ''}`}>
             <CollapsibleTrigger className="w-full block cursor-pointer">
-              <Alert className="mb-0 border-0 flex items-center justify-between">
-                <div className="flex items-center">
-                  <Info className="h-4 w-4" />
-                  <AlertDescription>
-                    <div className="font-semibold text-lg mb-0 ml-2">{config.title}</div>
-                  </AlertDescription>
+              <Alert className="mb-0 border-0 relative">
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="font-semibold text-lg">{config.title}</div>
+                </AlertDescription>
+                <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                  <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform ${instructionsOpen ? 'transform rotate-180' : ''}`} />
                 </div>
-                <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform ${instructionsOpen ? 'transform rotate-180' : ''}`} />
               </Alert>
             </CollapsibleTrigger>
           </div>
