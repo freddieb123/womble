@@ -376,18 +376,21 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
     <div className="flex flex-col h-[600px]">
       {config.userInstructions && !isViewOnly && (
         <Collapsible open={instructionsOpen} onOpenChange={setInstructionsOpen} className="mb-4">
-          <Alert className="mb-0 border-b-0 rounded-b-none relative">
-            <CollapsibleTrigger className="absolute inset-0 w-full h-full cursor-pointer flex items-center justify-end pr-4">
-              <span className="sr-only">{instructionsOpen ? 'Hide instructions' : 'Show instructions'}</span>
-              <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform ${instructionsOpen ? 'transform rotate-180' : ''}`} />
+          <div className={`border rounded-lg ${instructionsOpen ? 'rounded-b-none border-b-0' : ''}`}>
+            <CollapsibleTrigger className="w-full block cursor-pointer">
+              <Alert className="mb-0 border-0 flex items-center justify-between">
+                <div className="flex items-center">
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    <div className="font-semibold text-lg mb-0 ml-2">{config.title}</div>
+                  </AlertDescription>
+                </div>
+                <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform ${instructionsOpen ? 'transform rotate-180' : ''}`} />
+              </Alert>
             </CollapsibleTrigger>
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              <div className="font-semibold text-lg mb-0 pr-8">{config.title}</div>
-            </AlertDescription>
-          </Alert>
+          </div>
           <CollapsibleContent>
-            <div className="border border-t-0 border-muted rounded-t-none rounded-b-lg p-4 bg-muted/20">
+            <div className="border border-t-0 rounded-t-none rounded-b-lg p-4 bg-muted/20">
               <pre className="font-sans whitespace-pre-wrap text-sm">{config.userInstructions}</pre>
             </div>
           </CollapsibleContent>
