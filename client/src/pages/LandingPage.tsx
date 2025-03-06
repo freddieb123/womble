@@ -318,6 +318,50 @@ export default function LandingPage() {
         
       </section>
 
+      {/* Types of Activities Section */}
+      <section id="activity-types" className="py-20 px-4 md:px-8 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Types of Activities</h2>
+            <p className="mt-4 text-xl text-gray-600 max-w-3xl mx-auto">
+              Choose from different activity formats to engage your participants
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-10">
+            <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow">
+              <div className="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center mb-6">
+                <BarChart className="h-6 w-6 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900">Quiz</h3>
+              <p className="mt-4 text-gray-600">
+                Create interactive quizzes with multiple-choice or free-text answers. Get AI-powered insights on participant responses.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow">
+              <div className="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center mb-6">
+                <Users className="h-6 w-6 text-green-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900">Conversation</h3>
+              <p className="mt-4 text-gray-600">
+                Practice conversations with AI feedback. Perfect for role-playing scenarios and communication skills development.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow">
+              <div className="h-12 w-12 rounded-lg bg-purple-100 flex items-center justify-center mb-6">
+                <Database className="h-6 w-6 text-purple-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900">Screenshot</h3>
+              <p className="mt-4 text-gray-600">
+                Upload screenshots for analysis and feedback. Great for design reviews, interface critiques, and visual exercises.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Pricing Section */}
       <section id="pricing" className="py-20 px-4 md:px-8 bg-white">
         <div className="max-w-5xl mx-auto">
