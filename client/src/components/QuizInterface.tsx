@@ -120,7 +120,7 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
         b.score - a.score
       );
 
-      const userRankIndex = sortedEntries.findIndex(entry => entry.isCurrentUser);
+      const userRankIndex = sortedEntries.findIndex((entry: LeaderboardEntry) => entry.isCurrentUser);
       if (userRankIndex !== -1) {
         setUserRank(userRankIndex + 1);
       }
