@@ -139,7 +139,7 @@ export default function LandingPage() {
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur opacity-30"></div>
                 <div className="bg-white p-6 rounded-lg shadow-xl relative">
                   <img 
-                    src="/images/conversation-demo.png" 
+                    src="/images/top_image.png" 
                     alt="Conversation Demo" 
                     className="rounded-md w-full"
                   />
@@ -216,7 +216,7 @@ export default function LandingPage() {
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur opacity-20"></div>
                     <div className="bg-white p-4 rounded-lg shadow-md relative">
                       <img 
-                        src="/images/create-activity.png" 
+                        src="/images/1 screenshot.png" 
                         alt="Create Activity" 
                         className="rounded-md w-full"
                       />
@@ -241,7 +241,7 @@ export default function LandingPage() {
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur opacity-20"></div>
                     <div className="bg-white p-4 rounded-lg shadow-md relative">
                       <img 
-                        src="https://placehold.co/500x300/e9f0fd/1a56db?text=Share+Quiz" 
+                        src="/images/2 screenshot.png" 
                         alt="Share Quiz" 
                         className="rounded-md w-full"
                       />
@@ -266,7 +266,7 @@ export default function LandingPage() {
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur opacity-20"></div>
                     <div className="bg-white p-4 rounded-lg shadow-md relative">
                       <img 
-                        src="/images/analysis-demo.png" 
+                        src="/images/3 screenshot.png" 
                         alt="Conversation Analysis" 
                         className="rounded-md w-full"
                       />
