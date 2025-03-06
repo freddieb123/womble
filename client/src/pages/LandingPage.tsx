@@ -251,9 +251,8 @@ export default function LandingPage() {
                 <div className="md:w-1/2 order-1 relative">
                   {/* Removed the original number on the left */}
                   <div className="md:pl-8">
-                    <div className="flex items-center justify-center mb-4">
-                      <h3 className="text-2xl font-bold text-gray-900 mr-3">2. Share with your Participants</h3>
-                      
+                    <div className="flex items-start mb-4">
+                      <h3 className="text-2xl font-bold text-gray-900 md:text-left">2. Share with your Participants</h3>
                     </div>
                     <p className="mt-4 text-gray-600 md:text-left text-center">
                       Generate a unique link to share in the chat for each session your run. Participants can get hints and feedback.
@@ -302,7 +301,7 @@ export default function LandingPage() {
                 </div>
                 <div className="md:w-1/2 order-1 relative">
                   <div className="md:pl-8">
-                    <div className="flex items-center justify-center mb-4">
+                    <div className="flex items-start mb-4">
                         <h3 className="text-2xl font-bold text-gray-900 md:text-left">4. You get a class analysis</h3>
                     </div>
                     <p className="mt-4 text-gray-600 md:text-left text-center">
