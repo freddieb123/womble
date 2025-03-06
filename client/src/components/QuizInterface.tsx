@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import type { AdminConfig } from "@/lib/types";
 import UserNameModal from "./UserNameModal";
 import LeaderboardModal from "./LeaderboardModal";
-import { Trophy } from "lucide-react";
+import { Trophy, ChevronLeft, ChevronRight } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 interface QuizQuestion {
   question: string;
@@ -42,6 +43,7 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [userRank, setUserRank] = useState<number>();
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const { toast } = useToast();
 
   const handleAnswerChange = (index: number, value: string) => {
@@ -70,6 +72,20 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
       percentage: (score / totalQuestions) * 100
     };
   };
+
+  const goToNextQuestion = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    }
+  };
+
+  const goToPreviousQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+    }
+  };
+
+  const progressPercentage = ((currentQuestionIndex + 1) / questions.length) * 100;
 
   const areAllQuestionsAnswered = questions.length > 0 && questions.every((_, index) => {
     const hasAnswer = answers[index]?.trim().length > 0;
@@ -195,6 +211,7 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
   }
 
   const overallScore = calculateOverallScore();
+  const currentQuestion = questions[currentQuestionIndex];
 
   return (
     <div className="space-y-8 max-w-3xl mx-auto">
@@ -226,63 +243,119 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
               <h2 className="text-2xl font-bold text-blue-900">
                 Overall Score: {overallScore?.score} / {overallScore?.total}
               </h2>
-              <Button
-                onClick={() => {
-                  fetchLeaderboard();
-                  setShowLeaderboard(true);
-                }}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                <Trophy className="w-4 h-4 mr-2" />
-                View Leaderboard
-              </Button>
+              <div className="flex justify-center mt-2">
+                <Button
+                  onClick={() => {
+                    fetchLeaderboard();
+                    setShowLeaderboard(true);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Trophy className="w-4 h-4 mr-2" />
+                  View Leaderboard
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {questions.map((question, index) => (
-        <Card key={index} className={`p-6 ${
-          feedback?.[index]
-            ? `border-2 border-${getFeedbackColor(feedback[index]?.status)}-500`
-            : ''
-        }`}>
+      {!feedback && (
+        <div className="space-y-2 mb-4">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-500">Question {currentQuestionIndex + 1} of {questions.length}</span>
+            <span className="text-sm text-gray-500">{Math.round(progressPercentage)}% Complete</span>
+          </div>
+          <Progress value={progressPercentage} className="h-2" />
+        </div>
+      )}
+
+      {feedback ? (
+        // Display all questions with feedback
+        <div className="space-y-6">
+          {questions.map((question, index) => (
+            <Card key={index} className={`p-6 ${
+              feedback?.[index]
+                ? `border-2 border-${getFeedbackColor(feedback[index]?.status)}-500`
+                : ''
+            }`}>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-lg font-semibold">Question {index + 1}</Label>
+                  <p className="text-gray-700">{question.question}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`answer-${index}`}>Your Answer</Label>
+                  <Textarea
+                    id={`answer-${index}`}
+                    value={answers[index] || ""}
+                    readOnly
+                    className="bg-gray-50"
+                  />
+                </div>
+                {feedback?.[index] && (
+                  <div className={`p-4 rounded-md bg-${getFeedbackColor(feedback[index].status)}-100`}>
+                    <p className={`font-semibold capitalize text-${getFeedbackColor(feedback[index].status)}-700`}>
+                      {feedback[index].status}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-700">{feedback[index].feedback}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        // Display only the current question
+        <Card className="p-6 shadow-md">
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-lg font-semibold">Question {index + 1}</Label>
-              <p className="text-gray-700">{question.question}</p>
+              <Label className="text-xl font-semibold">Question {currentQuestionIndex + 1}</Label>
+              <p className="text-gray-700 text-lg">{currentQuestion.question}</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor={`answer-${index}`}>Your Answer</Label>
+              <Label htmlFor={`answer-${currentQuestionIndex}`}>Your Answer</Label>
               <Textarea
-                id={`answer-${index}`}
-                value={answers[index] || ""}
-                onChange={(e) => handleAnswerChange(index, e.target.value)}
+                id={`answer-${currentQuestionIndex}`}
+                value={answers[currentQuestionIndex] || ""}
+                onChange={(e) => handleAnswerChange(currentQuestionIndex, e.target.value)}
                 placeholder="Type your answer here..."
-                disabled={feedback !== null || isViewOnly}
+                className="min-h-[120px]"
+                disabled={isViewOnly}
               />
             </div>
-            {feedback?.[index] && (
-              <div className={`p-4 rounded-md bg-${getFeedbackColor(feedback[index].status)}-100`}>
-                <p className={`font-semibold capitalize text-${getFeedbackColor(feedback[index].status)}-700`}>
-                  {feedback[index].status}
-                </p>
-                <p className="mt-1 text-sm text-gray-700">{feedback[index].feedback}</p>
-              </div>
-            )}
           </CardContent>
+          <CardFooter className="flex justify-between pt-4">
+            <Button
+              variant="outline"
+              onClick={goToPreviousQuestion}
+              disabled={currentQuestionIndex === 0}
+              className="flex items-center gap-1"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            
+            {currentQuestionIndex === questions.length - 1 ? (
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitting || !areAllQuestionsAnswered || !localUserName}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {isSubmitting ? "Submitting..." : areAllQuestionsAnswered ? "Submit Quiz" : "Answer all questions to submit"}
+              </Button>
+            ) : (
+              <Button
+                variant="default"
+                onClick={goToNextQuestion}
+                className="flex items-center gap-1"
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            )}
+          </CardFooter>
         </Card>
-      ))}
-      {!isViewOnly && (
-        <div className="flex justify-end">
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting || feedback !== null || !areAllQuestionsAnswered || !localUserName}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg"
-          >
-            {isSubmitting ? "Submitting..." : areAllQuestionsAnswered ? "Submit Quiz" : "Answer all questions to submit"}
-          </Button>
-        </div>
       )}
 
       <div className="mt-auto py-2 text-center text-xs text-gray-400">
