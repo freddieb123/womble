@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Brain, Zap, Award, Users, Server, Database, BarChart, LogOut } from "lucide-react";
+import { CheckCircle, Brain, Zap, Award, Users, Server, Database, BarChart, LogOut, CameraIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"; // Added import
@@ -227,9 +227,9 @@ export default function LandingPage() {
                   
                   <div className="md:pl-8">
                     <div className="md:hidden flex h-10 w-10 rounded-full bg-primary text-white items-center justify-center font-bold text-xl shadow-lg mb-4 mx-auto"></div>
-                    <h3 className="text-2xl font-bold text-gray-900 md:text-left text-center">1. Create Your Activity</h3>
+                    <h3 className="text-2xl font-bold text-gray-900 md:text-left text-center">1. Create Your Activity and Feedback Criteria</h3>
                     <p className="mt-4 text-gray-600 md:text-left text-center">
-                      Activity types include quizzes, screenshot uploads and practice conversations.
+                      Activity types include quizzes, screenshot uploads and practice conversations. Create clear and specific feedback criteria.
                     </p>
                   </div>
                 </div>
@@ -335,7 +335,7 @@ export default function LandingPage() {
               </div>
               <h3 className="text-xl font-semibold text-gray-900">Quiz</h3>
               <p className="mt-4 text-gray-600">
-                Create interactive quizzes with multiple-choice or free-text answers. Get AI-powered insights on participant responses.
+                Create interactive quizzes with free-text answers. Set clear assessment criteria to guide the AI in creating helpful feedback. 
               </p>
             </div>
 
@@ -345,17 +345,17 @@ export default function LandingPage() {
               </div>
               <h3 className="text-xl font-semibold text-gray-900">Conversation</h3>
               <p className="mt-4 text-gray-600">
-                Practice conversations with AI feedback. Perfect for role-playing scenarios and communication skills development.
+                Practice conversations with an AI and get feedback. Perfect for role-playing scenarios and communication skills development.
               </p>
             </div>
 
             <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow">
               <div className="h-12 w-12 rounded-lg bg-purple-100 flex items-center justify-center mb-6">
-                <Database className="h-6 w-6 text-purple-600" />
+                <CameraIcon className="h-6 w-6 text-purple-600" />
               </div>
               <h3 className="text-xl font-semibold text-gray-900">Screenshot</h3>
               <p className="mt-4 text-gray-600">
-                Upload screenshots for analysis and feedback. Great for design reviews, interface critiques, and visual exercises.
+                Upload screenshots for analysis and feedback based on your criteria. Great for reviewing documents or notes from participants.
               </p>
             </div>
           </div>
