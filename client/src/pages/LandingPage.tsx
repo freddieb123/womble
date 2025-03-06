@@ -25,7 +25,7 @@ export default function LandingPage() {
                   <p className="text-sm">
                     <span className="font-italic text-muted-foreground">noun</span>
                     <br />
-                    A fictional animal inhabiting Wimbledon Common in London, characterized as clearing up litter.
+                    A fictional animal inhabiting Wimbledon Common in London, characterised as clearing up litter.
                   </p>
                   <p className="text-sm">
                     <span className="font-italic text-muted-foreground">verb (informal)</span>
@@ -216,7 +216,7 @@ export default function LandingPage() {
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur opacity-20"></div>
                     <div className="bg-white p-4 rounded-lg shadow-md relative">
                       <img 
-                        src="/images/1 screenshot.png" 
+                        src="/images/1.2 screenshot.png" 
                         alt="Create Activity" 
                         className="rounded-md w-full"
                       />
@@ -241,7 +241,7 @@ export default function LandingPage() {
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur opacity-20"></div>
                     <div className="bg-white p-4 rounded-lg shadow-md relative">
                       <img 
-                        src="/images/2 screenshot.png" 
+                        src="/images/screenshot 2.2.png" 
                         alt="Share Quiz" 
                         className="rounded-md w-full"
                       />
@@ -267,7 +267,7 @@ export default function LandingPage() {
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur opacity-20"></div>
                     <div className="bg-white p-4 rounded-lg shadow-md relative">
                       <img 
-                        src="/images/3 screenshot.png" 
+                        src="/images/3.1 screenshot.png" 
                         alt="Conversation Analysis" 
                         className="rounded-md w-full"
                       />
