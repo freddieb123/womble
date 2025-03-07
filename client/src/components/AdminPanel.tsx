@@ -68,7 +68,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
     <div className="space-y-6">
       {/* Segmented control for "Type" */}
       <div className="space-y-1">
-       
+
         <div className="inline-flex items-center justify-start space-x-px rounded-md border overflow-hidden">
           <button
             type="button"
@@ -234,7 +234,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
                 className="resize-none"
                 rows={4}
               />
-             
+
             </div>
           </>
         )}
