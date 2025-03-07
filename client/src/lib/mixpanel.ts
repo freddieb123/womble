@@ -3,7 +3,7 @@ import mixpanel from 'mixpanel-browser';
 // Initialize Mixpanel
 // Replace with your Mixpanel token when ready to use
 // For now, we're using a placeholder
-mixpanel.init('YOUR_MIXPANEL_TOKEN', {
+mixpanel.init('VITE_MIXPANEL_TOKEN', {
   debug: import.meta.env.DEV,
   ignore_dnt: false,
   track_pageview: true,
