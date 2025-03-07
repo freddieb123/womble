@@ -7,6 +7,7 @@ import { Helmet } from "react-helmet";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"; // Added import
+import { track, EventName } from "@/lib/mixpanel";
 
 export default function LandingPage() {
   const { user, logoutMutation } = useAuth();
@@ -90,13 +91,19 @@ export default function LandingPage() {
                 <Button 
                   variant="outline" 
                   className="hidden md:inline-flex" 
-                  onClick={() => window.location.href = "/auth?mode=login"}
+                  onClick={() => {
+                    track(EventName.LANDING_LOGIN_CLICK, { location: 'navbar' });
+                    window.location.href = "/auth?mode=login";
+                  }}
                 >
                   Log In
                 </Button>
                 <Button 
                   className="bg-primary hover:bg-primary/90" 
-                  onClick={() => window.location.href = "/auth?mode=register"}
+                  onClick={() => {
+                    track(EventName.LANDING_GET_STARTED_CLICK, { location: 'navbar' });
+                    window.location.href = "/auth?mode=register";
+                  }}
                 >
                   Get Started
                 </Button>
@@ -131,7 +138,10 @@ export default function LandingPage() {
                   <Button 
                     size="lg" 
                     className="bg-primary hover:bg-primary/90 w-full sm:w-auto"
-                    onClick={() => window.location.href = user ? "/dashboard" : "/auth?mode=register"}
+                    onClick={() => {
+                      track(EventName.LANDING_START_CREATING_CLICK, { location: 'hero' });
+                      window.location.href = user ? "/dashboard" : "/auth?mode=register";
+                    }}
                   >
                     {user ? "Go to Dashboard" : "Start Creating"}
                   </Button>
@@ -147,7 +157,12 @@ export default function LandingPage() {
                       delay: 0.5 
                     }}
                   >
-                    <Button size="lg" variant="outline" className="w-full sm:w-auto">
+                    <Button 
+                      size="lg" 
+                      variant="outline" 
+                      className="w-full sm:w-auto"
+                      onClick={() => track(EventName.LANDING_HOW_IT_WORKS_CLICK, { location: 'hero' })}
+                    >
                       See How It Works
                     </Button>
                   </motion.div>
