@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { Redirect } from "wouter";
+import { Redirect, Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,8 +66,14 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted flex flex-col p-4">
+      <div className="w-full p-4">
+        <Link href="/">
+          <img src="/Womble_new_logo_full.png" alt="Womble Logo" className="h-16 cursor-pointer" />
+        </Link>
+      </div>
+      <div className="flex-1 flex items-center justify-center">
+        <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>{isLogin ? "Login" : "Register"}</CardTitle>
           <CardDescription>
@@ -154,6 +160,7 @@ export default function AuthPage() {
           </Form>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
