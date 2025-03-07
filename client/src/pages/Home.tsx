@@ -828,7 +828,7 @@ export default function Home() {
           <div className="mt-4">
             <textarea
               className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={6}
+              rows={3}
               placeholder="Describe what this template is for and how it should be used... (25 words max)"
               value={savingAsTemplate?.templateDescription || ''}
               onChange={(e) => {
