@@ -828,14 +828,24 @@ export default function Home() {
           <div className="mt-4">
             <textarea
               className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={4}
-              placeholder="Describe what this template is for and how it should be used..."
+              rows={6}
+              placeholder="Describe what this template is for and how it should be used... (50 words max)"
               value={savingAsTemplate?.templateDescription || ''}
-              onChange={(e) => savingAsTemplate && setSavingAsTemplate({
-                ...savingAsTemplate,
-                templateDescription: e.target.value
-              })}
+              onChange={(e) => {
+                const words = e.target.value.trim().split(/\s+/);
+                if (words.length <= 50 || e.target.value.length < (savingAsTemplate?.templateDescription || '').length) {
+                  savingAsTemplate && setSavingAsTemplate({
+                    ...savingAsTemplate,
+                    templateDescription: e.target.value
+                  });
+                }
+              }}
             />
+            <div className="text-xs text-right mt-1 text-muted-foreground">
+              {savingAsTemplate?.templateDescription ? 
+                `${savingAsTemplate.templateDescription.trim().split(/\s+/).length}/50 words` : 
+                "0/50 words"}
+            </div>
           </div>
           <div className="flex justify-end mt-4">
             <Button 

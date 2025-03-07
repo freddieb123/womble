@@ -82,8 +82,8 @@ export default function TemplateGallery({ onSelectTemplate, onStartFromScratch }
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="flex flex-col h-[100px]">
-                  <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                <CardContent className="flex flex-col h-[120px]">
+                  <p className="text-sm text-muted-foreground line-clamp-3 mb-2">
                     {template.templateDescription || template.systemPrompt.slice(0, 150) + "..."}
                   </p>
                   <div className="flex justify-between items-center mt-auto">
