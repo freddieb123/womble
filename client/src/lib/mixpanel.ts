@@ -1,9 +1,8 @@
+
 import mixpanel from 'mixpanel-browser';
 
-// Initialize Mixpanel
-// Replace with your Mixpanel token when ready to use
-// For now, we're using a placeholder
-mixpanel.init('VITE_MIXPANEL_TOKEN', {
+// Initialize Mixpanel with the environment variable
+mixpanel.init(import.meta.env.VITE_MIXPANEL_TOKEN || 'YOUR_MIXPANEL_TOKEN', {
   debug: import.meta.env.DEV,
   ignore_dnt: false,
   track_pageview: true,
