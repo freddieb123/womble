@@ -124,7 +124,6 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
         {/* Quiz section */}
         {config.type === 'quiz' && (
           <div className="space-y-4 border rounded-lg p-4">
-            <h3 className="text-lg font-semibold mb-4">Quiz Questions</h3>
             {Array.isArray(config.questions) &&
               config.questions.map((question, index) => (
                 <div key={index} className="space-y-4 mb-6 pb-6 border-b last:border-b-0">
