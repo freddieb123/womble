@@ -441,8 +441,11 @@ export default function LandingPage() {
               <h3 className="text-xl font-bold text-gray-900">Pro</h3>
               <p className="text-gray-600 mt-2">For AI evangelists</p>
               <div className="mt-6 mb-8">
-                <span className="text-4xl font-bold text-gray-900">£15</span>
+                <span className="text-4xl font-bold text-gray-900">£8</span>
                 <span className="text-gray-600 ml-2">/month</span>
+                <div className="text-sm text-red-500 font-medium mt-1">
+                  <span className="line-through">£15</span> Limited time offer!
+                </div>
               </div>
               <ul className="space-y-3 mb-8">
                 <li className="flex items-start">
