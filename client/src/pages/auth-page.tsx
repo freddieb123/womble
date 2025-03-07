@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SiGoogle } from "react-icons/si";
+import { track, EventName } from "@/lib/mixpanel";
 
 const authSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -48,8 +49,10 @@ export default function AuthPage() {
 
   const onSubmit = (data: AuthForm) => {
     if (isLogin) {
+      track(EventName.USER_LOGIN, { method: 'email' });
       loginMutation.mutate(data);
     } else {
+      track(EventName.USER_REGISTER, { method: 'email' });
       registerMutation.mutate(data);
     }
   };
@@ -128,7 +131,10 @@ export default function AuthPage() {
                   type="button"
                   variant="outline"
                   className="w-full flex items-center gap-2"
-                  onClick={signInWithGoogle}
+                  onClick={() => {
+                    track(EventName.USER_GOOGLE_LOGIN);
+                    signInWithGoogle();
+                  }}
                 >
                   <SiGoogle className="h-4 w-4" />
                   Sign in with Google

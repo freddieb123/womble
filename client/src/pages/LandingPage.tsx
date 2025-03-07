@@ -442,7 +442,10 @@ export default function LandingPage() {
               <Button 
                 variant="outline" 
                 className="w-full"
-                onClick={() => window.location.href = "/auth?mode=register"}
+                onClick={() => {
+                  track(EventName.PRICING_BUTTON_CLICK, { plan: 'free', location: 'pricing_section' });
+                  window.location.href = "/auth?mode=register";
+                }}
               >
                 Sign Up Free
               </Button>
@@ -482,7 +485,10 @@ export default function LandingPage() {
               </ul>
               <Button 
                 className="w-full bg-primary hover:bg-primary/90"
-                onClick={() => window.location.href = "/auth?mode=register"}
+                onClick={() => {
+                  track(EventName.PRICING_BUTTON_CLICK, { plan: 'pro', location: 'pricing_section' });
+                  window.location.href = "/auth?mode=register";
+                }}
               >
                 Get Started
               </Button>
@@ -515,7 +521,10 @@ export default function LandingPage() {
               <Button 
                 variant="outline" 
                 className="w-full"
-                onClick={() => window.location.href = "/auth?mode=register"}
+                onClick={() => {
+                  track(EventName.PRICING_BUTTON_CLICK, { plan: 'enterprise', location: 'pricing_section' });
+                  window.location.href = "/auth?mode=register";
+                }}
               >
                 Contact Sales
               </Button>
@@ -550,7 +559,10 @@ export default function LandingPage() {
               <Button 
                 size="lg" 
                 className="bg-primary hover:bg-primary/90"
-                onClick={() => window.location.href = "/auth?mode=register"}
+                onClick={() => {
+                  track(EventName.LANDING_GET_STARTED_CLICK, { location: 'cta_section' });
+                  window.location.href = "/auth?mode=register";
+                }}
               >
                 Get Started for Free
               </Button>
