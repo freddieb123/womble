@@ -403,7 +403,7 @@ export default function LandingPage() {
               <h3 className="text-xl font-bold text-gray-900">Free</h3>
               <p className="text-gray-600 mt-2">For occasional use</p>
               <div className="mt-6 mb-8">
-                <span className="text-4xl font-bold text-gray-900">$0</span>
+                <span className="text-4xl font-bold text-gray-900">£0</span>
                 <span className="text-gray-600 ml-2">/month</span>
               </div>
               <ul className="space-y-3 mb-8">
