@@ -1,14 +1,38 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Brain, Zap, Award, Users, Server, Database, BarChart, LogOut, CameraIcon } from "lucide-react";
+
+import { Helmet } from "react-helmet";
+
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"; // Added import
 
 export default function LandingPage() {
   const { user, logoutMutation } = useAuth();
+  
+  // Structured data for rich snippets
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Womble",
+    "applicationCategory": "EducationalApplication",
+    "offers": {
+      "@type": "Offer",
+      "price": "49.00",
+      "priceCurrency": "USD"
+    },
+    "description": "Womble provides bespoke formative feedback for education and training through AI-powered activities.",
+    "operatingSystem": "Web"
+  };
+
   return (
     <div className="min-h-screen flex flex-col landing-page-font">
+      <Helmet>
+        <script type="application/ld+json">
+          {JSON.stringify(structuredData)}
+        </script>
+      </Helmet>
       {/* Navigation */}
       <nav className="border-b bg-white py-4 px-4 md:px-8">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -154,9 +178,9 @@ export default function LandingPage() {
       <section id="features" className="py-20 px-4 md:px-8 bg-white">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Powerful Features</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Powerful AI Feedback Features</h2>
             <p className="mt-4 text-xl text-gray-600 max-w-3xl mx-auto">
-              Get great feedback to all your participants, every time.
+              Provide personalized formative feedback to all your participants, every time.
             </p>
           </div>
 
@@ -293,8 +317,9 @@ export default function LandingPage() {
                     <div className="bg-white p-4 rounded-lg shadow-md relative">
                       <img 
                         src="/images/3 screenshot.png" 
-                        alt="Improve Teaching" 
+                        alt="Womble class analysis dashboard showing key feedback themes for educators" 
                         className="rounded-md w-full"
+                        loading="lazy"
                       />
                     </div>
                   </div>
@@ -322,9 +347,9 @@ export default function LandingPage() {
       <section id="activity-types" className="py-20 px-4 md:px-8 bg-white">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Types of Activities</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Interactive Learning Activities</h2>
             <p className="mt-4 text-xl text-gray-600 max-w-3xl mx-auto">
-              Choose from different activity formats to engage your participants
+              Choose from different activity formats to engage your participants with personalized feedback
             </p>
           </div>
 
