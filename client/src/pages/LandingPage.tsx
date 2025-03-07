@@ -601,7 +601,7 @@ export default function LandingPage() {
             <div>
               <h3 className="text-lg font-semibold mb-4">Company</h3>
               <ul className="space-y-2">
-                <li><a href="#" className="text-gray-400 hover:text-white">Contact Us</a></li>
+                <li><a href="mailto:womblefeedback@gmail.com" className="text-gray-400 hover:text-white">Contact Us</a></li>
 
               </ul>
             </div>

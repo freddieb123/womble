@@ -465,7 +465,10 @@ export default function Home() {
         title="Admin Home" 
         showNewButton={true}
         newButtonText="New GPT"
-        onNewButtonClick={() => setIsTemplateGalleryOpen(true)}
+        onNewButtonClick={() => {
+          track(EventName.GPT_CREATE_CLICK, { location: 'admin_navbar' });
+          setIsTemplateGalleryOpen(true);
+        }}
       />
 
       <div className="max-w-7xl mx-auto p-4 md:p-8">
