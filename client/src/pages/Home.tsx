@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Plus, Pencil, Copy, MoreVertical, BarChart2, Trash2, ArrowUpCircle, Flag, Share2, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { track, EventName } from "@/lib/mixpanel";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import AdminPanel from "@/components/AdminPanel";
@@ -126,7 +127,13 @@ export default function Home() {
 
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Track GPT creation event
+      track(EventName.GPT_CONFIRM_CREATION, { 
+        type: config.type, 
+        hasQuestions: config.type === 'quiz' && config.questions?.length > 0
+      });
+      
       queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
       setIsCreateOpen(false);
       setIsPreviewingTemplate(false);
@@ -310,6 +317,10 @@ export default function Home() {
     try {
       const url = `${window.location.origin}/chat?configId=${configId}`;
       await navigator.clipboard.writeText(url);
+      
+      // Track GPT share link event
+      track(EventName.GPT_SHARE_LINK, { configId });
+      
       toast({
         description: "Link copied to clipboard!",
       });
@@ -490,7 +501,10 @@ export default function Home() {
                 </p>
                 <Button 
                   size="lg"
-                  onClick={() => setIsTemplateGalleryOpen(true)}
+                  onClick={() => {
+                    track(EventName.GPT_CREATE_CLICK, { location: 'empty_state' });
+                    setIsTemplateGalleryOpen(true);
+                  }}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
                   <Plus className="h-4 w-4 mr-2" />
