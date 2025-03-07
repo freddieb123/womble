@@ -1089,6 +1089,35 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: error.message });
     }
   });
+  
+  app.post("/api/chat-configs/:id/template/remove", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.id);
+      if (isNaN(configId)) {
+        return res.status(400).json({ error: "Invalid config ID" });
+      }
+      
+      // Update the config to remove template status
+      const updatedConfig = await db.update(chatConfigs)
+        .set({
+          isTemplate: false,
+          templateDescription: null
+        })
+        .where(and(
+          eq(chatConfigs.id, configId),
+          eq(chatConfigs.userId, req.user?.id)
+        ))
+        .returning();
+
+      if (!updatedConfig.length) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+      res.json(updatedConfig[0]);
+    } catch (error: any) {
+      console.error("Error removing config from templates:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   app.get("/api/templates", async (req:Request, res: Response) => {
     try {

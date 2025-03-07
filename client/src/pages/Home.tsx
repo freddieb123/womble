@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Copy, MoreVertical, BarChart2, Trash2, ArrowUpCircle, Flag, Share2 } from "lucide-react";
+import { Plus, Pencil, Copy, MoreVertical, BarChart2, Trash2, ArrowUpCircle, Flag, Share2, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
@@ -243,37 +243,67 @@ export default function Home() {
   });
 
   const saveAsTemplate = useMutation({
-    mutationFn: async (configToTemplate: ChatConfig) => {
-      console.log('Saving template with description:', configToTemplate.templateDescription);
-      const response = await fetch(`/api/chat-configs/${configToTemplate.id}/template`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ templateDescription: configToTemplate.templateDescription })
+    mutationFn: async ({ id, templateDescription }: { id: number; templateDescription: string }) => {
+      const response = await fetch(`/api/chat-configs/${id}/template`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ templateDescription }),
       });
-
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to save as template");
+        throw new Error('Failed to save as template');
       }
-
-      const result = await response.json();
-      console.log('Template save response:', result);
-      return result;
+      return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
+      queryClient.invalidateQueries({
+        queryKey: ['/api/chat-configs'],
+      });
+      toast({
+        title: 'Saved as template',
+        description: 'Your GPT is now available as a public template.',
+      });
       setSavingAsTemplate(null);
-      toast({
-        description: "GPT saved as public template successfully! It will remain in your list and be available in the template gallery.",
-      });
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       toast({
-        variant: "destructive",
-        title: "Error",
+        title: 'Failed to save as template',
         description: error.message,
+        variant: 'destructive',
+      });
+    }
+  });
+
+  const removeFromTemplates = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/chat-configs/${id}/template/remove`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to remove from templates');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['/api/chat-configs'],
+      });
+      toast({
+        title: 'Removed from templates',
+        description: 'Your GPT is no longer available as a public template.',
       });
     },
+    onError: (error) => {
+      toast({
+        title: 'Failed to remove from templates',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
   });
 
   const handleCopyLink = async (configId: number) => {
@@ -426,7 +456,7 @@ export default function Home() {
         newButtonText="New GPT"
         onNewButtonClick={() => setIsTemplateGalleryOpen(true)}
       />
-      
+
       <div className="max-w-7xl mx-auto p-4 md:p-8">
         {/* Search Bar */}
         {configs && configs.length > 4 && (
@@ -440,9 +470,9 @@ export default function Home() {
             />
           </div>
         )}
-        
+
         {/* Toggle removed as requested */}
-        
+
         {/* Main Content */}
         <ScrollArea className="h-[calc(100vh-12rem)]">
           <div className="space-y-4">
@@ -527,6 +557,12 @@ export default function Home() {
                                   <DropdownMenuItem onClick={() => setSavingAsTemplate(config)}>
                                     <Flag className="h-4 w-4 mr-2" />
                                     Save as Public Template
+                                  </DropdownMenuItem>
+                                )}
+                                {config.isTemplate && (
+                                  <DropdownMenuItem onClick={() => removeFromTemplates.mutate(config.id)}>
+                                    <EyeOff className="h-4 w-4 mr-2" />
+                                    Remove from Templates
                                   </DropdownMenuItem>
                                 )}
                                 <DropdownMenuItem
