@@ -53,7 +53,7 @@ export default function AdminNavbar({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <div className="flex items-center gap-2 cursor-pointer">
-                <img src="/Womble_new_logo_full.png" alt="Womble Logo" className="h-14 w-29" />
+                <img src="/Womble_new_logo_full.png" alt="Womble Logo" className="h-20 w-35" />
                 <span className="text-xl font-bold text-primary"></span>
               </div>
             </DropdownMenuTrigger>
