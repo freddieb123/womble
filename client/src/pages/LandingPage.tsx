@@ -19,8 +19,8 @@ export default function LandingPage() {
     "applicationCategory": "EducationalApplication",
     "offers": {
       "@type": "Offer",
-      "price": "49.00",
-      "priceCurrency": "USD"
+      "price": "8.00",
+      "priceCurrency": "GBP"
     },
     "description": "Womble provides bespoke formative feedback for education and training through AI-powered activities.",
     "operatingSystem": "Web"
@@ -441,7 +441,7 @@ export default function LandingPage() {
               <h3 className="text-xl font-bold text-gray-900">Pro</h3>
               <p className="text-gray-600 mt-2">For AI evangelists</p>
               <div className="mt-6 mb-8">
-                <span className="text-4xl font-bold text-gray-900">$29</span>
+                <span className="text-4xl font-bold text-gray-900">£15</span>
                 <span className="text-gray-600 ml-2">/month</span>
               </div>
               <ul className="space-y-3 mb-8">
@@ -475,7 +475,7 @@ export default function LandingPage() {
               <h3 className="text-xl font-bold text-gray-900">Enterprise</h3>
               <p className="text-gray-600 mt-2">For organisations</p>
               <div className="mt-6 mb-8">
-                <span className="text-4xl font-bold text-gray-900">$99</span>
+                <span className="text-4xl font-bold text-gray-900">£99</span>
                 <span className="text-gray-600 ml-2">/month</span>
               </div>
               <ul className="space-y-3 mb-8">
