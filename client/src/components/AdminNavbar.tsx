@@ -76,8 +76,8 @@ export default function AdminNavbar({
             </DropdownMenuContent>
           </DropdownMenu>
           
-          {/* Page Title - Center aligned */}
-          <h1 className="text-2xl font-bold text-primary">{title}</h1>
+          {/* Page Title - Center aligned, hidden on mobile */}
+          <h1 className="text-2xl font-bold text-primary hidden md:block">{title}</h1>
           
           {/* New GPT Button and User Profile - Right aligned */}
           <div className="flex items-center gap-4">
