@@ -214,7 +214,7 @@ export default function QuizInterface({ config, sessionId, userName, isViewOnly,
   const currentQuestion = questions[currentQuestionIndex];
 
   return (
-    <div className="space-y-8 max-w-3xl mx-auto">
+    <div className="space-y-8 max-w-3xl mx-auto h-[800px]">
       {showNameModal && (
         <UserNameModal
           open={showNameModal}

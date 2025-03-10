@@ -373,7 +373,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
   };
 
   return (
-    <div className="flex flex-col h-[600px]">
+    <div className="flex flex-col h-[800px]">
       {config.userInstructions && !isViewOnly && (
         <Collapsible open={instructionsOpen} onOpenChange={setInstructionsOpen} className="mb-4">
           <div className={`border rounded-lg ${instructionsOpen ? 'rounded-b-none border-b-0' : ''}`}>

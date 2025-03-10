@@ -210,7 +210,7 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
   };
 
   return (
-    <div className="flex flex-col h-[600px]">
+    <div className="flex flex-col h-[800px]">
       {showNameModal && (
         <UserNameModal
           open={showNameModal}
