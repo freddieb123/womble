@@ -14,7 +14,7 @@ export const users = pgTable("users", {
 export const chatConfigs = pgTable("chat_configs", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
-  type: text("type", { enum: ['chat', 'upload', 'quiz'] }).default('chat').notNull(),
+  type: text("type", { enum: ['chat', 'upload', 'quiz', 'dual-conversation'] }).default('chat').notNull(),
   title: text("title").notNull(),
   systemPrompt: text("system_prompt").notNull(),
   userInstructions: text("user_instructions"),
@@ -90,6 +90,23 @@ export interface ConversationFeedback {
   summary: string | null;
 }
 
+export interface DualConversationFeedback {
+  participant1: {
+    bullets: string[];
+    score: number;
+    summary: string | null;
+  };
+  participant2: {
+    bullets: string[];
+    score: number;
+    summary: string | null;
+  };
+  overall: {
+    bullets: string[];
+    summary: string | null;
+  };
+}
+
 export interface UploadFeedback {
   bullets: string[];
   score: number;
@@ -135,6 +152,26 @@ export const uploadsRelations = relations(uploads, ({ one }) => ({
 export const quizResponsesRelations = relations(quizResponses, ({ one }) => ({
   config: one(chatConfigs, {
     fields: [quizResponses.configId],
+    references: [chatConfigs.id],
+  }),
+}));
+
+export const dualConversations = pgTable("dual_conversations", {
+  configId: integer("config_id").notNull().references(() => chatConfigs.id),
+  sessionId: text("session_id").notNull(),
+  participant1Name: text("participant1_name"),
+  participant2Name: text("participant2_name"),
+  transcript: jsonb("transcript").$type<{role: 'participant1' | 'participant2', content: string, timestamp: number}[]>().notNull().default([]),
+  audioUrl: text("audio_url"),
+  feedback: jsonb("feedback").$type<DualConversationFeedback>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.configId, table.sessionId] })
+}));
+
+export const dualConversationsRelations = relations(dualConversations, ({ one }) => ({
+  config: one(chatConfigs, {
+    fields: [dualConversations.configId],
     references: [chatConfigs.id],
   }),
 }));

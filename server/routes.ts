@@ -2,8 +2,9 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { chatConfigs, conversations, uploads, quizQuestions, quizResponses, type Message, type ConversationFeedback, type UploadFeedback } from "@db/schema";
+import { chatConfigs, conversations, uploads, quizQuestions, quizResponses, dualConversations, type Message, type ConversationFeedback, type UploadFeedback, type DualConversationFeedback } from "@db/schema";
 import { eq, and, or, desc, count } from "drizzle-orm";
+import { saveAudio, handleSaveAudio, transcribeAudio, generateFeedback } from "./routes/dual-conversation";
 import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
@@ -1116,6 +1117,45 @@ export function registerRoutes(app: Express): Server {
       res.json(updatedConfig[0]);
     } catch (error: any) {
       console.error("Error removing config from templates:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Dual Conversation Routes
+  app.post("/api/dual-conversation/save", saveAudio, handleSaveAudio);
+  
+  app.post("/api/dual-conversation/transcribe", async (req: Request, res: Response) => {
+    return transcribeAudio(req, res);
+  });
+  
+  app.post("/api/dual-conversation/feedback", async (req: Request, res: Response) => {
+    return generateFeedback(req, res);
+  });
+  
+  app.get("/api/dual-conversations/:configId", async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.configId);
+
+      if (isNaN(configId)) {
+        return res.status(400).json({ error: "Invalid config ID" });
+      }
+
+      const conversationData = await db.query.dualConversations.findMany({
+        where: eq(dualConversations.configId, configId),
+        orderBy: [desc(dualConversations.createdAt)]
+      });
+
+      const conversationsWithMetadata = conversationData.map(conv => ({
+        sessionId: conv.sessionId,
+        participant1Name: conv.participant1Name,
+        participant2Name: conv.participant2Name,
+        transcript: conv.transcript,
+        feedback: conv.feedback
+      }));
+
+      res.json(conversationsWithMetadata);
+    } catch (error: any) {
+      console.error("[GET /api/dual-conversations] Error:", error);
       res.status(500).json({ error: error.message });
     }
   });
