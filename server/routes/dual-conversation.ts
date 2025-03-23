@@ -169,9 +169,13 @@ export async function generateFeedback(req: Request, res: Response) {
       where: eq(chatConfigs.id, configId)
     });
 
-    if (!config || !config.feedbackCriteria) {
-      return res.status(400).json({ error: "Feedback criteria not found for this configuration" });
+    if (!config) {
+      return res.status(400).json({ error: "Configuration not found" });
     }
+    
+    // Use default feedback criteria if none is provided
+    const feedbackCriteria = config.feedbackCriteria || 
+      "Evaluate the conversation for clarity, engagement, and effective communication. Consider turn-taking, active listening, and how well each participant expresses their ideas.";
 
     // Format the transcript for analysis
     const transcriptText = transcript
@@ -183,7 +187,7 @@ export async function generateFeedback(req: Request, res: Response) {
     Context: ${config.systemPrompt}
     
     Analyze this conversation between ${participant1Name} and ${participant2Name} based on these criteria:
-    ${config.feedbackCriteria}
+    ${feedbackCriteria}
     
     Please provide separate feedback for each participant, addressing them directly using "you" instead of their name or "the participant".
     

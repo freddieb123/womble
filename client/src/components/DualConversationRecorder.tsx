@@ -92,7 +92,7 @@ export default function DualConversationRecorder({
     setIsProcessing(true);
     
     try {
-      // First, save the audio file
+      // First, save the audio file to temporary storage
       const formData = new FormData();
       formData.append('audio', audioBlob);
       formData.append('configId', configId.toString());
@@ -112,9 +112,20 @@ export default function DualConversationRecorder({
       const saveData = await saveResponse.json();
       const audioUrl = saveData.audioUrl;
       
-      // Then request transcription and basic processing
-      const transcribeResponse = await fetch(`/api/dual-conversation/transcribe?configId=${configId}&sessionId=${sessionId}&audioUrl=${encodeURIComponent(audioUrl)}&participant1Name=${encodeURIComponent(participant1Name)}&participant2Name=${encodeURIComponent(participant2Name)}`, {
-        method: 'POST'
+      // Then request transcription with participant names
+      const transcribeParams = new URLSearchParams({
+        configId: configId.toString(),
+        sessionId,
+        audioUrl,
+        participant1Name,
+        participant2Name
+      });
+      
+      const transcribeResponse = await fetch(`/api/dual-conversation/transcribe?${transcribeParams.toString()}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
       
       if (!transcribeResponse.ok) {
@@ -122,10 +133,13 @@ export default function DualConversationRecorder({
       }
       
       const transcriptData = await transcribeResponse.json();
-      setTranscript(transcriptData.transcript);
+      
+      // Make sure we have a valid transcript array
+      const transcriptArray = transcriptData.transcript || [];
+      setTranscript(transcriptArray);
       
       if (onTranscriptReady) {
-        onTranscriptReady(transcriptData.transcript);
+        onTranscriptReady(transcriptArray);
       }
       
       toast({
