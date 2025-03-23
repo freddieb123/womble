@@ -10,7 +10,7 @@ import multer from 'multer';
 import crypto from 'crypto';
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY || import.meta.env.OPENAI_API_KEY,
   dangerouslyAllowBrowser: false
 });
 
@@ -84,10 +84,55 @@ export async function transcribeAudio(req: Request, res: Response) {
     }
 
     try {
-      // Because we're experiencing connection issues, we'll add a mock transcript
-      // for now until the OpenAI API connection issues are resolved
+      console.log(`Transcribing audio file: ${audioFilePath}`);
       
-      // This is a temporary mock transcript to allow testing without API
+      // Create a readable stream from the file
+      const audioFile = fs.createReadStream(audioFilePath);
+      
+      // Call OpenAI API to transcribe the audio
+      const transcription = await openai.audio.transcriptions.create({
+        file: audioFile,
+        model: "whisper-1",
+        response_format: "verbose_json",
+        timestamp_granularities: ["segment"]
+      });
+      
+      console.log("Transcription successful");
+      
+      // Process the segments to assign speakers
+      const segments = transcription.segments || [];
+      
+      // Simple algorithm to alternate speakers
+      // For a production app, you would want to use a more sophisticated speaker diarization
+      // but this is a simplified approach for the POC
+      let currentSpeaker = "participant1";
+      const transcript = segments.map((segment, index) => {
+        // Toggle speaker for every segment
+        // In a real app, you'd use more sophisticated speaker recognition
+        if (index > 0) {
+          currentSpeaker = currentSpeaker === "participant1" ? "participant2" : "participant1";
+        }
+        
+        return {
+          role: currentSpeaker,
+          content: segment.text.trim(),
+          timestamp: segment.start
+        };
+      });
+      
+      // Return the processed transcript
+      res.json({
+        success: true,
+        transcript,
+        participant1Name,
+        participant2Name
+      });
+      
+    } catch (openaiError: any) {
+      console.error("OpenAI API Error:", openaiError);
+      
+      // If we still have API issues, fall back to the mock data 
+      // but provide information about the error
       const mockTranscript = [
         { 
           role: "participant1", 
@@ -116,14 +161,7 @@ export async function transcribeAudio(req: Request, res: Response) {
         transcript: mockTranscript,
         participant1Name,
         participant2Name,
-        note: "Using mock data due to API connection issues. Please ensure your OpenAI API key is valid."
-      });
-      
-    } catch (openaiError) {
-      console.error("OpenAI API Error:", openaiError);
-      res.status(503).json({ 
-        error: "OpenAI service unavailable", 
-        message: "There was an issue connecting to OpenAI. The system is currently using mock data for demonstration."
+        note: `Using sample data due to API error: ${openaiError.message || 'Unknown error'}. Please check your OpenAI API key and network connection.`
       });
     }
   } catch (error: any) {
@@ -161,11 +199,70 @@ export async function generateFeedback(req: Request, res: Response) {
       // Use default feedback criteria if none is provided
       const feedbackCriteria = config.feedbackCriteria || 
         "Evaluate the conversation for clarity, engagement, and effective communication. Consider turn-taking, active listening, and how well each participant expresses their ideas.";
-
-      // Because we're experiencing connection issues, we'll use sample feedback
-      // for now until the OpenAI API connection issues are resolved
       
-      // This is a temporary mock feedback response
+      console.log("Generating feedback using OpenAI API");
+      
+      // Format the conversation for GPT analysis
+      const conversationText = transcript.map((entry: { role: string; content: string }) => {
+        const speaker = entry.role === 'participant1' ? participant1Name : participant2Name;
+        return `${speaker}: ${entry.content}`;
+      }).join('\n');
+      
+      // Prepare the system prompt with instructions
+      const systemPrompt = `
+You are an expert in analyzing conversations between two people. You'll be evaluating a conversation between ${participant1Name} and ${participant2Name}.
+
+${feedbackCriteria}
+
+After analyzing the conversation, provide constructive feedback in this exact JSON structure:
+{
+  "participant1": {
+    "bullets": [array of 3-5 specific feedback points for ${participant1Name}],
+    "score": [numerical score from 1-10],
+    "summary": [1-2 sentence overall feedback]
+  },
+  "participant2": {
+    "bullets": [array of 3-5 specific feedback points for ${participant2Name}],
+    "score": [numerical score from 1-10],
+    "summary": [1-2 sentence overall feedback]
+  },
+  "overall": {
+    "bullets": [array of 3-5 points about the conversation as a whole],
+    "summary": [1-2 sentence summary of the overall interaction]
+  }
+}
+
+Make sure your feedback is specific, actionable, and balanced between strengths and areas for improvement.
+`;
+
+      // Call OpenAI API
+      const completion = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo-16k",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: conversationText }
+        ],
+        temperature: 0.7,
+        response_format: { type: "json_object" }
+      });
+      
+      const responseContent = completion.choices[0].message.content;
+      console.log("OpenAI API response received successfully");
+      
+      if (!responseContent) {
+        throw new Error("Empty response from OpenAI API");
+      }
+      
+      // Parse the JSON response
+      const feedbackData = JSON.parse(responseContent);
+      
+      // No database storage needed - just return the feedback
+      res.json(feedbackData);
+      
+    } catch (openaiError: any) {
+      console.error("OpenAI API Error:", openaiError);
+      
+      // If we still have API issues, fall back to the mock data
       const mockFeedback = {
         "participant1": {
           "bullets": [
@@ -195,17 +292,9 @@ export async function generateFeedback(req: Request, res: Response) {
         }
       };
       
-      // No database storage needed - just return the mock feedback for now
       res.json({
         ...mockFeedback,
-        note: "Using sample feedback due to API connection issues. Please ensure your OpenAI API key is valid."
-      });
-      
-    } catch (openaiError) {
-      console.error("OpenAI API Error:", openaiError);
-      res.status(503).json({ 
-        error: "OpenAI service unavailable", 
-        message: "There was an issue connecting to OpenAI. The system is currently using sample data for demonstration."
+        note: `Using sample feedback due to API error: ${openaiError.message || 'Unknown error'}. Please check your OpenAI API key and network connection.`
       });
     }
   } catch (error: any) {
