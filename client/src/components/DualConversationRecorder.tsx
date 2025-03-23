@@ -109,8 +109,11 @@ export default function DualConversationRecorder({
         throw new Error('Failed to save audio');
       }
       
+      const saveData = await saveResponse.json();
+      const audioUrl = saveData.audioUrl;
+      
       // Then request transcription and basic processing
-      const transcribeResponse = await fetch(`/api/dual-conversation/transcribe?configId=${configId}&sessionId=${sessionId}`, {
+      const transcribeResponse = await fetch(`/api/dual-conversation/transcribe?configId=${configId}&sessionId=${sessionId}&audioUrl=${encodeURIComponent(audioUrl)}&participant1Name=${encodeURIComponent(participant1Name)}&participant2Name=${encodeURIComponent(participant2Name)}`, {
         method: 'POST'
       });
       

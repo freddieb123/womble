@@ -1140,20 +1140,8 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Invalid config ID" });
       }
 
-      const conversationData = await db.query.dualConversations.findMany({
-        where: eq(dualConversations.configId, configId),
-        orderBy: [desc(dualConversations.createdAt)]
-      });
-
-      const conversationsWithMetadata = conversationData.map(conv => ({
-        sessionId: conv.sessionId,
-        participant1Name: conv.participant1Name,
-        participant2Name: conv.participant2Name,
-        transcript: conv.transcript,
-        feedback: conv.feedback
-      }));
-
-      res.json(conversationsWithMetadata);
+      // Since we're not using a database for dual_conversations, return empty array
+      res.json([]);
     } catch (error: any) {
       console.error("[GET /api/dual-conversations] Error:", error);
       res.status(500).json({ error: error.message });
