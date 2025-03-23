@@ -526,15 +526,23 @@ export default function Home() {
                         <div className="flex items-center gap-2">
                           <CardTitle>{config.title}</CardTitle>
                           <Badge
-                            variant={config.type === 'chat' ? 'default' : config.type === 'upload' ? 'secondary' : 'outline'}
+                            variant={
+                              config.type === 'chat' ? 'default' : 
+                              config.type === 'upload' ? 'secondary' : 
+                              config.type === 'dual-conversation' ? 'destructive' : 
+                              'outline'
+                            }
                             className={
                               config.type === 'chat' ? 'bg-green-100 text-green-800' :
-                                config.type === 'upload' ? 'bg-purple-100 text-purple-800' :
-                                  'bg-blue-100 text-blue-800'
+                              config.type === 'upload' ? 'bg-purple-100 text-purple-800' :
+                              config.type === 'dual-conversation' ? 'bg-orange-100 text-orange-800' :
+                              'bg-blue-100 text-blue-800'
                             }
                           >
                             {config.type === 'chat' ? 'conversation' :
-                              config.type === 'upload' ? 'upload' : 'quiz'}
+                             config.type === 'upload' ? 'upload' : 
+                             config.type === 'dual-conversation' ? 'dual conversation' : 
+                             'quiz'}
                           </Badge>
                           {config.isTemplate && (
                             <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 flex items-center gap-1">

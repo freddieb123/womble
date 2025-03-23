@@ -22,7 +22,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
     }
   }, [config.type]);
 
-  const handleTypeChange = (newType: 'chat' | 'upload' | 'quiz') => {
+  const handleTypeChange = (newType: 'chat' | 'upload' | 'quiz' | 'dual-conversation') => {
     onConfigChange({
       ...config,
       type: newType,
@@ -99,6 +99,16 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
             onClick={() => handleTypeChange('quiz')}
           >
             Quiz
+          </button>
+          <button
+            type="button"
+            disabled={isEditMode}
+            className={`px-4 py-2 text-sm font-medium focus:outline-none
+              ${config.type === 'dual-conversation' ? "bg-green-200 text-green-900" : "bg-white text-gray-700"}
+            `}
+            onClick={() => handleTypeChange('dual-conversation')}
+          >
+            Dual Conversation
           </button>
         </div>
       </div>
@@ -203,7 +213,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               <Label htmlFor="user-instructions">User Instructions</Label>
               <Textarea
                 id="user-instructions"
-                value={config.userInstructions}
+                value={config.userInstructions || ''}
                 onChange={(e) =>
                   onConfigChange({
                     ...config,
@@ -223,7 +233,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               <Label htmlFor="feedback-criteria">Feedback Criteria</Label>
               <Textarea
                 id="feedback-criteria"
-                value={config.feedbackCriteria}
+                value={config.feedbackCriteria || ''}
                 onChange={(e) =>
                   onConfigChange({
                     ...config,
