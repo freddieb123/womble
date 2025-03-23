@@ -27,7 +27,7 @@ export interface QuizQuestion {
 export interface BaseConfig {
   id?: number;
   title: string;
-  type: 'chat' | 'upload' | 'quiz';
+  type: 'chat' | 'upload' | 'quiz' | 'dual-conversation';
   systemPrompt: string;
   userInstructions: string | null;
   feedbackCriteria: string | null;
@@ -46,10 +46,11 @@ export interface AdminConfig extends BaseConfig {
 }
 
 // Template specific configuration
-export interface Template extends AdminConfig {
+export interface Template extends Omit<AdminConfig, 'templateDescription'> {
   usageCount?: number;
   id: number;
   isTemplate: boolean;
+  templateDescription?: string | null;
 }
 
 // Badge variant types
@@ -74,24 +75,4 @@ export interface QuizFeedback {
   status: 'correct' | 'almost' | 'incorrect';
   feedback: string;
 }
-// Add or update the Template interface
-export interface Template {
-  id: number;
-  title: string;
-  type: 'chat' | 'upload' | 'quiz';
-  systemPrompt: string;
-  userInstructions?: string | null;
-  feedbackCriteria?: string | null;
-  createdAt: string;
-  isTemplate: boolean;
-  templateDescription?: string | null;
-  conversationCount?: number;
-  questions?: Array<{
-    question: string;
-    expectedAnswer: string;
-  }>;
-  creator?: {
-    firstName?: string | null;
-    lastName?: string | null;
-  } | null;
-}
+// NOTE: Template interface is already defined above
