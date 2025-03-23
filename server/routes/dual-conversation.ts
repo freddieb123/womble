@@ -131,8 +131,13 @@ export async function transcribeAudio(req: Request, res: Response) {
     } catch (openaiError: any) {
       console.error("OpenAI API Error:", openaiError);
       
-      // If we still have API issues, fall back to the mock data 
-      // but provide information about the error
+      // Check for quota exceeded error
+      const isQuotaError = openaiError.message && openaiError.message.includes("quota");
+      const errorMessage = isQuotaError 
+        ? "OpenAI API quota exceeded. Please check your billing details on your OpenAI account."
+        : openaiError.message || 'Unknown error';
+      
+      // If we have API issues, fall back to the mock data but provide specific information about the error
       const mockTranscript = [
         { 
           role: "participant1", 
@@ -161,7 +166,7 @@ export async function transcribeAudio(req: Request, res: Response) {
         transcript: mockTranscript,
         participant1Name,
         participant2Name,
-        note: `Using sample data due to API error: ${openaiError.message || 'Unknown error'}. Please check your OpenAI API key and network connection.`
+        note: `Using sample data due to API error: ${errorMessage}. ${isQuotaError ? 'Your API key is valid but has reached its usage limit.' : 'Please check your OpenAI API key configuration.'}`
       });
     }
   } catch (error: any) {
@@ -262,6 +267,12 @@ Make sure your feedback is specific, actionable, and balanced between strengths 
     } catch (openaiError: any) {
       console.error("OpenAI API Error:", openaiError);
       
+      // Check for quota exceeded error
+      const isQuotaError = openaiError.message && openaiError.message.includes("quota");
+      const errorMessage = isQuotaError 
+        ? "OpenAI API quota exceeded. Please check your billing details on your OpenAI account."
+        : openaiError.message || 'Unknown error';
+      
       // If we still have API issues, fall back to the mock data
       const mockFeedback = {
         "participant1": {
@@ -294,7 +305,7 @@ Make sure your feedback is specific, actionable, and balanced between strengths 
       
       res.json({
         ...mockFeedback,
-        note: `Using sample feedback due to API error: ${openaiError.message || 'Unknown error'}. Please check your OpenAI API key and network connection.`
+        note: `Using sample feedback due to API error: ${errorMessage}. ${isQuotaError ? 'Your API key is valid but has reached its usage limit.' : 'Please check your OpenAI API key configuration.'}`
       });
     }
   } catch (error: any) {
