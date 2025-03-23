@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'wouter';
 import { ChevronLeft, Users, MessageSquare, FileAudio, BarChart } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { ScrollArea } from '../components/ui/scroll-area';
-import { useToast } from '../components/ui/use-toast';
-import DualConversationRecorder from '../components/DualConversationRecorder';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useToast } from '@/hooks/use-toast';
+import DualConversationRecorder from '@/components/DualConversationRecorder';
 import { v4 as uuidv4 } from 'uuid';
 
 interface DualConversationPageProps {}
@@ -116,9 +116,9 @@ export default function DualConversationPage({}: DualConversationPageProps) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
         <p className="text-red-500 mb-4">{error}</p>
-        <Link to="/dashboard">
-          <Button variant="outline">Return to Dashboard</Button>
-        </Link>
+        <Button variant="outline" onClick={() => window.location.href = "/dashboard"}>
+          Return to Dashboard
+        </Button>
       </div>
     );
   }
@@ -126,12 +126,14 @@ export default function DualConversationPage({}: DualConversationPageProps) {
   return (
     <div className="container mx-auto py-6">
       <div className="flex items-center mb-6">
-        <Link to="/dashboard">
-          <Button variant="ghost" className="mr-2">
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-        </Link>
+        <Button 
+          variant="ghost" 
+          className="mr-2" 
+          onClick={() => window.location.href = "/dashboard"}
+        >
+          <ChevronLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
         <h1 className="text-2xl font-bold">{config?.title || 'Conversation Analysis'}</h1>
       </div>
       

@@ -3,6 +3,7 @@ import Home from "./pages/Home";
 import UserView from "./pages/UserView";
 import ConversationAnalysis from "./pages/ConversationAnalysis";
 import StaticConversationView from "./pages/StaticConversationView";
+import DualConversationPage from "./pages/DualConversationPage";
 import AuthPage from "./pages/auth-page";
 import ResetPasswordPage from "./pages/reset-password-page";
 import LandingPage from "./pages/LandingPage";
@@ -20,6 +21,7 @@ function App() {
         <Route path="/reset-password" component={ResetPasswordPage} />
         <ProtectedRoute path="/dashboard" component={Home} />
         <Route path="/chat" component={UserView} />
+        <Route path="/dual-conversation/:id" component={DualConversationPage} />
         <ProtectedRoute path="/analysis" component={ConversationAnalysis} />
         <Route path="/conversation" component={StaticConversationView} />
         <Route component={NotFound} />

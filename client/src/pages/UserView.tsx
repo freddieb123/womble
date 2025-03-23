@@ -100,6 +100,23 @@ export default function UserView() {
 
   console.log('Transformed config:', config);
 
+  // Redirect to the dual conversation page if the type is 'dual-conversation'
+  if (config.type === 'dual-conversation') {
+    // Redirect to DualConversationPage
+    window.location.href = `/dual-conversation/${configId}?sessionId=${sessionId}${userName ? `&userName=${encodeURIComponent(userName)}` : ''}`;
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
+        <div className="max-w-4xl mx-auto">
+          <Card className="p-6">
+            <div className="flex items-center justify-center h-[600px]">
+              <div className="animate-pulse text-blue-900">Redirecting to conversation recording interface...</div>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
