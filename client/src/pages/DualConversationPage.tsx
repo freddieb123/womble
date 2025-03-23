@@ -98,17 +98,25 @@ export default function DualConversationPage({}: DualConversationPageProps) {
       const feedbackData = await response.json();
       setFeedback(feedbackData);
       
+      // Check if we received a note indicating mock data
+      if (feedbackData.note) {
+        toast({
+          title: "Sample Data Notice",
+          description: feedbackData.note
+        });
+      } else {
+        toast({
+          title: "Feedback Generated",
+          description: "Conversation feedback is now available.",
+        });
+      }
+      
       // Refresh conversations list
       const conversationsResponse = await fetch(`/api/dual-conversations/${parsedConfigId}`);
       if (conversationsResponse.ok) {
         const conversationsData = await conversationsResponse.json();
         setConversations(conversationsData);
       }
-      
-      toast({
-        title: "Feedback generated",
-        description: "Conversation feedback is now available.",
-      });
     } catch (error) {
       console.error("Error generating feedback:", error);
       toast({

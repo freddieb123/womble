@@ -138,6 +138,14 @@ export default function DualConversationRecorder({
       const transcriptArray = transcriptData.transcript || [];
       setTranscript(transcriptArray);
       
+      // Check if we received a note indicating mock data
+      if (transcriptData.note) {
+        toast({
+          title: "Sample Data Notice",
+          description: transcriptData.note
+        });
+      }
+      
       if (onTranscriptReady) {
         onTranscriptReady(transcriptArray);
       }
