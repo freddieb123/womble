@@ -47,31 +47,16 @@ export async function handleSaveAudio(req: Request, res: Response) {
 
     const audioUrl = `/uploads/${req.file.filename}`;
 
-    await db
-      .insert(dualConversations)
-      .values({
-        configId: parseInt(configId),
-        sessionId,
-        participant1Name: participant1Name || null,
-        participant2Name: participant2Name || null,
-        audioUrl,
-        transcript: [],
-      })
-      .onConflictDoUpdate({
-        target: [dualConversations.configId, dualConversations.sessionId],
-        set: {
-          participant1Name: participant1Name || null,
-          participant2Name: participant2Name || null,
-          audioUrl,
-        }
-      });
-
+    // Skip database saving since the table doesn't exist
+    // Just return the audio URL for processing
     res.json({
       success: true,
-      audioUrl
+      audioUrl,
+      participant1Name,
+      participant2Name
     });
   } catch (error: any) {
-    console.error("Error saving audio:", error);
+    console.error("Error handling audio:", error);
     res.status(500).json({ error: error.message });
   }
 }
@@ -80,24 +65,19 @@ export async function transcribeAudio(req: Request, res: Response) {
   try {
     const configId = parseInt(req.query.configId as string);
     const sessionId = req.query.sessionId as string;
+    const participant1Name = req.query.participant1Name as string || 'Person 1';
+    const participant2Name = req.query.participant2Name as string || 'Person 2';
+    const audioUrl = req.body.audioUrl || req.query.audioUrl;
 
     if (isNaN(configId) || !sessionId) {
       return res.status(400).json({ error: "Valid config ID and session ID are required" });
     }
 
-    // Get the conversation record with the audio file path
-    const conversation = await db.query.dualConversations.findFirst({
-      where: and(
-        eq(dualConversations.configId, configId),
-        eq(dualConversations.sessionId, sessionId)
-      )
-    });
-
-    if (!conversation || !conversation.audioUrl) {
-      return res.status(404).json({ error: "Audio file not found" });
+    if (!audioUrl) {
+      return res.status(400).json({ error: "Audio URL is required" });
     }
 
-    const audioFilePath = path.join(process.cwd(), conversation.audioUrl.replace(/^\//, ''));
+    const audioFilePath = path.join(process.cwd(), audioUrl.replace(/^\//, ''));
     
     if (!fs.existsSync(audioFilePath)) {
       return res.status(404).json({ error: "Audio file not found on disk" });
@@ -113,7 +93,7 @@ export async function transcribeAudio(req: Request, res: Response) {
 
     // Use a separate API call to identify speakers and segment the conversation
     const speakerDetectionPrompt = `
-    This is a transcription of a conversation between two people: ${conversation.participant1Name || 'Person 1'} and ${conversation.participant2Name || 'Person 2'}.
+    This is a transcription of a conversation between two people: ${participant1Name} and ${participant2Name}.
     Please analyze this text and separate it into individual turns, identifying which person is speaking for each part.
     Format your response as a JSON array where each object has:
     1. "role": either "participant1" or "participant2"
@@ -139,7 +119,7 @@ export async function transcribeAudio(req: Request, res: Response) {
       response_format: { type: "json_object" },
     });
 
-    // Parse the response and save the transcript
+    // Parse the response
     const responseContent = completion.choices[0]?.message?.content;
     if (!responseContent) {
       throw new Error("Failed to get response from OpenAI");
@@ -149,20 +129,12 @@ export async function transcribeAudio(req: Request, res: Response) {
       const parsedTranscript = JSON.parse(responseContent);
       const transcript = parsedTranscript.transcript || [];
       
-      // Save the transcript to the database
-      await db
-        .update(dualConversations)
-        .set({
-          transcript
-        })
-        .where(and(
-          eq(dualConversations.configId, configId),
-          eq(dualConversations.sessionId, sessionId)
-        ));
-      
+      // No database storage - just return the transcript
       res.json({
         success: true,
-        transcript
+        transcript,
+        participant1Name,
+        participant2Name
       });
     } catch (parseError) {
       console.error("Error parsing transcript:", parseError);
@@ -178,21 +150,16 @@ export async function generateFeedback(req: Request, res: Response) {
   try {
     const configId = parseInt(req.query.configId as string);
     const sessionId = req.query.sessionId as string;
+    const transcript = req.body.transcript || [];
+    const participant1Name = req.body.participant1Name || req.query.participant1Name as string || 'Person 1';
+    const participant2Name = req.body.participant2Name || req.query.participant2Name as string || 'Person 2';
 
     if (isNaN(configId) || !sessionId) {
       return res.status(400).json({ error: "Valid config ID and session ID are required" });
     }
 
-    // Get the conversation with transcript
-    const conversation = await db.query.dualConversations.findFirst({
-      where: and(
-        eq(dualConversations.configId, configId),
-        eq(dualConversations.sessionId, sessionId)
-      )
-    });
-
-    if (!conversation || !conversation.transcript || conversation.transcript.length === 0) {
-      return res.status(404).json({ error: "Conversation transcript not found" });
+    if (!transcript || transcript.length === 0) {
+      return res.status(400).json({ error: "Transcript is required" });
     }
 
     // Get the config with feedback criteria
@@ -205,15 +172,15 @@ export async function generateFeedback(req: Request, res: Response) {
     }
 
     // Format the transcript for analysis
-    const transcriptText = conversation.transcript
-      .map(entry => `${entry.role === 'participant1' ? conversation.participant1Name : conversation.participant2Name}: ${entry.content}`)
+    const transcriptText = transcript
+      .map((entry: any) => `${entry.role === 'participant1' ? participant1Name : participant2Name}: ${entry.content}`)
       .join('\n');
 
     // Create the feedback prompt
     const prompt = `
     Context: ${config.systemPrompt}
     
-    Analyze this conversation between ${conversation.participant1Name} and ${conversation.participant2Name} based on these criteria:
+    Analyze this conversation between ${participant1Name} and ${participant2Name} based on these criteria:
     ${config.feedbackCriteria}
     
     Please provide separate feedback for each participant, addressing them directly using "you" instead of their name or "the participant".
@@ -264,17 +231,7 @@ export async function generateFeedback(req: Request, res: Response) {
     try {
       const feedbackData = JSON.parse(responseContent);
       
-      // Save the feedback to the database
-      await db
-        .update(dualConversations)
-        .set({
-          feedback: feedbackData
-        })
-        .where(and(
-          eq(dualConversations.configId, configId),
-          eq(dualConversations.sessionId, sessionId)
-        ));
-      
+      // No database storage needed - just return the feedback
       res.json(feedbackData);
     } catch (parseError) {
       console.error("Error parsing feedback:", parseError);
