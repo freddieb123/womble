@@ -37,6 +37,13 @@ export default function TemplateGallery({ onSelectTemplate, onStartFromScratch }
     (template.templateDescription || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const typeDisplayName = {
+    chat: 'Conversation',
+    upload: 'Upload',
+    quiz: 'Quiz',
+    'dual-conversation': '2 Person Conversation'
+  };
+
   return (
     <div className="space-y-6">
       <div className="mb-8">
@@ -76,8 +83,8 @@ export default function TemplateGallery({ onSelectTemplate, onStartFromScratch }
                       <CardTitle>{template.title}</CardTitle>
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                      <Badge variant={template.type === 'chat' ? 'default' : template.type === 'upload' ? 'secondary' : 'outline'}>
-                        {template.type}
+                      <Badge variant={typeDisplayName[template.type] ? template.type : 'outline'}> {/* Updated to use typeDisplayName */}
+                        {typeDisplayName[template.type] || template.type} {/* Updated to use typeDisplayName */}
                       </Badge>
                     </div>
                   </div>
