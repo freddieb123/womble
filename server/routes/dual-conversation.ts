@@ -126,8 +126,10 @@ export async function transcribeAudio(req: Request, res: Response) {
     }
     
     try {
-      const parsedTranscript = JSON.parse(responseContent);
-      const transcript = parsedTranscript.transcript || [];
+      const parsedResponse = JSON.parse(responseContent);
+      // The AI might return an array directly or it might put it under a transcript key
+      const transcript = Array.isArray(parsedResponse) ? parsedResponse : 
+                        (parsedResponse.transcript || []);
       
       // No database storage - just return the transcript
       res.json({

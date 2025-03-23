@@ -74,8 +74,21 @@ export default function DualConversationPage({}: DualConversationPageProps) {
     setIsGeneratingFeedback(true);
     
     try {
+      // Get the participant names from the transcript UI
+      const participant1Name = config?.participant1Name || 'Participant 1';
+      const participant2Name = config?.participant2Name || 'Participant 2';
+      
+      // Send the entire transcript to the backend
       const response = await fetch(`/api/dual-conversation/feedback?configId=${parsedConfigId}&sessionId=${sessionId}`, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          transcript,
+          participant1Name,
+          participant2Name
+        })
       });
       
       if (!response.ok) {
