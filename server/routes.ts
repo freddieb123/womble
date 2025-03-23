@@ -28,7 +28,7 @@ const quizQuestionSchema = z.object({
 
 const chatConfigSchema = z.object({
   title: z.string().min(1, "Title is required"),
-  type: z.enum(['chat', 'upload', 'quiz']).default('chat'),
+  type: z.enum(['chat', 'upload', 'quiz', 'dual-conversation']).default('chat'),
   systemPrompt: z.string().min(1, "System prompt is required"),
   userInstructions: z.string().nullable(),
   feedbackCriteria: z.string().nullable(),
