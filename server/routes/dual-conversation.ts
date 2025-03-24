@@ -8,6 +8,11 @@ import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
 import crypto from 'crypto';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegStatic from 'ffmpeg-static';
+
+// Configure ffmpeg with the static binary path
+ffmpeg.setFfmpegPath(ffmpegStatic as string);
 
 // Custom multer error handler
 export const multerErrorHandler = (error: any, req: Request, res: Response, next: Function) => {
@@ -127,6 +132,39 @@ export async function handleSaveAudio(req: Request, res: Response) {
 // Helper function for exponential backoff
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Helper function to convert audio file to MP3 format
+async function convertAudioToMp3(inputPath: string): Promise<string> {
+  const outputPath = inputPath.replace(/\.[^/.]+$/, "") + ".mp3";
+  
+  return new Promise((resolve, reject) => {
+    console.log(`Converting audio file from ${inputPath} to ${outputPath}`);
+    
+    ffmpeg(inputPath)
+      .output(outputPath)
+      .audioCodec('libmp3lame')
+      .audioQuality(3) // Medium quality, 0-9 (0 is best)
+      .audioChannels(1) // Mono for better speech recognition
+      .noVideo()
+      .on('start', (commandLine) => {
+        console.log('FFmpeg conversion started:', commandLine);
+      })
+      .on('progress', (progress) => {
+        if (progress.percent) {
+          console.log(`Conversion progress: ${Math.round(progress.percent)}%`);
+        }
+      })
+      .on('error', (err) => {
+        console.error('Error converting audio:', err);
+        reject(err);
+      })
+      .on('end', () => {
+        console.log('Audio conversion completed successfully');
+        resolve(outputPath);
+      })
+      .run();
+  });
+};
+
 // Function to attempt API call with retries
 async function retryOpenAICall<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
   let lastError: any;
@@ -230,10 +268,30 @@ export async function transcribeAudio(req: Request, res: Response) {
         // Continue anyway - the error handling below will catch any issues
       }
       
+      // Try to convert the audio file to a more compatible format (MP3)
+      let fileToTranscribe = audioFilePath;
+      try {
+        console.log("Attempting to convert audio to MP3 format...");
+        fileToTranscribe = await convertAudioToMp3(audioFilePath);
+        console.log(`Using converted file for transcription: ${fileToTranscribe}`);
+        
+        // Check converted file size
+        const convertedStats = fs.statSync(fileToTranscribe);
+        console.log(`Converted file size: ${convertedStats.size} bytes (${(convertedStats.size / 1024 / 1024).toFixed(2)} MB)`);
+        
+        if (convertedStats.size === 0) {
+          throw new Error("Converted audio file is empty (0 bytes)");
+        }
+      } catch (conversionError) {
+        console.error("Error converting audio:", conversionError);
+        console.log("Proceeding with original file format...");
+        // Continue with the original file if conversion fails
+      }
+      
       // Use our retry function for API call
       const transcription = await retryOpenAICall(async () => {
         // Create a readable stream from the file for each attempt
-        const audioFile = fs.createReadStream(audioFilePath);
+        const audioFile = fs.createReadStream(fileToTranscribe);
         
         // Call OpenAI API to transcribe the audio
         return await openai.audio.transcriptions.create({

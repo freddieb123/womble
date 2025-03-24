@@ -1,0 +1,48 @@
+Transcribing audio file: /home/runner/workspace/uploads/1742848138255-84c08796497c
+Audio file size: 41287 bytes (0.04 MB)
+File header bytes: 1a45dfa39f4286810142f7810142f281
+API call attempt 1/3
+Error not eligible for retry: 400 Unrecognized file format. Supported formats: ['flac', 'm4a', 'mp3', 'mp4', 'mpeg', 'mpga', 'oga', 'ogg', 'wav', 'webm']
+OpenAI API Error: BadRequestError: 400 Unrecognized file format. Supported formats: ['flac', 'm4a', 'mp3', 'mp4', 'mpeg', 'mpga', 'oga', 'ogg', 'wav', 'webm']
+    at Function.generate (/home/runner/workspace/node_modules/openai/src/error.ts:72:14)
+    at OpenAI.makeStatusError (/home/runner/workspace/node_modules/openai/src/core.ts:443:21)
+    at OpenAI.makeRequest (/home/runner/workspace/node_modules/openai/src/core.ts:507:24)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async <anonymous> (/home/runner/workspace/server/routes/dual-conversation.ts:239:16)
+    at async retryOpenAICall (/home/runner/workspace/server/routes/dual-conversation.ts:137:14)
+    at async transcribeAudio (/home/runner/workspace/server/routes/dual-conversation.ts:234:29) {
+  status: 400,
+  headers: {
+    'access-control-expose-headers': 'X-Request-ID',
+    'alt-svc': 'h3=":443"; ma=86400',
+    'cf-cache-status': 'DYNAMIC',
+    'cf-ray': '9258eb029defb0a4-ATL',
+    connection: 'keep-alive',
+    'content-length': '231',
+    'content-type': 'application/json',
+    date: 'Mon, 24 Mar 2025 20:28:59 GMT',
+    'openai-organization': 'user-vrz1vahy7b93mdz0lccuen9m',
+    'openai-processing-ms': '176',
+    'openai-version': '2020-10-01',
+    server: 'cloudflare',
+    'set-cookie': '__cf_bm=X01sJkSnpdch..pn9mBV8fc.M8ZcY3nmwP.E4gWXSj0-1742848139-1.0.1.1-p9jyzm3VoBrHPJgSJNzYmazCf78hIFAYDhynFWrxecal3aMkzEGmE2hrcvyxfBlR..gpgwfrKMcPMavSIGpSq0OrT.Xvps2S.t13eQ2T2mk; path=/; expires=Mon, 24-Mar-25 20:58:59 GMT; domain=.api.openai.com; HttpOnly; Secure; SameSite=None, _cfuvid=VcR8qbINhxWKXOwlnq8jRhJPBUItOxktNl31YFbknZ0-1742848139243-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None',
+    'strict-transport-security': 'max-age=31536000; includeSubDomains; preload',
+    via: 'envoy-router-64988d66cf-h9kdf',
+    'x-content-type-options': 'nosniff',
+    'x-envoy-upstream-service-time': '92',
+    'x-ratelimit-limit-requests': '2500',
+    'x-ratelimit-remaining-requests': '2499',
+    'x-ratelimit-reset-requests': '24ms',
+    'x-request-id': 'req_120d25dcf1d913861c9275ae20bdc5bb'
+  },
+  request_id: 'req_120d25dcf1d913861c9275ae20bdc5bb',
+  error: {
+    message: "Unrecognized file format. Supported formats: ['flac', 'm4a', 'mp3', 'mp4', 'mpeg', 'mpga', 'oga', 'ogg', 'wav', 'webm']",
+    type: 'invalid_request_error',
+    param: null,
+    code: null
+  },
+  code: null,
+  param: null,
+  type: 'invalid_request_error'
+}
