@@ -1,0 +1,58 @@
+> rest-express@1.0.0 dev
+> tsx server/index.ts
+
+Initializing Firebase Admin with project ID: gpt-custom-ec5a2
+Private key validation passed, initializing Firebase Admin...
+Firebase Admin initialized successfully
+Starting server in development mode
+1
+1
+Upload attempted with file: blob size: undefined type: audio/webm
+Audio file accepted
+handleSaveAudio called with request: {
+  body: [Object: null prototype] {
+    configId: '73',
+    sessionId: 'bbbf6864-734e-4558-9220-7b657c3b6888',
+    participant1Name: 'fdg',
+    participant2Name: 'sdf'
+  },
+  file: {
+    originalname: 'blob',
+    mimetype: 'audio/webm',
+    size: 76177,
+    filename: '1742846669226-33d1c49212a6'
+  }
+}
+Received parameters: {
+  configId: '73',
+  sessionId: 'bbbf6864-734e-4558-9220-7b657c3b6888',
+  participant1Name: 'fdg',
+  participant2Name: 'sdf'
+}
+Audio saved successfully at: /uploads/1742846669226-33d1c49212a6
+Transcribing audio file: /home/runner/workspace/uploads/1742846669226-33d1c49212a6
+OpenAI API Error: APIConnectionError: Connection error.
+    at OpenAI.makeRequest (/home/runner/workspace/node_modules/openai/src/core.ts:488:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async transcribeAudio (/home/runner/workspace/server/routes/dual-conversation.ts:156:29) {
+  status: undefined,
+  headers: undefined,
+  request_id: undefined,
+  error: undefined,
+  code: undefined,
+  param: undefined,
+  type: undefined,
+  cause: FetchError: request to https://api.openai.com/v1/audio/transcriptions failed, reason: read ECONNRESET
+      at ClientRequest.<anonymous> (/home/runner/workspace/node_modules/node-fetch/lib/index.js:1501:11)
+      at ClientRequest.emit (node:events:518:28)
+      at emitErrorEvent (node:_http_client:101:11)
+      at TLSSocket.socketErrorListener (node:_http_client:504:5)
+      at TLSSocket.emit (node:events:530:35)
+      at emitErrorNT (node:internal/streams/destroy:169:8)
+      at emitErrorCloseNT (node:internal/streams/destroy:128:3)
+      at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+    type: 'system',
+    errno: 'ECONNRESET',
+    code: 'ECONNRESET'
+  }
+}

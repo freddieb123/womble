@@ -124,6 +124,57 @@ export async function handleSaveAudio(req: Request, res: Response) {
   }
 }
 
+// Helper function for exponential backoff
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Function to attempt API call with retries
+async function retryOpenAICall<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+  let lastError: any;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`API call attempt ${attempt}/${maxRetries}`);
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      
+      // Don't retry on specific errors
+      if (error.status === 400 || // Bad request
+          (error.message && error.message.includes("quota")) || // Quota exceeded
+          (error.message && error.message.includes("billing"))) { // Billing issues
+        console.error(`Error not eligible for retry:`, error.message);
+        throw error;
+      }
+      
+      // Connection errors are good candidates for retry
+      const isConnectionError = 
+        error.message?.includes("ECONNRESET") || 
+        error.message?.includes("socket hang up") ||
+        error.message?.includes("network") ||
+        error.message?.includes("timeout") ||
+        error.message?.includes("Connection") ||
+        error.message?.includes("connect");
+      
+      if (!isConnectionError) {
+        console.error(`Non-connection error, not retrying:`, error.message);
+        throw error;
+      }
+      
+      if (attempt < maxRetries) {
+        // Exponential backoff: wait 2^attempt * 1000ms
+        const backoffTime = Math.min(2000 * Math.pow(2, attempt - 1), 10000);
+        console.log(`Connection error, retrying in ${backoffTime}ms...`, error.message);
+        await delay(backoffTime);
+      } else {
+        console.error(`Failed after ${maxRetries} attempts:`, error);
+        throw error;
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
 export async function transcribeAudio(req: Request, res: Response) {
   try {
     const configId = parseInt(req.query.configId as string);
@@ -143,22 +194,55 @@ export async function transcribeAudio(req: Request, res: Response) {
     const audioFilePath = path.join(process.cwd(), audioUrl.replace(/^\//, ''));
     
     if (!fs.existsSync(audioFilePath)) {
-      return res.status(404).json({ error: "Audio file not found on disk" });
+      return res.status(404).json({ 
+        error: "Audio file not found on disk",
+        message: `The file at ${audioUrl} was not found. The upload may have failed.`
+      });
     }
 
     try {
       console.log(`Transcribing audio file: ${audioFilePath}`);
       
-      // Create a readable stream from the file
-      const audioFile = fs.createReadStream(audioFilePath);
+      // Check the file size before sending
+      const stats = fs.statSync(audioFilePath);
+      console.log(`Audio file size: ${stats.size} bytes (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
       
-      // Call OpenAI API to transcribe the audio
-      const transcription = await openai.audio.transcriptions.create({
-        file: audioFile,
-        model: "whisper-1",
-        response_format: "verbose_json",
-        timestamp_granularities: ["segment"]
-      });
+      if (stats.size === 0) {
+        throw new Error("Audio file is empty (0 bytes)");
+      }
+      
+      if (stats.size > 25 * 1024 * 1024) { // 25MB OpenAI limit
+        throw new Error(`Audio file size (${(stats.size / 1024 / 1024).toFixed(2)} MB) exceeds OpenAI's 25MB limit`);
+      }
+      
+      // Try to validate the file format - make sure it's a properly formatted audio file
+      try {
+        // Read a small piece of the file to verify it's not corrupted
+        const fileHeader = Buffer.alloc(16);
+        const fd = fs.openSync(audioFilePath, 'r');
+        fs.readSync(fd, fileHeader, 0, 16, 0);
+        fs.closeSync(fd);
+        
+        // Log the header bytes for debugging
+        console.log("File header bytes:", fileHeader.toString('hex'));
+      } catch (readError) {
+        console.error("Error reading file header:", readError);
+        // Continue anyway - the error handling below will catch any issues
+      }
+      
+      // Use our retry function for API call
+      const transcription = await retryOpenAICall(async () => {
+        // Create a readable stream from the file for each attempt
+        const audioFile = fs.createReadStream(audioFilePath);
+        
+        // Call OpenAI API to transcribe the audio
+        return await openai.audio.transcriptions.create({
+          file: audioFile,
+          model: "whisper-1",
+          response_format: "verbose_json",
+          timestamp_granularities: ["segment"]
+        });
+      }, 3); // try up to 3 times
       
       console.log("Transcription successful");
       
@@ -172,7 +256,7 @@ export async function transcribeAudio(req: Request, res: Response) {
       const transcript = segments.map((segment, index) => {
         // Toggle speaker for every segment
         // In a real app, you'd use more sophisticated speaker recognition
-        if (index > 0) {
+        if (index > 0 && segment.text.trim().length > 0) {
           currentSpeaker = currentSpeaker === "participant1" ? "participant2" : "participant1";
         }
         
@@ -181,7 +265,7 @@ export async function transcribeAudio(req: Request, res: Response) {
           content: segment.text.trim(),
           timestamp: segment.start
         };
-      });
+      }).filter(entry => entry.content.length > 0); // Remove empty segments
       
       // Return the processed transcript
       res.json({
@@ -194,11 +278,35 @@ export async function transcribeAudio(req: Request, res: Response) {
     } catch (openaiError: any) {
       console.error("OpenAI API Error:", openaiError);
       
-      // Check for quota exceeded error
-      const isQuotaError = openaiError.message && openaiError.message.includes("quota");
-      const errorMessage = isQuotaError 
-        ? "OpenAI API quota exceeded. Please check your billing details on your OpenAI account."
-        : openaiError.message || 'Unknown error';
+      // Check for various error types to provide better messages
+      let errorType = "unknown";
+      let errorMessage = openaiError.message || 'Unknown error';
+      
+      if (openaiError.message) {
+        if (openaiError.message.includes("quota")) {
+          errorType = "quota";
+          errorMessage = "OpenAI API quota exceeded. Please check your billing details on your OpenAI account.";
+        } else if (openaiError.message.includes("ECONNRESET") || 
+                 openaiError.message.includes("socket hang up") ||
+                 openaiError.message.includes("network") ||
+                 openaiError.message.includes("connect")) {
+          errorType = "connection";
+          errorMessage = "Connection to OpenAI API failed. This might be a temporary network issue.";
+        } else if (openaiError.message.includes("too large") ||
+                 openaiError.message.includes("file size")) {
+          errorType = "file_size";
+          errorMessage = "Audio file is too large for OpenAI API. The maximum file size is 25MB.";
+        } else if (openaiError.message.includes("format") ||
+                 openaiError.message.includes("unsupported")) {
+          errorType = "file_format";
+          errorMessage = "Audio file format not supported by OpenAI API. Try a different format like MP3, M4A, WAV, or WebM.";
+        } else if (openaiError.message.includes("authorization") ||
+                 openaiError.message.includes("authentication") ||
+                 openaiError.message.includes("key")) {
+          errorType = "auth";
+          errorMessage = "OpenAI API key is invalid or not properly configured.";
+        }
+      }
       
       // If we have API issues, fall back to the mock data but provide specific information about the error
       const mockTranscript = [
@@ -224,17 +332,42 @@ export async function transcribeAudio(req: Request, res: Response) {
         }
       ];
       
+      // Send a detailed response to the client
       res.json({
         success: true,
         transcript: mockTranscript,
         participant1Name,
         participant2Name,
-        note: `Using sample data due to API error: ${errorMessage}. ${isQuotaError ? 'Your API key is valid but has reached its usage limit.' : 'Please check your OpenAI API key configuration.'}`
+        error: {
+          type: errorType,
+          message: errorMessage,
+          details: openaiError.toString()
+        },
+        note: `Using sample transcript data due to API error: ${errorMessage}`
       });
     }
   } catch (error: any) {
     console.error("Error transcribing audio:", error);
-    res.status(500).json({ error: "Failed to transcribe audio", message: error.message });
+    
+    // Provide more detailed error information
+    let statusCode = 500;
+    let errorMessage = error.message || "Failed to transcribe audio";
+    
+    if (error.message && error.message.includes("not found")) {
+      statusCode = 404;
+    } else if (error.message && (
+      error.message.includes("required") || 
+      error.message.includes("invalid") ||
+      error.message.includes("missing")
+    )) {
+      statusCode = 400;
+    }
+    
+    res.status(statusCode).json({ 
+      error: "Failed to transcribe audio", 
+      message: errorMessage,
+      details: error.toString()
+    });
   }
 }
 
@@ -303,16 +436,18 @@ After analyzing the conversation, provide constructive feedback in this exact JS
 Make sure your feedback is specific, actionable, and balanced between strengths and areas for improvement.
 `;
 
-      // Call OpenAI API
-      const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo-16k",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: conversationText }
-        ],
-        temperature: 0.7,
-        response_format: { type: "json_object" }
-      });
+      // Use our retry function for the OpenAI API call
+      const completion = await retryOpenAICall(async () => {
+        return await openai.chat.completions.create({
+          model: "gpt-3.5-turbo-16k",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: conversationText }
+          ],
+          temperature: 0.7,
+          response_format: { type: "json_object" }
+        });
+      }, 3); // Try up to 3 times
       
       const responseContent = completion.choices[0].message.content;
       console.log("OpenAI API response received successfully");
@@ -330,11 +465,27 @@ Make sure your feedback is specific, actionable, and balanced between strengths 
     } catch (openaiError: any) {
       console.error("OpenAI API Error:", openaiError);
       
-      // Check for quota exceeded error
-      const isQuotaError = openaiError.message && openaiError.message.includes("quota");
-      const errorMessage = isQuotaError 
-        ? "OpenAI API quota exceeded. Please check your billing details on your OpenAI account."
-        : openaiError.message || 'Unknown error';
+      // Check for various error types to provide better messages
+      let errorType = "unknown";
+      let errorMessage = openaiError.message || 'Unknown error';
+      
+      if (openaiError.message) {
+        if (openaiError.message.includes("quota")) {
+          errorType = "quota";
+          errorMessage = "OpenAI API quota exceeded. Please check your billing details on your OpenAI account.";
+        } else if (openaiError.message.includes("ECONNRESET") || 
+                 openaiError.message.includes("socket hang up") ||
+                 openaiError.message.includes("network") ||
+                 openaiError.message.includes("connect")) {
+          errorType = "connection";
+          errorMessage = "Connection to OpenAI API failed. This might be a temporary network issue.";
+        } else if (openaiError.message.includes("authorization") ||
+                 openaiError.message.includes("authentication") ||
+                 openaiError.message.includes("key")) {
+          errorType = "auth";
+          errorMessage = "OpenAI API key is invalid or not properly configured.";
+        }
+      }
       
       // If we still have API issues, fall back to the mock data
       const mockFeedback = {
@@ -366,13 +517,34 @@ Make sure your feedback is specific, actionable, and balanced between strengths 
         }
       };
       
+      // Send a detailed response to the client
       res.json({
         ...mockFeedback,
-        note: `Using sample feedback due to API error: ${errorMessage}. ${isQuotaError ? 'Your API key is valid but has reached its usage limit.' : 'Please check your OpenAI API key configuration.'}`
+        error: {
+          type: errorType,
+          message: errorMessage,
+          details: openaiError.toString()
+        },
+        note: `Using sample feedback due to API error: ${errorMessage}`
       });
     }
   } catch (error: any) {
     console.error("Error generating feedback:", error);
-    res.status(500).json({ error: "Failed to generate feedback", message: error.message });
+    
+    // Provide more detailed error information
+    let statusCode = 500;
+    let errorMessage = error.message || "Failed to generate feedback";
+    
+    if (error.message && (error.message.includes("required") || 
+                        error.message.includes("invalid") ||
+                        error.message.includes("missing"))) {
+      statusCode = 400;
+    }
+    
+    res.status(statusCode).json({ 
+      error: "Failed to generate feedback", 
+      message: errorMessage,
+      details: error.toString()
+    });
   }
 }
