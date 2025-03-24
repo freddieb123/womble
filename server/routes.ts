@@ -1122,7 +1122,16 @@ export function registerRoutes(app: Express): Server {
   });
   
   // Dual Conversation Routes
-  app.post("/api/dual-conversation/save", saveAudio, handleSaveAudio);
+  app.post("/api/dual-conversation/save", saveAudio, (error, req, res, next) => {
+    if (error) {
+      console.error("Multer error:", error);
+      return res.status(400).json({ 
+        error: "File upload error",
+        message: error.message || "Failed to upload audio file"
+      });
+    }
+    next();
+  }, handleSaveAudio);
   
   app.post("/api/dual-conversation/transcribe", async (req: Request, res: Response) => {
     return transcribeAudio(req, res);

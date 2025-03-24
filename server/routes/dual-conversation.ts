@@ -9,6 +9,18 @@ import path from 'path';
 import multer from 'multer';
 import crypto from 'crypto';
 
+// Custom multer error handler
+export const multerErrorHandler = (error: any, req: Request, res: Response, next: Function) => {
+  if (error) {
+    console.error("Multer error:", error);
+    return res.status(400).json({ 
+      error: "File upload error",
+      message: error.message || "Failed to upload audio file"
+    });
+  }
+  next();
+};
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || import.meta.env.OPENAI_API_KEY,
   dangerouslyAllowBrowser: false
@@ -29,23 +41,69 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage: storage });
+// Set upload size limit to 50MB and add better error handling
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB file size limit
+  fileFilter: (req, file, cb) => {
+    console.log("Upload attempted with file:", file.originalname, "size:", file.size, "type:", file.mimetype);
+    
+    // Accept all audio file types
+    if (file.mimetype.startsWith('audio/')) {
+      console.log("Audio file accepted");
+      cb(null, true);
+    } else {
+      console.log("File rejected: not an audio file");
+      cb(new Error('Only audio files are allowed!'));
+    }
+  }
+});
 
 export const saveAudio = upload.single('audio');
 
 export async function handleSaveAudio(req: Request, res: Response) {
   try {
+    console.log("handleSaveAudio called with request:", {
+      body: req.body,
+      file: req.file ? {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        filename: req.file.filename
+      } : null
+    });
+    
+    // Multer errors are handled by the error handler middleware
+    
     if (!req.file) {
-      return res.status(400).json({ error: "No audio file provided" });
+      console.error("No file in request");
+      return res.status(400).json({ 
+        error: "No audio file provided",
+        message: "Please make sure you're recording and uploading an audio file."
+      });
+    }
+
+    // Validate file size - additional check beyond multer limits
+    if (req.file.size > 50 * 1024 * 1024) { // 50MB
+      console.error("File too large:", req.file.size);
+      return res.status(400).json({
+        error: "File too large",
+        message: "Audio file exceeds the 50MB size limit."
+      });
     }
 
     const { configId, sessionId, participant1Name, participant2Name } = req.body;
 
+    // Log the received parameters
+    console.log("Received parameters:", { configId, sessionId, participant1Name, participant2Name });
+
     if (!configId || !sessionId) {
+      console.error("Missing required parameters:", { configId, sessionId });
       return res.status(400).json({ error: "Missing required parameters" });
     }
 
     const audioUrl = `/uploads/${req.file.filename}`;
+    console.log("Audio saved successfully at:", audioUrl);
 
     // Skip database saving since the table doesn't exist
     // Just return the audio URL for processing
@@ -57,7 +115,12 @@ export async function handleSaveAudio(req: Request, res: Response) {
     });
   } catch (error: any) {
     console.error("Error handling audio:", error);
-    res.status(500).json({ error: error.message });
+    // Provide more descriptive error message to client
+    res.status(500).json({ 
+      error: "Failed to save audio file",
+      message: error.message,
+      details: error.toString()
+    });
   }
 }
 
