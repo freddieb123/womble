@@ -340,8 +340,8 @@ export default function DualConversationAnalysis() {
                           onClick={() => {
                             const url = `/transcript/${configId}/${conversation.sessionId}`;
                             console.log(`Opening transcript: ${url}`);
-                            // Open in a new window instead of a new tab for more reliable behavior
-                            window.open(url, `transcript_${conversation.sessionId}`, 'width=1000,height=800,resizable=yes');
+                            // Open in a new tab
+                            window.open(url, '_blank');
                           }}
                         >
                           <MessageSquare className="h-4 w-4" />
