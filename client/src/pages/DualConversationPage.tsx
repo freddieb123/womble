@@ -174,15 +174,7 @@ export default function DualConversationPage({}: DualConversationPageProps) {
         transcript={transcript}
       />
       
-      <div className="flex items-center mb-6">
-        <Button 
-          variant="ghost" 
-          className="mr-2" 
-          onClick={() => window.location.href = "/dashboard"}
-        >
-          <ChevronLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
+      <div className="flex items-center justify-center mb-6">
         <h1 className="text-2xl font-bold">{config?.title || 'Conversation Analysis'}</h1>
       </div>
       
@@ -191,7 +183,6 @@ export default function DualConversationPage({}: DualConversationPageProps) {
           <div className="max-w-2xl mx-auto">
             <div className="flex flex-col justify-center items-center mb-8">
               <Mic className="h-10 w-10 text-primary mb-2" />
-              <h2 className="text-xl font-semibold">Record Conversation</h2>
             </div>
             
             <DualConversationRecorder 

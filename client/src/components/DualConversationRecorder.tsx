@@ -352,15 +352,9 @@ export default function DualConversationRecorder({
 
   return (
     <Card className="w-full max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle>Record Conversation</CardTitle>
-        <CardDescription>
-          Record a conversation between two participants for feedback
-        </CardDescription>
-      </CardHeader>
       <CardContent className="space-y-4">
         
-        {audioUrl && (
+        {audioUrl && transcript.length === 0 && (
           <div className="pt-2">
             <Label>Recording</Label>
             <audio src={audioUrl} controls className="w-full mt-2" />
@@ -381,51 +375,54 @@ export default function DualConversationRecorder({
           </div>
         )}
       </CardContent>
-      <CardFooter className="justify-between space-x-2">
-        {!audioBlob ? (
-          <Button
-            className="w-full"
-            onClick={isRecording ? stopRecording : startRecording}
-            variant={isRecording ? "destructive" : "default"}
-            disabled={isProcessing}
-          >
-            {isRecording ? (
-              <>
-                <MicOff className="mr-2 h-4 w-4" /> Stop Recording
-              </>
-            ) : (
-              <>
-                <Mic className="mr-2 h-4 w-4" /> Start Recording
-              </>
-            )}
-          </Button>
-        ) : (
-          <>
-            <Button 
-              variant="destructive" 
-              onClick={discardRecording}
+      {/* Only show card footer with buttons if transcript is not ready */}
+      {transcript.length === 0 && (
+        <CardFooter className="justify-between space-x-2">
+          {!audioBlob ? (
+            <Button
+              className="w-full"
+              onClick={isRecording ? stopRecording : startRecording}
+              variant={isRecording ? "destructive" : "default"}
               disabled={isProcessing}
             >
-              <Trash className="mr-2 h-4 w-4" /> Discard
-            </Button>
-            <Button 
-              variant="default" 
-              onClick={processRecording}
-              disabled={isProcessing}
-            >
-              {isProcessing ? (
+              {isRecording ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing
+                  <MicOff className="mr-2 h-4 w-4" /> Stop Recording
                 </>
               ) : (
                 <>
-                  <Save className="mr-2 h-4 w-4" /> Process
+                  <Mic className="mr-2 h-4 w-4" /> Start Recording
                 </>
               )}
             </Button>
-          </>
-        )}
-      </CardFooter>
+          ) : (
+            <>
+              <Button 
+                variant="destructive" 
+                onClick={discardRecording}
+                disabled={isProcessing}
+              >
+                <Trash className="mr-2 h-4 w-4" /> Discard
+              </Button>
+              <Button 
+                variant="default" 
+                onClick={processRecording}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" /> Process
+                  </>
+                )}
+              </Button>
+            </>
+          )}
+        </CardFooter>
+      )}
     </Card>
   );
 }
