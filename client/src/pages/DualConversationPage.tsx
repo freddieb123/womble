@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'wouter';
-import { ChevronLeft, Mic } from 'lucide-react';
+import { ChevronLeft, Mic, ChevronDown, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import DualConversationRecorder from '@/components/DualConversationRecorder';
 import ParticipantsNameModal from '@/components/ParticipantsNameModal';
@@ -26,6 +28,7 @@ export default function DualConversationPage({}: DualConversationPageProps) {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [participant1Name, setParticipant1Name] = useState("");
   const [participant2Name, setParticipant2Name] = useState("");
+  const [instructionsOpen, setInstructionsOpen] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -181,9 +184,36 @@ export default function DualConversationPage({}: DualConversationPageProps) {
       <Card className="w-full">
         <CardContent className="p-6">
           <div className="max-w-2xl mx-auto">
-            <div className="flex flex-col justify-center items-center mb-8">
+            <div className="flex flex-col justify-center items-center mb-4">
               <Mic className="h-10 w-10 text-primary mb-2" />
             </div>
+
+            {config?.userInstructions && (
+              <Collapsible
+                open={instructionsOpen}
+                onOpenChange={setInstructionsOpen}
+                className="mb-8">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <HelpCircle className="h-4 w-4 text-blue-600" />
+                    <h3 className="text-sm font-medium">Instructions</h3>
+                  </div>
+                  <CollapsibleTrigger className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800">
+                    {instructionsOpen ? "Hide" : "Show"} Instructions
+                    <ChevronDown 
+                      className={`h-4 w-4 transition-transform ${instructionsOpen ? 'transform rotate-180' : ''}`} 
+                    />
+                  </CollapsibleTrigger>
+                </div>
+                <CollapsibleContent>
+                  <Alert className="bg-blue-50 border-blue-200">
+                    <AlertDescription className="text-sm whitespace-pre-line">
+                      {config?.userInstructions}
+                    </AlertDescription>
+                  </Alert>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
             
             <DualConversationRecorder 
               configId={parsedConfigId || 0} 

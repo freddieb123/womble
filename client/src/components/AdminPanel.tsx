@@ -22,7 +22,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
     }
   }, [config.type]);
 
-  const handleTypeChange = (newType: 'chat' | 'upload' | 'quiz' | 'dual-conversation') => {
+  const handleTypeChange = (newType: 'chat' | 'upload' | 'quiz' | 'two-way-conversation') => {
     onConfigChange({
       ...config,
       type: newType,
@@ -104,7 +104,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
             type="button"
             disabled={isEditMode}
             className={`px-4 py-2 text-sm font-medium focus:outline-none
-              ${config.type === 'dual-conversation' ? "bg-green-200 text-green-900" : "bg-white text-gray-700"}
+              ${config.type === 'two-way-conversation' ? "bg-green-200 text-green-900" : "bg-white text-gray-700"}
             `}
             onClick={() => handleTypeChange('two-way-conversation')}
           >
