@@ -196,11 +196,12 @@ export default function DualConversationPage({}: DualConversationPageProps) {
             {transcript.length > 0 && (
               <div className="mt-6">
                 <Button 
-                  onClick={generateFeedback}
+                  onClick={feedback ? () => setShowFeedbackModal(true) : generateFeedback}
                   disabled={isGeneratingFeedback}
                   className="w-full py-6 text-lg"
                 >
-                  {isGeneratingFeedback ? 'Generating Feedback...' : 'Generate Feedback'}
+                  {isGeneratingFeedback ? 'Generating Feedback...' : 
+                   feedback ? 'View Feedback' : 'Generate Feedback'}
                 </Button>
               </div>
             )}
