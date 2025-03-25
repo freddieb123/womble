@@ -109,7 +109,7 @@ export default function StaticTranscriptView() {
               </Button>
             </CardTitle>
             <div className="text-sm text-muted-foreground">
-              <span className="font-medium">Conversation Transcript</span>
+              <span className="font-medium">Participant 1 and Participant 2</span>
             </div>
           </CardHeader>
           
@@ -126,7 +126,9 @@ export default function StaticTranscriptView() {
                     }`}
                   >
                     <div className="font-medium text-sm mb-1">
-                      {entry.role === 'participant1' ? 'Participant 1' : 'Participant 2'}
+                      {entry.role === 'participant1' 
+                        ? 'Participant 1' 
+                        : 'Participant 2'}
                     </div>
                     <div className="text-sm">{entry.content}</div>
                   </div>
