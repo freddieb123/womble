@@ -306,8 +306,8 @@ export default function DualConversationAnalysis() {
                         <Tabs defaultValue="overall">
                           <TabsList className="mb-4">
                             <TabsTrigger value="overall">Overall Feedback</TabsTrigger>
-                            <TabsTrigger value="participant1">{conversation.participant1Name}</TabsTrigger>
-                            <TabsTrigger value="participant2">{conversation.participant2Name}</TabsTrigger>
+                            <TabsTrigger value="participant1">Participant 1</TabsTrigger>
+                            <TabsTrigger value="participant2">Participant 2</TabsTrigger>
                           </TabsList>
                           
                           <TabsContent value="overall" className="space-y-4">
@@ -335,13 +335,16 @@ export default function DualConversationAnalysis() {
                           </TabsContent>
                           
                           <TabsContent value="participant1" className="space-y-4">
-                            {conversation.feedback?.participant1?.score !== undefined && (
-                              <div className="flex items-center gap-2">
+                            <div className="flex items-start justify-between mb-4">
+                              <p className="text-sm text-muted-foreground">
+                                Participant name: <span className="font-medium text-gray-900">{conversation.participant1Name}</span>
+                              </p>
+                              {conversation.feedback?.participant1?.score !== undefined && (
                                 <p className="text-xl font-bold text-blue-900">
                                   Score: {conversation.feedback.participant1.score}/10
                                 </p>
-                              </div>
-                            )}
+                              )}
+                            </div>
                             {conversation.feedback?.participant1?.bullets && Array.isArray(conversation.feedback.participant1.bullets) && (
                               <div className="space-y-2">
                                 <h3 className="text-md font-semibold">Key Points</h3>
@@ -366,13 +369,16 @@ export default function DualConversationAnalysis() {
                           </TabsContent>
                           
                           <TabsContent value="participant2" className="space-y-4">
-                            {conversation.feedback?.participant2?.score !== undefined && (
-                              <div className="flex items-center gap-2">
+                            <div className="flex items-start justify-between mb-4">
+                              <p className="text-sm text-muted-foreground">
+                                Participant name: <span className="font-medium text-gray-900">{conversation.participant2Name}</span>
+                              </p>
+                              {conversation.feedback?.participant2?.score !== undefined && (
                                 <p className="text-xl font-bold text-blue-900">
                                   Score: {conversation.feedback.participant2.score}/10
                                 </p>
-                              </div>
-                            )}
+                              )}
+                            </div>
                             {conversation.feedback?.participant2?.bullets && Array.isArray(conversation.feedback.participant2.bullets) && (
                               <div className="space-y-2">
                                 <h3 className="text-md font-semibold">Key Points</h3>

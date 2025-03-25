@@ -58,6 +58,10 @@ export default function FeedbackModal({
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">Conversation Feedback</DialogTitle>
+          <p className="text-sm text-muted-foreground mt-2">
+            Note: Feedback refers to speakers as "Participant 1" and "Participant 2" rather than by name 
+            to ensure accuracy when describing communication patterns.
+          </p>
         </DialogHeader>
         
         <Tabs defaultValue="overall" className="w-full overflow-hidden">

@@ -494,29 +494,31 @@ export async function generateFeedback(req: Request, res: Response) {
       
       // Prepare the system prompt with instructions
       const systemPrompt = `
-You are an expert in analyzing conversations between two people. You'll be evaluating a conversation between ${participant1Name} and ${participant2Name}.
+You are an expert in analyzing conversations between two people. You'll be evaluating a conversation between Participant 1 (${participant1Name}) and Participant 2 (${participant2Name}).
 
 ${feedbackCriteria}
+
+IMPORTANT: In your feedback, always refer to the participants as "Participant 1" and "Participant 2" rather than using their actual names. This ensures accuracy and prevents confusion about who performed which actions.
 
 After analyzing the conversation, provide constructive feedback in this exact JSON structure:
 {
   "participant1": {
-    "bullets": [array of 3-5 specific feedback points for ${participant1Name}],
+    "bullets": [array of 3-5 specific feedback points for Participant 1, using "Participant 1" in the text rather than their name],
     "score": [numerical score from 1-10],
-    "summary": [1-2 sentence overall feedback]
+    "summary": [1-2 sentence overall feedback using "Participant 1" rather than their name]
   },
   "participant2": {
-    "bullets": [array of 3-5 specific feedback points for ${participant2Name}],
+    "bullets": [array of 3-5 specific feedback points for Participant 2, using "Participant 2" in the text rather than their name],
     "score": [numerical score from 1-10],
-    "summary": [1-2 sentence overall feedback]
+    "summary": [1-2 sentence overall feedback using "Participant 2" rather than their name]
   },
   "overall": {
-    "bullets": [array of 3-5 points about the conversation as a whole],
+    "bullets": [array of 3-5 points about the conversation as a whole, referring to "Participant 1" and "Participant 2"],
     "summary": [1-2 sentence summary of the overall interaction]
   }
 }
 
-Make sure your feedback is specific, actionable, and balanced between strengths and areas for improvement.
+Make sure your feedback is specific, actionable, and balanced between strengths and areas for improvement, but NEVER use the participants' actual names in the feedback.
 `;
 
       // Use our retry function for the OpenAI API call
