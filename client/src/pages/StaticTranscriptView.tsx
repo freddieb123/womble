@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRoute } from 'wouter';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,8 +24,12 @@ export default function StaticTranscriptView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [conversation, setConversation] = useState<DualConversation | null>(null);
+  const fetchedRef = useRef(false);
 
   useEffect(() => {
+    // Only fetch once - prevent infinite fetch loop
+    if (fetchedRef.current) return;
+    
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -38,6 +42,8 @@ export default function StaticTranscriptView() {
           configId: params.configId,
           sessionId: params.sessionId
         });
+        
+        fetchedRef.current = true; // Mark as fetched before the actual fetch
         
         const response = await fetch(`/api/dual-conversations/${params.configId}?sessionId=${params.sessionId}`);
         
