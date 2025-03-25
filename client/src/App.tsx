@@ -2,6 +2,7 @@ import { Switch, Route } from "wouter";
 import Home from "./pages/Home";
 import UserView from "./pages/UserView";
 import ConversationAnalysis from "./pages/ConversationAnalysis";
+import DualConversationAnalysis from "./pages/DualConversationAnalysis";
 import StaticConversationView from "./pages/StaticConversationView";
 import DualConversationPage from "./pages/DualConversationPage";
 import AuthPage from "./pages/auth-page";
@@ -23,6 +24,7 @@ function App() {
         <Route path="/chat" component={UserView} />
         <Route path="/dual-conversation/:id" component={DualConversationPage} />
         <ProtectedRoute path="/analysis" component={ConversationAnalysis} />
+        <ProtectedRoute path="/dual-analysis" component={DualConversationAnalysis} />
         <Route path="/conversation" component={StaticConversationView} />
         <Route component={NotFound} />
       </Switch>
