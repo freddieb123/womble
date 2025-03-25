@@ -100,8 +100,8 @@ export default function UserView() {
 
   console.log('Transformed config:', config);
 
-  // Redirect to the dual conversation page if the type is 'dual-conversation'
-  if (config.type === 'dual-conversation') {
+  // Redirect to the dual conversation page if the type is 'two-way-conversation'
+  if (config.type === 'two-way-conversation') {
     // Redirect to DualConversationPage
     window.location.href = `/dual-conversation/${configId}?sessionId=${sessionId}${userName ? `&userName=${encodeURIComponent(userName)}` : ''}`;
     return (

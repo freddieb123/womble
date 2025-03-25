@@ -27,7 +27,7 @@ export interface QuizQuestion {
 export interface BaseConfig {
   id?: number;
   title: string;
-  type: 'chat' | 'upload' | 'quiz' | 'dual-conversation';
+  type: 'chat' | 'upload' | 'quiz' | 'two-way-conversation';
   systemPrompt: string;
   userInstructions: string | null;
   feedbackCriteria: string | null;
