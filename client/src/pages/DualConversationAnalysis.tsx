@@ -223,22 +223,16 @@ export default function DualConversationAnalysis() {
                 <CollapsibleContent>
                   <CardContent>
                     <div className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                           <h3 className="text-sm font-medium text-gray-500">Feedback Coverage</h3>
                           <p className="text-2xl font-bold text-blue-900">{summary.feedbackCount}/{summary.totalCount}</p>
                           <p className="text-sm text-gray-600">conversations with feedback</p>
                         </div>
                         <div className="space-y-2">
-                          <h3 className="text-sm font-medium text-gray-500">Participant 1 Avg. Score</h3>
+                          <h3 className="text-sm font-medium text-gray-500">Overall Avg. Score</h3>
                           <p className="text-2xl font-bold text-blue-900">
-                            {summary.averageScore.participant1.toFixed(1)}/10
-                          </p>
-                        </div>
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-medium text-gray-500">Participant 2 Avg. Score</h3>
-                          <p className="text-2xl font-bold text-blue-900">
-                            {summary.averageScore.participant2.toFixed(1)}/10
+                            {((summary.averageScore.participant1 + summary.averageScore.participant2) / 2).toFixed(1)}/10
                           </p>
                         </div>
                       </div>
