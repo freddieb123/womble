@@ -10,6 +10,8 @@ import { Loader2, Mic, MicOff, Trash, Save } from "lucide-react";
 interface DualConversationRecorderProps {
   configId: number;
   sessionId: string;
+  participant1Name?: string;
+  participant2Name?: string;
   onTranscriptReady?: (transcript: any[]) => void;
 }
 
@@ -22,18 +24,33 @@ interface TranscriptEntry {
 export default function DualConversationRecorder({ 
   configId, 
   sessionId,
+  participant1Name: propParticipant1Name,
+  participant2Name: propParticipant2Name,
   onTranscriptReady 
 }: DualConversationRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [participant1Name, setParticipant1Name] = useState("");
-  const [participant2Name, setParticipant2Name] = useState("");
+  
+  // Use the prop values if provided, otherwise use empty strings
+  const [participant1Name, setParticipant1Name] = useState(propParticipant1Name || "");
+  const [participant2Name, setParticipant2Name] = useState(propParticipant2Name || "");
+  
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const { toast } = useToast();
+  
+  // Update local state when prop values change
+  useEffect(() => {
+    if (propParticipant1Name) {
+      setParticipant1Name(propParticipant1Name);
+    }
+    if (propParticipant2Name) {
+      setParticipant2Name(propParticipant2Name);
+    }
+  }, [propParticipant1Name, propParticipant2Name]);
 
   const startRecording = async () => {
     try {

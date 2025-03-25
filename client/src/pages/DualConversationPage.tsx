@@ -64,6 +64,28 @@ export default function DualConversationPage({}: DualConversationPageProps) {
   const handleTranscriptReady = (newTranscript: any[]) => {
     setTranscript(newTranscript);
   };
+  
+  const handleNameSubmit = (names: { participant1Name: string; participant2Name: string }) => {
+    setParticipant1Name(names.participant1Name);
+    setParticipant2Name(names.participant2Name);
+    
+    // Update config with participant names for this session only
+    if (config) {
+      const updatedConfig = { 
+        ...config, 
+        participant1Name: names.participant1Name, 
+        participant2Name: names.participant2Name 
+      };
+      setConfig(updatedConfig);
+    }
+    
+    setShowNamesModal(false);
+    
+    toast({
+      title: "Names Saved",
+      description: `Participants: ${names.participant1Name} and ${names.participant2Name}`,
+    });
+  };
 
   const generateFeedback = async () => {
     if (!parsedConfigId || !sessionId || transcript.length === 0) {
@@ -150,6 +172,12 @@ export default function DualConversationPage({}: DualConversationPageProps) {
 
   return (
     <div className="container mx-auto py-6">
+      {/* Names modal - always shown on page load */}
+      <ParticipantsNameModal 
+        open={showNamesModal} 
+        onSubmit={handleNameSubmit} 
+      />
+      
       <div className="flex items-center mb-6">
         <Button 
           variant="ghost" 
@@ -178,6 +206,8 @@ export default function DualConversationPage({}: DualConversationPageProps) {
               <DualConversationRecorder 
                 configId={parsedConfigId || 0} 
                 sessionId={sessionId}
+                participant1Name={participant1Name}
+                participant2Name={participant2Name}
                 onTranscriptReady={handleTranscriptReady}
               />
               
