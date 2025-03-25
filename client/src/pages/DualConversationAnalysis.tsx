@@ -66,7 +66,6 @@ export default function DualConversationAnalysis() {
   const [isLoading, setIsLoading] = useState(false);
   const [summary, setSummary] = useState<FeedbackSummary | null>(null);
   const [isOpen, setIsOpen] = useState(true);
-  const [expandedTranscripts, setExpandedTranscripts] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const searchParams = new URLSearchParams(window.location.search);
@@ -77,17 +76,7 @@ export default function DualConversationAnalysis() {
     enabled: !!configId,
   });
 
-  const toggleTranscript = (sessionId: string) => {
-    setExpandedTranscripts(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(sessionId)) {
-        newSet.delete(sessionId);
-      } else {
-        newSet.add(sessionId);
-      }
-      return newSet;
-    });
-  };
+  // No longer need toggleTranscript as we're opening in a new tab
 
   const generateSummary = async (conversationsData: DualConversationData[]): Promise<FeedbackSummary> => {
     const withFeedback = conversationsData.filter(conv => 
@@ -348,39 +337,14 @@ export default function DualConversationAnalysis() {
                           variant="outline"
                           size="sm"
                           className="flex items-center gap-2"
-                          onClick={() => toggleTranscript(conversation.sessionId)}
+                          onClick={() => window.open(`/transcript/${configId}/${conversation.sessionId}`, '_blank')}
                         >
                           <MessageSquare className="h-4 w-4" />
-                          {expandedTranscripts.has(conversation.sessionId) ? 'Hide Transcript' : 'View Transcript'}
+                          View Transcript
                         </Button>
                       </CardFooter>
                       
-                      {expandedTranscripts.has(conversation.sessionId) && (
-                        <CardContent className="pt-0">
-                          <div className="border rounded-md p-4 space-y-4">
-                            <h3 className="text-md font-semibold">Conversation Transcript</h3>
-                            <div className="max-h-80 overflow-y-auto space-y-3">
-                              {conversation.transcript.map((entry, index) => (
-                                <div 
-                                  key={index} 
-                                  className={`p-3 rounded-lg ${
-                                    entry.role === 'participant1' 
-                                      ? 'bg-blue-50 border-l-4 border-blue-300' 
-                                      : 'bg-green-50 border-l-4 border-green-300'
-                                  }`}
-                                >
-                                  <div className="font-medium text-sm mb-1">
-                                    {entry.role === 'participant1' 
-                                      ? conversation.participant1Name 
-                                      : conversation.participant2Name}
-                                  </div>
-                                  <div className="text-sm">{entry.content}</div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </CardContent>
-                      )}
+
                     </Card>
                   ))
                 ) : (
