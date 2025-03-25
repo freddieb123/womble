@@ -104,6 +104,7 @@ export function registerRoutes(app: Express): Server {
           conversations: true,
           uploads: true,
           quizResponses: true,
+          dualConversations: true,
         }
       });
 
@@ -119,6 +120,8 @@ export function registerRoutes(app: Express): Server {
           responseCount = config.uploads.length;
         } else if (config.type === 'quiz') {
           responseCount = config.quizResponses.length;
+        } else if (config.type === 'dual-conversation') {
+          responseCount = config.dualConversations?.length || 0;
         } else {
           responseCount = config.conversations.length;
         }
@@ -128,7 +131,8 @@ export function registerRoutes(app: Express): Server {
           conversationCount: responseCount,
           conversations: undefined,
           uploads: undefined,
-          quizResponses: undefined
+          quizResponses: undefined,
+          dualConversations: undefined
         };
       });
 

@@ -126,6 +126,7 @@ export const chatConfigsRelations = relations(chatConfigs, ({ one, many }) => ({
   uploads: many(uploads),
   quizQuestions: many(quizQuestions),
   quizResponses: many(quizResponses),
+  dualConversations: many(dualConversations),
 }));
 
 export const quizQuestionsRelations = relations(quizQuestions, ({ one }) => ({
