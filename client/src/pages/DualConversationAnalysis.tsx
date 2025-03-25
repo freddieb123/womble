@@ -303,14 +303,22 @@ export default function DualConversationAnalysis() {
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <Tabs defaultValue="overall">
-                          <TabsList className="mb-4">
-                            <TabsTrigger value="overall">Overall Feedback</TabsTrigger>
-                            <TabsTrigger value="participant1">Participant 1</TabsTrigger>
-                            <TabsTrigger value="participant2">Participant 2</TabsTrigger>
-                          </TabsList>
+                        <div className="space-y-6">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h3 className="text-md font-semibold">Participants</h3>
+                              <p className="text-sm text-gray-500 mt-1">
+                                <span className="font-medium">Participant 1:</span> {conversation.participant1Name}<br />
+                                <span className="font-medium">Participant 2:</span> {conversation.participant2Name}
+                              </p>
+                            </div>
+                            
+                            <div className="text-xl font-bold text-blue-900 flex items-center">
+                              Score: {Math.round(((conversation.feedback?.participant1?.score || 0) + (conversation.feedback?.participant2?.score || 0)) / 2)}/10
+                            </div>
+                          </div>
                           
-                          <TabsContent value="overall" className="space-y-4">
+                          <div className="space-y-4">
                             {conversation.feedback?.overall?.bullets && Array.isArray(conversation.feedback.overall.bullets) && (
                               <div className="space-y-2">
                                 <h3 className="text-md font-semibold">Key Points</h3>
@@ -332,76 +340,8 @@ export default function DualConversationAnalysis() {
                                 </div>
                               </div>
                             )}
-                          </TabsContent>
-                          
-                          <TabsContent value="participant1" className="space-y-4">
-                            <div className="flex items-start justify-between mb-4">
-                              <p className="text-sm text-muted-foreground">
-                                Participant name: <span className="font-medium text-gray-900">{conversation.participant1Name}</span>
-                              </p>
-                              {conversation.feedback?.participant1?.score !== undefined && (
-                                <p className="text-xl font-bold text-blue-900">
-                                  Score: {conversation.feedback.participant1.score}/10
-                                </p>
-                              )}
-                            </div>
-                            {conversation.feedback?.participant1?.bullets && Array.isArray(conversation.feedback.participant1.bullets) && (
-                              <div className="space-y-2">
-                                <h3 className="text-md font-semibold">Key Points</h3>
-                                {conversation.feedback.participant1.bullets.map((bullet, bulletIndex) => (
-                                  <div key={bulletIndex} className="flex items-start gap-2 text-sm">
-                                    <span>•</span>
-                                    <span>{bullet}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {conversation.feedback?.participant1?.summary && (
-                              <div className="border-t pt-4">
-                                <h3 className="text-md font-semibold mb-2">Summary</h3>
-                                <div className="bg-blue-50 p-4 rounded-lg">
-                                  <p className="text-sm text-blue-700">
-                                    {conversation.feedback.participant1.summary}
-                                  </p>
-                                </div>
-                              </div>
-                            )}
-                          </TabsContent>
-                          
-                          <TabsContent value="participant2" className="space-y-4">
-                            <div className="flex items-start justify-between mb-4">
-                              <p className="text-sm text-muted-foreground">
-                                Participant name: <span className="font-medium text-gray-900">{conversation.participant2Name}</span>
-                              </p>
-                              {conversation.feedback?.participant2?.score !== undefined && (
-                                <p className="text-xl font-bold text-blue-900">
-                                  Score: {conversation.feedback.participant2.score}/10
-                                </p>
-                              )}
-                            </div>
-                            {conversation.feedback?.participant2?.bullets && Array.isArray(conversation.feedback.participant2.bullets) && (
-                              <div className="space-y-2">
-                                <h3 className="text-md font-semibold">Key Points</h3>
-                                {conversation.feedback.participant2.bullets.map((bullet, bulletIndex) => (
-                                  <div key={bulletIndex} className="flex items-start gap-2 text-sm">
-                                    <span>•</span>
-                                    <span>{bullet}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {conversation.feedback?.participant2?.summary && (
-                              <div className="border-t pt-4">
-                                <h3 className="text-md font-semibold mb-2">Summary</h3>
-                                <div className="bg-blue-50 p-4 rounded-lg">
-                                  <p className="text-sm text-blue-700">
-                                    {conversation.feedback.participant2.summary}
-                                  </p>
-                                </div>
-                              </div>
-                            )}
-                          </TabsContent>
-                        </Tabs>
+                          </div>
+                        </div>
                       </CardContent>
                       <CardFooter className="justify-end">
                         <Button
