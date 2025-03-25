@@ -334,7 +334,11 @@ export default function Home() {
   };
 
   const handleViewFeedback = (configToView: ChatConfig) => {
-    window.open(`${window.location.origin}/analysis?configId=${configToView.id}`, '_blank');
+    if (configToView.type === 'dual-conversation') {
+      window.open(`${window.location.origin}/dual-analysis?configId=${configToView.id}`, '_blank');
+    } else {
+      window.open(`${window.location.origin}/analysis?configId=${configToView.id}`, '_blank');
+    }
   };
 
   const handleDuplicate = async (configToDuplicate: ChatConfig) => {
