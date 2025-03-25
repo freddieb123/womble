@@ -14,7 +14,7 @@ export const users = pgTable("users", {
 export const chatConfigs = pgTable("chat_configs", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
-  type: text("type", { enum: ['chat', 'upload', 'quiz', 'dual-conversation'] }).default('chat').notNull(),
+  type: text("type", { enum: ['chat', 'upload', 'quiz', 'two-way-conversation'] }).default('chat').notNull(),
   title: text("title").notNull(),
   systemPrompt: text("system_prompt").notNull(),
   userInstructions: text("user_instructions"),

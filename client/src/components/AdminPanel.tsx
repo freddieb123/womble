@@ -106,7 +106,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
             className={`px-4 py-2 text-sm font-medium focus:outline-none
               ${config.type === 'dual-conversation' ? "bg-green-200 text-green-900" : "bg-white text-gray-700"}
             `}
-            onClick={() => handleTypeChange('dual-conversation')}
+            onClick={() => handleTypeChange('two-way-conversation')}
           >
             Two-way Conversation
           </button>
