@@ -60,7 +60,7 @@ export default function FeedbackModal({
           <DialogTitle className="text-xl font-bold">Conversation Feedback</DialogTitle>
           <p className="text-sm text-muted-foreground mt-2">
             Note: Feedback refers to speakers as "Participant 1" and "Participant 2" rather than by name 
-            to ensure accuracy when describing communication patterns.
+            as the system can differentiate voices but doesn't know who is who!
           </p>
         </DialogHeader>
         
