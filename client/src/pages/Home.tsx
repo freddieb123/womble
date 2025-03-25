@@ -373,7 +373,7 @@ export default function Home() {
     }
   };
 
-  const handleTemplateSelect = async (template: ChatConfig) => {
+  const handleTemplateSelect = async (template: Template) => {
     try {
       let fullConfig = template;
       if (template.type === 'quiz') {
@@ -872,7 +872,10 @@ export default function Home() {
           </div>
           <div className="flex justify-end mt-4">
             <Button 
-              onClick={() => savingAsTemplate && saveAsTemplate.mutate(savingAsTemplate)}
+              onClick={() => savingAsTemplate && saveAsTemplate.mutate({
+                id: savingAsTemplate.id as number,
+                templateDescription: savingAsTemplate.templateDescription || ''
+              })}
               disabled={!savingAsTemplate?.templateDescription || saveAsTemplate.isPending}
             >
               Save as Template
