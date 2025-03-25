@@ -1150,6 +1150,8 @@ export function registerRoutes(app: Express): Server {
       const configId = parseInt(req.params.configId);
       const sessionId = req.query.sessionId as string | undefined;
 
+      console.log(`GET /api/dual-conversations/${configId} - SessionId: ${sessionId}`);
+
       if (isNaN(configId)) {
         return res.status(400).json({ error: "Invalid config ID" });
       }
@@ -1159,6 +1161,7 @@ export function registerRoutes(app: Express): Server {
       
       // If sessionId is provided, filter by it
       if (sessionId) {
+        console.log(`Filtering by sessionId: ${sessionId}`);
         whereClause = and(
           whereClause,
           eq(dualConversations.sessionId, sessionId)
@@ -1192,6 +1195,11 @@ export function registerRoutes(app: Express): Server {
           : conv.feedback,
         createdAt: conv.createdAt
       }));
+
+      console.log(`Found ${formattedConversations.length} conversation(s) for configId: ${configId}, sessionId: ${sessionId || 'not provided'}`);
+      if (formattedConversations.length === 0) {
+        console.log('No conversations found with the given criteria');
+      }
 
       res.json(formattedConversations);
     } catch (error: any) {

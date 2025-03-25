@@ -34,6 +34,11 @@ export default function StaticTranscriptView() {
           throw new Error('Missing configuration ID or session ID');
         }
         
+        console.log('StaticTranscriptView - Fetching data with:', {
+          configId: params.configId,
+          sessionId: params.sessionId
+        });
+        
         const response = await fetch(`/api/dual-conversations/${params.configId}?sessionId=${params.sessionId}`);
         
         if (!response.ok) {
@@ -41,6 +46,7 @@ export default function StaticTranscriptView() {
         }
         
         const data = await response.json();
+        console.log('StaticTranscriptView - Response data:', data);
         
         if (!data || !data.length) {
           throw new Error('No conversation data found');
