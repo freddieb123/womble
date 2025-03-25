@@ -325,6 +325,53 @@ export async function transcribeAudio(req: Request, res: Response) {
         };
       }).filter(entry => entry.content.length > 0); // Remove empty segments
       
+      // Store the transcript in the database
+      try {
+        // First check if a record already exists
+        const existingRecord = await db.select()
+          .from(dualConversations)
+          .where(and(
+            eq(dualConversations.configId, configId),
+            eq(dualConversations.sessionId, sessionId)
+          ))
+          .execute();
+        
+        if (existingRecord.length > 0) {
+          // Update existing record
+          await db.update(dualConversations)
+            .set({
+              participant1Name,
+              participant2Name,
+              transcript: JSON.stringify(transcript),
+              audioUrl
+            })
+            .where(and(
+              eq(dualConversations.configId, configId),
+              eq(dualConversations.sessionId, sessionId)
+            ))
+            .execute();
+            
+          console.log(`Updated existing transcript record for session ${sessionId}`);
+        } else {
+          // Insert new record
+          await db.insert(dualConversations)
+            .values({
+              configId,
+              sessionId,
+              participant1Name,
+              participant2Name,
+              transcript: JSON.stringify(transcript),
+              audioUrl
+            })
+            .execute();
+            
+          console.log(`Saved new transcript record for session ${sessionId}`);
+        }
+      } catch (dbError) {
+        console.error("Database error saving transcript:", dbError);
+        // Continue even if DB save fails - we'll still return the data to the client
+      }
+      
       // Return the processed transcript
       res.json({
         success: true,
@@ -366,42 +413,20 @@ export async function transcribeAudio(req: Request, res: Response) {
         }
       }
       
-      // If we have API issues, fall back to the mock data but provide specific information about the error
-      const mockTranscript = [
-        { 
-          role: "participant1", 
-          content: "Hello, how are you doing today?", 
-          timestamp: 0 
-        },
-        { 
-          role: "participant2", 
-          content: "I'm doing well, thank you for asking. How about yourself?", 
-          timestamp: 3 
-        },
-        { 
-          role: "participant1", 
-          content: "I'm good too. I wanted to discuss the project timeline with you.", 
-          timestamp: 7 
-        },
-        { 
-          role: "participant2", 
-          content: "Sure, what specifically about the timeline would you like to discuss?", 
-          timestamp: 12 
-        }
-      ];
+      // Use authentic data only for error cases - return empty array with error information
+      const emptyTranscript = [];
       
-      // Send a detailed response to the client
+      // Send a detailed error response to the client
       res.json({
-        success: true,
-        transcript: mockTranscript,
+        success: false,
+        transcript: emptyTranscript,
         participant1Name,
         participant2Name,
         error: {
           type: errorType,
           message: errorMessage,
           details: openaiError.toString()
-        },
-        note: `Using sample transcript data due to API error: ${errorMessage}`
+        }
       });
     }
   } catch (error: any) {
@@ -517,7 +542,26 @@ Make sure your feedback is specific, actionable, and balanced between strengths 
       // Parse the JSON response
       const feedbackData = JSON.parse(responseContent);
       
-      // No database storage needed - just return the feedback
+      // Store the feedback in the database
+      try {
+        // Update the existing record with the feedback
+        await db.update(dualConversations)
+          .set({
+            feedback: JSON.stringify(feedbackData)
+          })
+          .where(and(
+            eq(dualConversations.configId, configId),
+            eq(dualConversations.sessionId, sessionId)
+          ))
+          .execute();
+          
+        console.log(`Updated record with feedback for session ${sessionId}`);
+      } catch (dbError) {
+        console.error("Database error saving feedback:", dbError);
+        // Continue even if DB save fails - we'll still return the data to the client
+      }
+      
+      // Return the feedback to the client
       res.json(feedbackData);
       
     } catch (openaiError: any) {
