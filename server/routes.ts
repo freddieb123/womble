@@ -1149,8 +1149,35 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Invalid config ID" });
       }
 
-      // Since we're not using a database for dual_conversations, return empty array
-      res.json([]);
+      // Fetch all dual conversations for this config ID
+      const conversations = await db.select({
+        sessionId: dualConversations.sessionId,
+        participant1Name: dualConversations.participant1Name,
+        participant2Name: dualConversations.participant2Name,
+        transcript: dualConversations.transcript,
+        feedback: dualConversations.feedback,
+        createdAt: dualConversations.createdAt
+      })
+      .from(dualConversations)
+      .where(eq(dualConversations.configId, configId))
+      .orderBy(desc(dualConversations.createdAt))
+      .execute();
+      
+      // Format the response
+      const formattedConversations = conversations.map(conv => ({
+        sessionId: conv.sessionId,
+        participant1Name: conv.participant1Name || 'Participant 1',
+        participant2Name: conv.participant2Name || 'Participant 2',
+        transcript: typeof conv.transcript === 'string' 
+          ? JSON.parse(conv.transcript) 
+          : conv.transcript,
+        feedback: typeof conv.feedback === 'string'
+          ? JSON.parse(conv.feedback)
+          : conv.feedback,
+        createdAt: conv.createdAt
+      }));
+
+      res.json(formattedConversations);
     } catch (error: any) {
       console.error("[GET /api/dual-conversations] Error:", error);
       res.status(500).json({ error: error.message });

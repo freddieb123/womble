@@ -342,7 +342,7 @@ export async function transcribeAudio(req: Request, res: Response) {
             .set({
               participant1Name,
               participant2Name,
-              transcript: JSON.stringify(transcript),
+              transcript: transcript as any, // Type assertion to avoid TS error
               audioUrl
             })
             .where(and(
@@ -355,14 +355,14 @@ export async function transcribeAudio(req: Request, res: Response) {
         } else {
           // Insert new record
           await db.insert(dualConversations)
-            .values({
+            .values([{
               configId,
               sessionId,
               participant1Name,
               participant2Name,
-              transcript: JSON.stringify(transcript),
+              transcript: transcript as any, // Type assertion to avoid TS error
               audioUrl
-            })
+            }])
             .execute();
             
           console.log(`Saved new transcript record for session ${sessionId}`);
@@ -414,7 +414,7 @@ export async function transcribeAudio(req: Request, res: Response) {
       }
       
       // Use authentic data only for error cases - return empty array with error information
-      const emptyTranscript = [];
+      const emptyTranscript: { role: string; content: string; timestamp: number }[] = [];
       
       // Send a detailed error response to the client
       res.json({
@@ -547,7 +547,7 @@ Make sure your feedback is specific, actionable, and balanced between strengths 
         // Update the existing record with the feedback
         await db.update(dualConversations)
           .set({
-            feedback: JSON.stringify(feedbackData)
+            feedback: feedbackData as any // Type assertion to avoid TS error
           })
           .where(and(
             eq(dualConversations.configId, configId),
@@ -589,46 +589,32 @@ Make sure your feedback is specific, actionable, and balanced between strengths 
         }
       }
       
-      // If we still have API issues, fall back to the mock data
-      const mockFeedback = {
-        "participant1": {
-          "bullets": [
-            "You initiated the conversation well with a friendly greeting, demonstrating good social awareness",
-            "You effectively introduced the main topic of discussion by bringing up the project timeline",
-            "You could be more specific about what aspects of the timeline you wanted to discuss"
-          ],
-          "score": 8,
-          "summary": "Strong conversation starter with good initiative but could add more specificity"
-        },
-        "participant2": {
-          "bullets": [
-            "You responded positively and showed courtesy by asking about the other person too",
-            "You demonstrated active listening by asking a specific follow-up question about the timeline",
-            "You could provide more context or information instead of just asking questions"
-          ],
-          "score": 7,
-          "summary": "Good listening skills but could contribute more substantive content"
-        },
-        "overall": {
-          "bullets": [
-            "The conversation had a positive and professional tone",
-            "Both participants engaged in turn-taking appropriately",
-            "The conversation could benefit from more specific details and information exchange"
-          ],
-          "summary": "Professional and courteous exchange that needs more depth and specificity"
-        }
-      };
+      // For API issues, return a clean error without dummy data
       
-      // Send a detailed response to the client
-      res.json({
-        ...mockFeedback,
+      // Send a detailed error response to the client with empty feedback structure
+      const emptyFeedback = {
+        participant1: {
+          bullets: [],
+          score: null,
+          summary: null
+        },
+        participant2: {
+          bullets: [],
+          score: null, 
+          summary: null
+        },
+        overall: {
+          bullets: [],
+          summary: null
+        },
         error: {
           type: errorType,
           message: errorMessage,
           details: openaiError.toString()
-        },
-        note: `Using sample feedback due to API error: ${errorMessage}`
-      });
+        }
+      };
+      
+      res.json(emptyFeedback);
     }
   } catch (error: any) {
     console.error("Error generating feedback:", error);
