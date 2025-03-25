@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquare, UserRound, Users } from 'lucide-react';
 
-interface DualConversationFeedback {
+interface TwoWayConversationFeedback {
   participant1: {
     bullets: string[];
     score: number;

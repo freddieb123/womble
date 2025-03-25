@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Mic, MicOff, Trash, Save } from "lucide-react";
 
-interface DualConversationRecorderProps {
+interface TwoWayConversationRecorderProps {
   configId: number;
   sessionId: string;
   participant1Name?: string;

@@ -108,7 +108,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
             `}
             onClick={() => handleTypeChange('dual-conversation')}
           >
-            Dual Conversation
+            Two-way Conversation
           </button>
         </div>
       </div>

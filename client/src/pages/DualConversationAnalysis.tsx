@@ -24,7 +24,7 @@ interface ParticipantFeedback {
   summary: string | null;
 }
 
-interface DualConversationFeedback {
+interface TwoWayConversationFeedback {
   participant1: ParticipantFeedback;
   participant2: ParticipantFeedback;
   overall: {
