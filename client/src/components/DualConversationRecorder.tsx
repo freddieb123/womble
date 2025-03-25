@@ -359,28 +359,6 @@ export default function DualConversationRecorder({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="participant1">Participant 1</Label>
-            <Input
-              id="participant1"
-              placeholder="Name"
-              value={participant1Name}
-              onChange={(e) => setParticipant1Name(e.target.value)}
-              disabled={isRecording || isProcessing}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="participant2">Participant 2</Label>
-            <Input
-              id="participant2"
-              placeholder="Name"
-              value={participant2Name}
-              onChange={(e) => setParticipant2Name(e.target.value)}
-              disabled={isRecording || isProcessing}
-            />
-          </div>
-        </div>
         
         {audioUrl && (
           <div className="pt-2">
