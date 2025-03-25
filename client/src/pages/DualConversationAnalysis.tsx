@@ -55,6 +55,10 @@ interface FeedbackSummary {
     participant1: number;
     participant2: number;
   };
+  keyThemes?: {
+    positive: string;
+    constructive: string;
+  };
 }
 
 export default function DualConversationAnalysis() {
@@ -85,7 +89,7 @@ export default function DualConversationAnalysis() {
     });
   };
 
-  const generateSummary = (conversationsData: DualConversationData[]): FeedbackSummary => {
+  const generateSummary = async (conversationsData: DualConversationData[]): Promise<FeedbackSummary> => {
     const withFeedback = conversationsData.filter(conv => 
       conv.feedback && 
       conv.feedback.participant1 && 
@@ -109,10 +113,49 @@ export default function DualConversationAnalysis() {
       participant2: feedbackCount > 0 ? participant2TotalScore / feedbackCount : 0
     };
 
+    let themes = {
+      positive: "No positive themes identified yet",
+      constructive: "No constructive feedback available yet"
+    };
+
+    // Get themes from all feedback points
+    if (withFeedback.length > 0) {
+      try {
+        // Collect all feedback bullets from participants and overall feedback
+        const allFeedbacks = withFeedback.flatMap(conv => {
+          const p1Bullets = conv.feedback.participant1?.bullets || [];
+          const p2Bullets = conv.feedback.participant2?.bullets || [];
+          const overallBullets = conv.feedback.overall?.bullets || [];
+          return [...p1Bullets, ...p2Bullets, ...overallBullets];
+        });
+
+        const response = await fetch('/api/analyze-themes', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            feedbacks: [{ bullets: allFeedbacks }]
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          themes = {
+            positive: data.positive || "No positive themes identified yet",
+            constructive: data.constructive || "No constructive feedback available yet"
+          };
+        }
+      } catch (error) {
+        console.error('Error analyzing themes:', error);
+      }
+    }
+
     return {
       feedbackCount,
       totalCount,
-      averageScore
+      averageScore,
+      keyThemes: themes
     };
   };
 
@@ -134,7 +177,7 @@ export default function DualConversationAnalysis() {
         }
 
         setConversations(conversationsData);
-        const summaryData = generateSummary(conversationsData);
+        const summaryData = await generateSummary(conversationsData);
         setSummary(summaryData);
       } catch (error) {
         console.error('Fetch error:', error);
@@ -149,6 +192,7 @@ export default function DualConversationAnalysis() {
     };
 
     fetchData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configId, toast]);
 
   if (!configId) {
@@ -209,6 +253,22 @@ export default function DualConversationAnalysis() {
                           </p>
                         </div>
                       </div>
+                      
+                      {summary.keyThemes && (
+                        <div className="mt-6 border-t pt-6">
+                          <h3 className="text-sm font-medium text-gray-500 mb-4">Key Themes</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="bg-green-50 p-4 rounded-lg border border-green-100">
+                              <h4 className="text-sm font-semibold text-green-700 mb-2">What's Working Well</h4>
+                              <p className="text-sm text-green-800">{summary.keyThemes.positive}</p>
+                            </div>
+                            <div className="bg-amber-50 p-4 rounded-lg border border-amber-100">
+                              <h4 className="text-sm font-semibold text-amber-700 mb-2">Areas for Improvement</h4>
+                              <p className="text-sm text-amber-800">{summary.keyThemes.constructive}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </CollapsibleContent>
