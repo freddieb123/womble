@@ -679,16 +679,6 @@ export default function Home() {
           <TemplateGallery
             onSelectTemplate={handleTemplateSelect}
             onStartFromScratch={handleStartFromScratch}
-            templates={(configs?.filter(c => c.isTemplate) || []).map(template => ({
-              ...template,
-              temperature: template.temperature || 0.7,
-              maxTokens: template.maxTokens || 1000,
-              usageCount: configs?.filter(c =>
-                !c.isTemplate &&
-                c.systemPrompt === template.systemPrompt &&
-                c.type === template.type
-              ).length || 0
-            }))}
           />
         </DialogContent>
       </Dialog>
