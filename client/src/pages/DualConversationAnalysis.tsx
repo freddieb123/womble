@@ -84,14 +84,14 @@ export default function DualConversationAnalysis() {
       conv.feedback.participant1 && 
       conv.feedback.participant2
     );
-    
+
     const feedbackCount = withFeedback.length;
     const totalCount = conversationsData.length;
 
     // Calculate average scores
     let participant1TotalScore = 0;
     let participant2TotalScore = 0;
-    
+
     withFeedback.forEach(conv => {
       participant1TotalScore += conv.feedback.participant1.score || 0;
       participant2TotalScore += conv.feedback.participant2.score || 0;
@@ -236,7 +236,7 @@ export default function DualConversationAnalysis() {
                           </p>
                         </div>
                       </div>
-                      
+
                       {summary.keyThemes && (
                         <div className="mt-6 border-t pt-6">
                           <h3 className="text-sm font-medium text-gray-500 mb-4">Key Themes</h3>
@@ -288,19 +288,11 @@ export default function DualConversationAnalysis() {
                       <CardContent>
                         <div className="space-y-6">
                           <div className="flex items-start justify-between">
-                            <div>
-                              <h3 className="text-md font-semibold">Participants</h3>
-                              <p className="text-sm text-gray-500 mt-1">
-                                <span className="font-medium">Participant 1:</span> {conversation.participant1Name}<br />
-                                <span className="font-medium">Participant 2:</span> {conversation.participant2Name}
-                              </p>
-                            </div>
-                            
                             <div className="text-xl font-bold text-blue-900 flex items-center">
                               Score: {Math.round(((conversation.feedback?.participant1?.score || 0) + (conversation.feedback?.participant2?.score || 0)) / 2)}/10
                             </div>
                           </div>
-                          
+
                           <div className="space-y-4">
                             {conversation.feedback?.overall?.bullets && Array.isArray(conversation.feedback.overall.bullets) && (
                               <div className="space-y-2">
@@ -342,7 +334,7 @@ export default function DualConversationAnalysis() {
                           View Transcript
                         </Button>
                       </CardFooter>
-                      
+
 
                     </Card>
                   ))
