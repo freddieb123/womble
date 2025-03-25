@@ -1148,12 +1148,24 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/dual-conversations/:configId", async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.configId);
+      const sessionId = req.query.sessionId as string | undefined;
 
       if (isNaN(configId)) {
         return res.status(400).json({ error: "Invalid config ID" });
       }
 
-      // Fetch all dual conversations for this config ID
+      // Build where clause
+      let whereClause = eq(dualConversations.configId, configId);
+      
+      // If sessionId is provided, filter by it
+      if (sessionId) {
+        whereClause = and(
+          whereClause,
+          eq(dualConversations.sessionId, sessionId)
+        );
+      }
+
+      // Fetch dual conversations for this config ID (and optionally sessionId)
       const conversations = await db.select({
         sessionId: dualConversations.sessionId,
         participant1Name: dualConversations.participant1Name,
@@ -1163,7 +1175,7 @@ export function registerRoutes(app: Express): Server {
         createdAt: dualConversations.createdAt
       })
       .from(dualConversations)
-      .where(eq(dualConversations.configId, configId))
+      .where(whereClause)
       .orderBy(desc(dualConversations.createdAt))
       .execute();
       
