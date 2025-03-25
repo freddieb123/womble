@@ -204,7 +204,7 @@ export default function DualConversationAnalysis() {
         <div className="sticky top-0 z-10 p-4 md:p-8 pb-4">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-blue-900">
-              Dual Conversation Analysis
+              Two-way Conversation Analysis
             </h1>
           </div>
 
@@ -342,7 +342,7 @@ export default function DualConversationAnalysis() {
                   <Card>
                     <CardContent className="p-6">
                       <div className="text-center text-muted-foreground">
-                        No dual conversations available yet.
+                        No two-way conversations available yet.
                       </div>
                     </CardContent>
                   </Card>
