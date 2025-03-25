@@ -131,7 +131,7 @@ export default function Home() {
       // Track GPT creation event
       track(EventName.GPT_CONFIRM_CREATION, { 
         type: config.type, 
-        hasQuestions: config.type === 'quiz' && config.questions?.length > 0
+        hasQuestions: config.type === 'quiz' && (config.questions?.length ?? 0) > 0
       });
       
       queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
@@ -334,7 +334,7 @@ export default function Home() {
   };
 
   const handleViewFeedback = (configToView: ChatConfig) => {
-    if (configToView.type === 'dual-conversation') {
+    if (configToView.type === 'two-way-conversation') {
       window.open(`${window.location.origin}/dual-analysis?configId=${configToView.id}`, '_blank');
     } else {
       window.open(`${window.location.origin}/analysis?configId=${configToView.id}`, '_blank');
