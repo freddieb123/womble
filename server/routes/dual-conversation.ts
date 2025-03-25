@@ -497,7 +497,7 @@ Make sure your feedback is specific, actionable, and balanced between strengths 
       // Use our retry function for the OpenAI API call
       const completion = await retryOpenAICall(async () => {
         return await openai.chat.completions.create({
-          model: "gpt-3.5-turbo-16k",
+          model: "gpt-4o",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: conversationText }

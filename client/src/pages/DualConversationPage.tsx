@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import DualConversationRecorder from '@/components/DualConversationRecorder';
+import ParticipantsNameModal from '@/components/ParticipantsNameModal';
 import { v4 as uuidv4 } from 'uuid';
 
 interface DualConversationPageProps {}
@@ -23,6 +24,9 @@ export default function DualConversationPage({}: DualConversationPageProps) {
   const [transcript, setTranscript] = useState<any[]>([]);
   const [feedback, setFeedback] = useState<any | null>(null);
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
+  const [showNamesModal, setShowNamesModal] = useState(true);
+  const [participant1Name, setParticipant1Name] = useState("");
+  const [participant2Name, setParticipant2Name] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
