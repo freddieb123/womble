@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRoute } from 'wouter';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,28 +24,27 @@ export default function StaticTranscriptView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [conversation, setConversation] = useState<DualConversation | null>(null);
-  const fetchedRef = useRef(false);
+  const [requestSent, setRequestSent] = useState(false);
 
   useEffect(() => {
-    // Only fetch once - prevent infinite fetch loop
-    if (fetchedRef.current) return;
+    if (!params?.configId || !params?.sessionId || requestSent) {
+      return;
+    }
     
     const fetchData = async () => {
       try {
         setLoading(true);
-        
-        if (!params?.configId || !params?.sessionId) {
-          throw new Error('Missing configuration ID or session ID');
-        }
+        setRequestSent(true);
         
         console.log('StaticTranscriptView - Fetching data with:', {
           configId: params.configId,
           sessionId: params.sessionId
         });
         
-        fetchedRef.current = true; // Mark as fetched before the actual fetch
+        const url = `/api/dual-conversations/${params.configId}?sessionId=${params.sessionId}`;
+        console.log('Making request to:', url);
         
-        const response = await fetch(`/api/dual-conversations/${params.configId}?sessionId=${params.sessionId}`);
+        const response = await fetch(url);
         
         if (!response.ok) {
           throw new Error(`Failed to fetch conversation: ${response.statusText}`);
@@ -68,7 +67,7 @@ export default function StaticTranscriptView() {
     };
     
     fetchData();
-  }, [params]);
+  }, [params, requestSent]);
 
   if (loading) {
     return (

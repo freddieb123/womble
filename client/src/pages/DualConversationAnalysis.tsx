@@ -338,8 +338,10 @@ export default function DualConversationAnalysis() {
                           size="sm"
                           className="flex items-center gap-2"
                           onClick={() => {
-                            console.log(`Opening transcript: /transcript/${configId}/${conversation.sessionId}`);
-                            window.open(`/transcript/${configId}/${conversation.sessionId}`, '_blank');
+                            const url = `/transcript/${configId}/${conversation.sessionId}`;
+                            console.log(`Opening transcript: ${url}`);
+                            // Open in a new window instead of a new tab for more reliable behavior
+                            window.open(url, `transcript_${conversation.sessionId}`, 'width=1000,height=800,resizable=yes');
                           }}
                         >
                           <MessageSquare className="h-4 w-4" />
