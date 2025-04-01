@@ -67,7 +67,7 @@ export default function StaticConversationView() {
         <Card>
           <CardHeader>
             <h1 className="text-2xl font-bold text-blue-900">
-              {config?.title || 'Conversation'}
+              {config?.title || 'Chat with a GPT'}
             </h1>
           </CardHeader>
           <CardContent>

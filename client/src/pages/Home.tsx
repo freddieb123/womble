@@ -543,7 +543,7 @@ export default function Home() {
                               'bg-blue-100 text-blue-800'
                             }
                           >
-                            {config.type === 'chat' ? 'conversation' :
+                            {config.type === 'chat' ? 'Chat with a GPT' :
                              config.type === 'upload' ? 'upload' : 
                              config.type === 'two-way-conversation' ? 'two-way conversation' : 
                              'quiz'}

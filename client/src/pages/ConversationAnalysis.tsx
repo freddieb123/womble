@@ -208,7 +208,7 @@ export default function ConversationAnalysis() {
         <div className="sticky top-0 z-10 p-4 md:p-8 pb-4">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-blue-900">
-              {config?.type === 'upload' ? 'Upload Analysis' : config?.type === 'quiz' ? 'Quiz Analysis' : 'Conversation Analysis'}
+              {config?.type === 'upload' ? 'Upload Analysis' : config?.type === 'quiz' ? 'Quiz Analysis' : 'Chat with a GPT Analysis'}
             </h1>
           </div>
 
@@ -271,7 +271,7 @@ export default function ConversationAnalysis() {
             <Card>
               <CardContent className="p-6">
                 <div className="animate-pulse text-center">
-                  {config?.type === 'upload' ? 'Analyzing uploads...' : config?.type === 'quiz' ? 'Loading quiz responses...' : 'Analyzing conversations...'}
+                  {config?.type === 'upload' ? 'Analyzing uploads...' : config?.type === 'quiz' ? 'Loading quiz responses...' : 'Analyzing chats...'}
                 </div>
               </CardContent>
             </Card>
@@ -299,8 +299,8 @@ export default function ConversationAnalysis() {
                       <CardHeader className="flex flex-row items-center justify-between">
                         <h2 className="text-lg font-semibold">
                           {conversation.userName ?
-                            `${conversation.userName}'s ${config?.type === 'upload' ? 'Upload' : 'Conversation'}` :
-                            `Anonymous ${config?.type === 'upload' ? 'Upload' : 'Conversation'} ${index + 1}`}
+                            `${conversation.userName}'s ${config?.type === 'upload' ? 'Upload' : 'Chat with a GPT'}` :
+                            `Anonymous ${config?.type === 'upload' ? 'Upload' : 'Chat with a GPT'} ${index + 1}`}
                         </h2>
                         {config?.type === 'chat' && (
                           <Button
@@ -312,7 +312,7 @@ export default function ConversationAnalysis() {
                             }}
                           >
                             <MessageSquare className="h-4 w-4" />
-                            View Conversation
+                            View Chat
                           </Button>
                         )}
                       </CardHeader>
