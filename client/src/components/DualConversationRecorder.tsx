@@ -379,7 +379,7 @@ export default function DualConversationRecorder({
       {transcript.length === 0 && (
         <CardFooter className="flex flex-col space-y-3">
           <div className="w-full text-center">
-            <p className="text-xs text-gray-500 mb-2">Powered by Open AI</p>
+            <p className="text-xs text-gray-500 mb-2"></p>
           </div>
           {!audioBlob ? (
             <div className="w-full flex flex-col">
@@ -399,7 +399,7 @@ export default function DualConversationRecorder({
                   </>
                 )}
               </Button>
-              <p className="text-xs text-gray-500 mt-2 text-center">A transcript will be saved, but not the audio recording.</p>
+              <p className="text-xs text-gray-500 mt-2 text-center">A transcript will be saved, but not the audio recording. Your trainer has access to your transcript. Powered by <a href="https://womble.co" style={{ color: 'blue' }}>Womble.co</a></p>
             </div>
           ) : (
             <div className="w-full flex justify-between gap-2">
