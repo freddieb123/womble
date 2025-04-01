@@ -27,7 +27,7 @@ export default function DualConversationRecorder({
   participant1Name: propParticipant1Name,
   participant2Name: propParticipant2Name,
   onTranscriptReady 
-}: DualConversationRecorderProps) {
+}: TwoWayConversationRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -377,26 +377,32 @@ export default function DualConversationRecorder({
       </CardContent>
       {/* Only show card footer with buttons if transcript is not ready */}
       {transcript.length === 0 && (
-        <CardFooter className="justify-between space-x-2">
+        <CardFooter className="flex flex-col space-y-3">
+          <div className="w-full text-center">
+            <p className="text-xs text-gray-500 mb-2">Powered by Open AI</p>
+          </div>
           {!audioBlob ? (
-            <Button
-              className="w-full"
-              onClick={isRecording ? stopRecording : startRecording}
-              variant={isRecording ? "destructive" : "default"}
-              disabled={isProcessing}
-            >
-              {isRecording ? (
-                <>
-                  <MicOff className="mr-2 h-4 w-4" /> Stop Recording
-                </>
-              ) : (
-                <>
-                  <Mic className="mr-2 h-4 w-4" /> Start Recording
-                </>
-              )}
-            </Button>
+            <div className="w-full flex flex-col">
+              <Button
+                className="w-full"
+                onClick={isRecording ? stopRecording : startRecording}
+                variant={isRecording ? "destructive" : "default"}
+                disabled={isProcessing}
+              >
+                {isRecording ? (
+                  <>
+                    <MicOff className="mr-2 h-4 w-4" /> Stop Recording
+                  </>
+                ) : (
+                  <>
+                    <Mic className="mr-2 h-4 w-4" /> Start Recording
+                  </>
+                )}
+              </Button>
+              <p className="text-xs text-gray-500 mt-2 text-center">A transcript will be saved, but not the audio recording.</p>
+            </div>
           ) : (
-            <>
+            <div className="w-full flex justify-between gap-2">
               <Button 
                 variant="destructive" 
                 onClick={discardRecording}
@@ -419,7 +425,7 @@ export default function DualConversationRecorder({
                   </>
                 )}
               </Button>
-            </>
+            </div>
           )}
         </CardFooter>
       )}
