@@ -2,14 +2,18 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { X, Trophy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { AdminConfig, UploadState, Feedback, Message } from "@/lib/types";
 import UserNameModal from "./UserNameModal";
 import LeaderboardModal from "./LeaderboardModal";
-
 
 interface Props {
   config: AdminConfig;
@@ -25,18 +29,25 @@ interface LeaderboardEntry {
   isCurrentUser: boolean;
 }
 
-export default function UploadInterface({ config, sessionId, userName, onUserNameSubmit }: Props) {
+export default function UploadInterface({
+  config,
+  sessionId,
+  userName,
+  onUserNameSubmit,
+}: Props) {
   const [uploadState, setUploadState] = useState<UploadState>({
     file: null,
     isLoading: false,
     error: null,
-    feedback: null
+    feedback: null,
   });
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [localUserName, setLocalUserName] = useState(userName);
   const [showNameModal, setShowNameModal] = useState(!localUserName);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>(
+    [],
+  );
   const [userRank, setUserRank] = useState<number>();
   const { toast } = useToast();
 
@@ -45,11 +56,13 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
   }, [userName]);
 
   // Fetch existing feedback if available
-  const { data: conversations = [], error: fetchError } = useQuery<Array<{
-    sessionId: string;
-    feedback: Feedback | null;
-    messages: Array<Message>;
-  }>>({
+  const { data: conversations = [], error: fetchError } = useQuery<
+    Array<{
+      sessionId: string;
+      feedback: Feedback | null;
+      messages: Array<Message>;
+    }>
+  >({
     queryKey: [`/api/conversations/${config.id}`],
     enabled: !!config.id,
   });
@@ -58,7 +71,7 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
     try {
       const response = await fetch(`/api/conversations/${config.id}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch leaderboard data');
+        throw new Error("Failed to fetch leaderboard data");
       }
 
       const data = await response.json();
@@ -66,24 +79,27 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
       const scoredEntries = data
         .filter((entry: any) => entry.feedback && entry.feedback.score !== null)
         .map((entry: any) => ({
-          userName: entry.userName || 'Anonymous',
+          userName: entry.userName || "Anonymous",
           score: entry.feedback.score,
           total: 10, // Feedback scores are out of 10
-          isCurrentUser: entry.userName === localUserName && entry.sessionId === sessionId
+          isCurrentUser:
+            entry.userName === localUserName && entry.sessionId === sessionId,
         }));
 
-      const sortedEntries = scoredEntries.sort((a: LeaderboardEntry, b: LeaderboardEntry) =>
-        b.score - a.score
+      const sortedEntries = scoredEntries.sort(
+        (a: LeaderboardEntry, b: LeaderboardEntry) => b.score - a.score,
       );
 
-      const userRankIndex = sortedEntries.findIndex(entry => entry.isCurrentUser);
+      const userRankIndex = sortedEntries.findIndex(
+        (entry) => entry.isCurrentUser,
+      );
       if (userRankIndex !== -1) {
         setUserRank(userRankIndex + 1);
       }
 
       setLeaderboardData(sortedEntries);
     } catch (error) {
-      console.error('Error fetching leaderboard:', error);
+      console.error("Error fetching leaderboard:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -94,11 +110,11 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
 
   useEffect(() => {
     if (fetchError && uploadState.feedback) {
-      console.error('Error fetching conversations:', fetchError);
+      console.error("Error fetching conversations:", fetchError);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to load feedback data"
+        description: "Failed to load feedback data",
       });
     }
   }, [fetchError, uploadState.feedback, toast]);
@@ -106,12 +122,14 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
   // Get the latest feedback if available
   useEffect(() => {
     if (conversations && conversations.length > 0) {
-      const currentConversation = conversations.find(conv => conv.sessionId === sessionId);
+      const currentConversation = conversations.find(
+        (conv) => conv.sessionId === sessionId,
+      );
 
       if (currentConversation?.feedback) {
-        setUploadState(prev => ({
+        setUploadState((prev) => ({
           ...prev,
-          feedback: currentConversation.feedback
+          feedback: currentConversation.feedback,
         }));
         // Automatically show feedback if available
         setFeedbackOpen(true);
@@ -125,16 +143,16 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
 
       const items = e.clipboardData.items;
       for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf('image') !== -1) {
+        if (items[i].type.indexOf("image") !== -1) {
           const blob = items[i].getAsFile();
           if (!blob) continue;
 
           const reader = new FileReader();
           reader.onload = (event) => {
             const base64String = event.target?.result as string;
-            setUploadState(prev => ({
+            setUploadState((prev) => ({
               ...prev,
-              file: base64String
+              file: base64String,
             }));
           };
           reader.readAsDataURL(blob);
@@ -143,8 +161,8 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
       }
     };
 
-    document.addEventListener('paste', handlePaste);
-    return () => document.removeEventListener('paste', handlePaste);
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
   }, []);
 
   const getFeedback = async () => {
@@ -152,7 +170,7 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
       toast({
         variant: "destructive",
         title: "No screenshot",
-        description: "Please paste a screenshot first"
+        description: "Please paste a screenshot first",
       });
       return;
     }
@@ -168,7 +186,7 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
 
   const handleFeedbackRequest = async () => {
     try {
-      setUploadState(prev => ({ ...prev, isLoading: true, error: null }));
+      setUploadState((prev) => ({ ...prev, isLoading: true, error: null }));
       const response = await fetch("/api/upload-feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -177,7 +195,7 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
           sessionId,
           userName: localUserName,
           fileContent: uploadState.file,
-          fileName: "pasted_screenshot.png"
+          fileName: "pasted_screenshot.png",
         }),
       });
 
@@ -186,9 +204,9 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
       }
 
       const feedbackData = await response.json();
-      setUploadState(prev => ({
+      setUploadState((prev) => ({
         ...prev,
-        feedback: feedbackData
+        feedback: feedbackData,
       }));
       setFeedbackOpen(true);
 
@@ -198,14 +216,16 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
       toast({
         variant: "destructive",
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to get feedback"
+        description:
+          error instanceof Error ? error.message : "Failed to get feedback",
       });
-      setUploadState(prev => ({
+      setUploadState((prev) => ({
         ...prev,
-        error: error instanceof Error ? error.message : "Failed to get feedback"
+        error:
+          error instanceof Error ? error.message : "Failed to get feedback",
       }));
     } finally {
-      setUploadState(prev => ({ ...prev, isLoading: false }));
+      setUploadState((prev) => ({ ...prev, isLoading: false }));
     }
   };
 
@@ -227,14 +247,14 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
           <Info className="h-4 w-4" />
           <AlertDescription>
             <div className="font-semibold text-lg mb-2">{config.title}</div>
-            <pre className="font-sans whitespace-pre-wrap">{config.userInstructions}</pre>
+            <pre className="font-sans whitespace-pre-wrap">
+              {config.userInstructions}
+            </pre>
           </AlertDescription>
         </Alert>
       )}
 
-      <div
-        className="flex-1 border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-6 relative"
-      >
+      <div className="flex-1 border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-6 relative">
         {uploadState.file ? (
           <div className="relative inline-block">
             <img
@@ -243,7 +263,13 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
               className="max-h-96 rounded-lg border border-gray-200"
             />
             <button
-              onClick={() => setUploadState(prev => ({ ...prev, file: null, feedback: null }))}
+              onClick={() =>
+                setUploadState((prev) => ({
+                  ...prev,
+                  file: null,
+                  feedback: null,
+                }))
+              }
               className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-sm border border-gray-200"
             >
               <X className="h-4 w-4 text-gray-500" />
@@ -251,24 +277,30 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
           </div>
         ) : (
           <div className="text-center">
-            <p className="text-lg font-semibold mb-2">Press Ctrl+V (Cmd+V on Mac)</p>
-            <p className="text-sm text-gray-600">Paste your screenshot here to get feedback</p>
+            <p className="text-lg font-semibold mb-2">
+              Press Ctrl+V (Cmd+V on Mac)
+            </p>
+            <p className="text-sm text-gray-600">
+              Paste your screenshot here to get feedback
+            </p>
           </div>
         )}
       </div>
 
       <div className="mt-4">
         <Button
-          className={`w-full ${(uploadState.feedback && uploadState.feedback.score !== undefined) ? 'bg-green-600 hover:bg-green-700' : ''}`}
+          className={`w-full ${uploadState.feedback && uploadState.feedback.score !== undefined ? "bg-green-600 hover:bg-green-700" : ""}`}
           size="lg"
           disabled={!uploadState.file || uploadState.isLoading}
-          onClick={(uploadState.feedback && uploadState.feedback.score !== undefined)
-            ? () => setFeedbackOpen(true)
-            : getFeedback}
+          onClick={
+            uploadState.feedback && uploadState.feedback.score !== undefined
+              ? () => setFeedbackOpen(true)
+              : getFeedback
+          }
         >
           {uploadState.isLoading
             ? "Analyzing..."
-            : (uploadState.feedback && uploadState.feedback.score !== undefined)
+            : uploadState.feedback && uploadState.feedback.score !== undefined
               ? "View Feedback"
               : "Get Feedback"}
         </Button>
@@ -277,7 +309,9 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
       <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{localUserName ? `${localUserName}'s Upload` : 'Feedback'}</DialogTitle>
+            <DialogTitle>
+              {localUserName ? `${localUserName}'s Upload` : "Feedback"}
+            </DialogTitle>
           </DialogHeader>
           {uploadState.feedback && (
             <div className="space-y-6">
@@ -291,9 +325,13 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
               </div>
               <div className="border-t pt-4">
                 <div className="flex flex-col gap-4">
-                  <span className="text-2xl font-bold">{uploadState.feedback.score}/10</span>
+                  <span className="text-2xl font-bold">
+                    {uploadState.feedback.score}/10
+                  </span>
                   {uploadState.feedback.summary && (
-                    <p className="text-sm text-muted-foreground">{uploadState.feedback.summary}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {uploadState.feedback.summary}
+                    </p>
                   )}
                   <Button
                     onClick={() => {
@@ -322,9 +360,18 @@ export default function UploadInterface({ config, sessionId, userName, onUserNam
         onRefresh={fetchLeaderboard}
       />
       {/* Confirmation modal removed */}
-      
+
       <div className="mt-auto py-2 text-center text-xs text-gray-400">
-        This page is powered by <a href="https://www.womble.co" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700">Womble.co</a>
+        This page is powered by{" "}
+        <a
+          href="https://www.womble.co"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-500 hover:text-blue-700"
+        >
+          Womble.co
+        </a>
+        . Your trainer has access to the feedback.
       </div>
     </div>
   );
