@@ -307,19 +307,11 @@ export async function transcribeAudio(req: Request, res: Response) {
       // Process the segments to assign speakers
       const segments = transcription.segments || [];
       
-      // Simple algorithm to alternate speakers
-      // For a production app, you would want to use a more sophisticated speaker diarization
-      // but this is a simplified approach for the POC
-      let currentSpeaker = "participant1";
-      const transcript = segments.map((segment, index) => {
-        // Toggle speaker for every segment
-        // In a real app, you'd use more sophisticated speaker recognition
-        if (index > 0 && segment.text.trim().length > 0) {
-          currentSpeaker = currentSpeaker === "participant1" ? "participant2" : "participant1";
-        }
-        
+      // Instead of alternating speakers, we'll create a unified transcript
+      // This approach doesn't try to distinguish between speakers
+      const transcript = segments.map((segment) => {
         return {
-          role: currentSpeaker,
+          role: "transcript", // Use a single role for all segments
           content: segment.text.trim(),
           timestamp: segment.start
         };
@@ -486,39 +478,37 @@ export async function generateFeedback(req: Request, res: Response) {
       
       console.log("Generating feedback using OpenAI API");
       
-      // Format the conversation for GPT analysis
-      const conversationText = transcript.map((entry: { role: string; content: string }) => {
-        const speaker = entry.role === 'participant1' ? participant1Name : participant2Name;
-        return `${speaker}: ${entry.content}`;
+      // Format the conversation for GPT analysis - just combine all content
+      const conversationText = transcript.map((entry: { content: string }) => {
+        return entry.content;
       }).join('\n');
       
       // Prepare the system prompt with instructions
       const systemPrompt = `
-You are an expert in analyzing conversations between two people. You'll be evaluating a conversation between Participant 1 (${participant1Name}) and Participant 2 (${participant2Name}).
+You are an expert in analyzing conversations. You'll be evaluating a transcribed conversation for feedback.
 
 ${feedbackCriteria}
 
-IMPORTANT: In your feedback, always refer to the participants as "Participant 1" and "Participant 2" rather than using their actual names. This ensures accuracy and prevents confusion about who performed which actions.
-
 After analyzing the conversation, provide constructive feedback in this exact JSON structure:
 {
-  "participant1": {
-    "bullets": [array of 3-5 specific feedback points for Participant 1, using "Participant 1" in the text rather than their name],
-    "score": [numerical score from 1-10],
-    "summary": [1-2 sentence overall feedback using "Participant 1" rather than their name]
-  },
-  "participant2": {
-    "bullets": [array of 3-5 specific feedback points for Participant 2, using "Participant 2" in the text rather than their name],
-    "score": [numerical score from 1-10],
-    "summary": [1-2 sentence overall feedback using "Participant 2" rather than their name]
-  },
   "overall": {
-    "bullets": [array of 3-5 points about the conversation as a whole, referring to "Participant 1" and "Participant 2"],
-    "summary": [1-2 sentence summary of the overall interaction]
+    "bullets": [array of 5-7 specific feedback points about the conversation],
+    "score": [numerical score from 1-10 for the overall quality of the conversation],
+    "summary": [2-3 sentence summary of the overall conversation with key strengths and areas for improvement]
+  },
+  "communication_skills": {
+    "bullets": [array of 3-5 points about communication effectiveness in the conversation],
+    "score": [numerical score from 1-10],
+    "summary": [1-2 sentence summary of communication quality]
+  },
+  "content_quality": {
+    "bullets": [array of 3-5 points about the substance and content of the conversation],
+    "score": [numerical score from 1-10],
+    "summary": [1-2 sentence summary of content quality]
   }
 }
 
-Make sure your feedback is specific, actionable, and balanced between strengths and areas for improvement, but NEVER use the participants' actual names in the feedback.
+Make sure your feedback is specific, actionable, and balanced between strengths and areas for improvement.
 `;
 
       // Use our retry function for the OpenAI API call
@@ -595,18 +585,19 @@ Make sure your feedback is specific, actionable, and balanced between strengths 
       
       // Send a detailed error response to the client with empty feedback structure
       const emptyFeedback = {
-        participant1: {
+        overall: {
           bullets: [],
           score: null,
           summary: null
         },
-        participant2: {
+        communication_skills: {
           bullets: [],
           score: null, 
           summary: null
         },
-        overall: {
+        content_quality: {
           bullets: [],
+          score: null,
           summary: null
         },
         error: {

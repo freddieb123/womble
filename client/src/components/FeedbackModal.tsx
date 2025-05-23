@@ -14,24 +14,25 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquare, UserRound, Users } from 'lucide-react';
 
 interface TwoWayConversationFeedback {
-  participant1: {
-    bullets: string[];
-    score: number;
-    summary: string | null;
-  };
-  participant2: {
-    bullets: string[];
-    score: number;
-    summary: string | null;
-  };
   overall: {
     bullets: string[];
+    score: number;
+    summary: string | null;
+  };
+  communication_skills: {
+    bullets: string[];
+    score: number;
+    summary: string | null;
+  };
+  content_quality: {
+    bullets: string[];
+    score: number;
     summary: string | null;
   };
 }
 
 interface TranscriptEntry {
-  role: 'participant1' | 'participant2';
+  role: 'transcript';
   content: string;
   timestamp: number;
 }
@@ -39,7 +40,7 @@ interface TranscriptEntry {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  feedback: DualConversationFeedback | null;
+  feedback: TwoWayConversationFeedback | null;
   transcript: TranscriptEntry[];
 }
 
@@ -64,34 +65,106 @@ export default function FeedbackModal({
           </p>
         </DialogHeader>
         
-        <Card className="w-full">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Conversation Feedback</span>
-              <span className="text-2xl font-bold text-blue-600">
-                {Math.round(((feedback.participant1?.score || 0) + (feedback.participant2?.score || 0)) / 2)}/10
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[50vh]">
-              <div className="space-y-4">
-                {feedback.overall?.bullets?.map((bullet, i) => (
-                  <div key={i} className="flex items-start p-3 rounded-md bg-gray-50">
-                    <span className="font-medium text-gray-700 mr-2">•</span>
-                    <p className="text-gray-700">{bullet}</p>
+        <Tabs defaultValue="overall" className="w-full">
+          <TabsList className="grid grid-cols-3 mb-4">
+            <TabsTrigger value="overall">Overall</TabsTrigger>
+            <TabsTrigger value="communication">Communication</TabsTrigger>
+            <TabsTrigger value="content">Content</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="overall">
+            <Card className="w-full">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Overall Feedback</span>
+                  <span className="text-2xl font-bold text-blue-600">
+                    {feedback.overall?.score || 0}/10
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[50vh]">
+                  <div className="space-y-4">
+                    {feedback.overall?.bullets?.map((bullet: string, i: number) => (
+                      <div key={i} className="flex items-start p-3 rounded-md bg-gray-50">
+                        <span className="font-medium text-gray-700 mr-2">•</span>
+                        <p className="text-gray-700">{bullet}</p>
+                      </div>
+                    ))}
+                    
+                    {feedback.overall?.summary && (
+                      <div className="mt-6 pt-4 border-t">
+                        <p className="font-medium text-gray-800">{feedback.overall.summary}</p>
+                      </div>
+                    )}
                   </div>
-                ))}
-                
-                {feedback.overall?.summary && (
-                  <div className="mt-6 pt-4 border-t">
-                    <p className="font-medium text-gray-800">{feedback.overall.summary}</p>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="communication">
+            <Card className="w-full">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Communication Skills</span>
+                  <span className="text-2xl font-bold text-blue-600">
+                    {feedback.communication_skills?.score || 0}/10
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[50vh]">
+                  <div className="space-y-4">
+                    {feedback.communication_skills?.bullets?.map((bullet: string, i: number) => (
+                      <div key={i} className="flex items-start p-3 rounded-md bg-gray-50">
+                        <span className="font-medium text-gray-700 mr-2">•</span>
+                        <p className="text-gray-700">{bullet}</p>
+                      </div>
+                    ))}
+                    
+                    {feedback.communication_skills?.summary && (
+                      <div className="mt-6 pt-4 border-t">
+                        <p className="font-medium text-gray-800">{feedback.communication_skills.summary}</p>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="content">
+            <Card className="w-full">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Content Quality</span>
+                  <span className="text-2xl font-bold text-blue-600">
+                    {feedback.content_quality?.score || 0}/10
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[50vh]">
+                  <div className="space-y-4">
+                    {feedback.content_quality?.bullets?.map((bullet: string, i: number) => (
+                      <div key={i} className="flex items-start p-3 rounded-md bg-gray-50">
+                        <span className="font-medium text-gray-700 mr-2">•</span>
+                        <p className="text-gray-700">{bullet}</p>
+                      </div>
+                    ))}
+                    
+                    {feedback.content_quality?.summary && (
+                      <div className="mt-6 pt-4 border-t">
+                        <p className="font-medium text-gray-800">{feedback.content_quality.summary}</p>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
         
         <DialogFooter className="flex justify-between items-center">
           <div className="flex-1">
