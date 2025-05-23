@@ -91,18 +91,19 @@ export interface ConversationFeedback {
 }
 
 export interface DualConversationFeedback {
-  participant1: {
-    bullets: string[];
-    score: number;
-    summary: string | null;
-  };
-  participant2: {
-    bullets: string[];
-    score: number;
-    summary: string | null;
-  };
   overall: {
     bullets: string[];
+    score: number;
+    summary: string | null;
+  };
+  communication_skills: {
+    bullets: string[];
+    score: number;
+    summary: string | null;
+  };
+  content_quality: {
+    bullets: string[];
+    score: number;
     summary: string | null;
   };
 }

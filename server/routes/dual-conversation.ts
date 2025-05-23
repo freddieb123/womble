@@ -145,19 +145,19 @@ async function convertAudioToMp3(inputPath: string): Promise<string> {
       .audioQuality(3) // Medium quality, 0-9 (0 is best)
       .audioChannels(1) // Mono for better speech recognition
       .noVideo()
-      .on('start', (commandLine) => {
+      .on('start', function(commandLine: string) {
         console.log('FFmpeg conversion started:', commandLine);
       })
-      .on('progress', (progress) => {
+      .on('progress', function(progress: { percent?: number }) {
         if (progress.percent) {
           console.log(`Conversion progress: ${Math.round(progress.percent)}%`);
         }
       })
-      .on('error', (err) => {
+      .on('error', function(err: Error) {
         console.error('Error converting audio:', err);
         reject(err);
       })
-      .on('end', () => {
+      .on('end', function() {
         console.log('Audio conversion completed successfully');
         resolve(outputPath);
       })
