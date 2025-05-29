@@ -6,7 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, MessageSquare } from 'lucide-react';
 
 interface TranscriptEntry {
-  role: 'participant1' | 'participant2';
+  role: 'transcript';
   content: string;
   timestamp: number;
 }
@@ -109,30 +109,16 @@ export default function StaticTranscriptView() {
               </Button>
             </CardTitle>
             <div className="text-sm text-muted-foreground">
-              <span className="font-medium">Participant 1 and Participant 2</span>
+              <span className="font-medium">Full Conversation Transcript</span>
             </div>
           </CardHeader>
           
           <CardContent>
             <ScrollArea className="h-[70vh]">
-              <div className="space-y-4">
-                {transcript.map((entry, index) => (
-                  <div 
-                    key={index} 
-                    className={`p-4 rounded-lg ${
-                      entry.role === 'participant1' 
-                        ? 'bg-blue-50 border-l-4 border-blue-300' 
-                        : 'bg-green-50 border-l-4 border-green-300'
-                    }`}
-                  >
-                    <div className="font-medium text-sm mb-1">
-                      {entry.role === 'participant1' 
-                        ? 'Participant 1' 
-                        : 'Participant 2'}
-                    </div>
-                    <div className="text-sm">{entry.content}</div>
-                  </div>
-                ))}
+              <div className="p-4 rounded-lg bg-gray-50 border">
+                <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                  {transcript.map((entry) => entry.content).join(' ')}
+                </div>
               </div>
             </ScrollArea>
           </CardContent>
