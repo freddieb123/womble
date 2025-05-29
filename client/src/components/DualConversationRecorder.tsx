@@ -22,7 +22,7 @@ interface TwoWayConversationRecorderProps {
 }
 
 interface TranscriptEntry {
-  role: "participant1" | "participant2";
+  role: "transcript";
   content: string;
   timestamp: number;
 }
@@ -433,19 +433,11 @@ export default function DualConversationRecorder({
         {transcript.length > 0 && (
           <div className="pt-2 max-h-60 overflow-y-auto border rounded-md p-2">
             <Label className="mb-2 block">Transcript</Label>
-            {transcript.map((entry, index) => (
-              <div
-                key={index}
-                className={`mb-2 p-2 rounded ${entry.role === "participant1" ? "bg-blue-50" : "bg-green-50"}`}
-              >
-                <div className="font-medium">
-                  {entry.role === "participant1"
-                    ? participant1Name
-                    : participant2Name}
-                </div>
-                <div>{entry.content}</div>
+            <div className="p-3 bg-gray-50 rounded-md">
+              <div className="text-sm leading-relaxed">
+                {transcript.map((entry) => entry.content).join(' ')}
               </div>
-            ))}
+            </div>
           </div>
         )}
       </CardContent>
