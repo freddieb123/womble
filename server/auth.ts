@@ -103,7 +103,7 @@ async function getUserByEmail(email: string) {
 export function setupAuth(app: Express) {
   const store = new PostgresSessionStore({ pool, createTableIfMissing: true });
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.REPL_ID!,
+    secret: process.env.SESSION_SECRET!,
     resave: false,
     saveUninitialized: false,
     store,
