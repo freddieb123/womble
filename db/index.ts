@@ -1,22 +1,16 @@
-import { drizzle } from "drizzle-orm/neon-serverless";
-import ws from "ws";
+import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@db/schema";
 import pkg from 'pg';
 const { Pool } = pkg;
 
-if (!process.env.DATABASE_URL) {
+const connectionString = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL;
+
+if (!connectionString) {
   throw new Error(
     "DATABASE_URL must be set. Did you forget to provision a database?",
   );
 }
 
-// Create a PostgreSQL pool for session management
-export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+export const pool = new Pool({ connectionString });
 
-export const db = drizzle({
-  connection: process.env.DATABASE_URL,
-  schema,
-  ws: ws,
-});
+export const db = drizzle({ client: pool, schema });

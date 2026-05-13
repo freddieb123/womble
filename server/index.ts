@@ -96,8 +96,7 @@ const startServer = async () => {
       }
     }
 
-    // Always use port 5000 as required by .replit configuration
-    const port = 5000;
+    const port = parseInt(process.env.PORT || "5000", 10);
 
     try {
       server.listen(port, "0.0.0.0")
