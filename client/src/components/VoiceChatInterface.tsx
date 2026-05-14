@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, Lightbulb, Trophy, ChevronDown, Info, Brain } from "lucide-react";
+import { Mic, MicOff, Lightbulb, Trophy, ChevronDown, Info, Brain, PauseCircle, PlayCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AdminConfig, Message } from "@/lib/types";
 import UserNameModal from "./UserNameModal";
@@ -47,6 +47,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
   const [isGettingSummary, setIsGettingSummary] = useState(false);
   const [summaryData, setSummaryData] = useState<any>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
 
   const isThoughtPartner = (config.type as string) === 'thought-partner';
 
@@ -185,6 +186,17 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
     }
   };
 
+  const pauseSession = () => {
+    streamRef.current?.getTracks().forEach(t => { t.enabled = false; });
+    setIsPaused(true);
+    setActivityState('idle');
+  };
+
+  const resumeSession = () => {
+    streamRef.current?.getTracks().forEach(t => { t.enabled = true; });
+    setIsPaused(false);
+  };
+
   const stopSession = () => {
     pcRef.current?.close();
     streamRef.current?.getTracks().forEach(t => t.stop());
@@ -193,6 +205,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
     streamRef.current = null;
     setConnectionState('ended');
     setActivityState('idle');
+    setIsPaused(false);
   };
 
   const getHint = async () => {
@@ -282,11 +295,13 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
 
   const orbPulse = activityState !== 'idle' ? 'animate-pulse' : '';
 
-  const statusLabel = {
-    idle: connectionState === 'active' ? 'Ready — speak when you like' : '',
-    listening: 'Listening...',
-    speaking: 'Speaking...',
-  }[activityState];
+  const statusLabel = isPaused
+    ? 'Paused — microphone off'
+    : {
+      idle: connectionState === 'active' ? 'Ready — speak when you like' : '',
+      listening: 'Listening...',
+      speaking: 'Speaking...',
+    }[activityState];
 
   return (
     <div className="space-y-4">
@@ -326,6 +341,8 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
           <div className={`relative rounded-full w-32 h-32 shadow-xl transition-all duration-500 flex items-center justify-center ${orbColour} ${orbPulse}`}>
             {connectionState === 'connecting' ? (
               <div className="h-8 w-8 rounded-full border-4 border-gray-400 border-t-transparent animate-spin" />
+            ) : connectionState === 'active' && isPaused ? (
+              <PauseCircle className="h-10 w-10 text-gray-400" />
             ) : connectionState === 'active' ? (
               <Mic className={`h-10 w-10 transition-colors ${activityState === 'listening' ? 'text-green-600' : activityState === 'speaking' ? 'text-blue-600' : 'text-gray-400'}`} />
             ) : (
@@ -346,7 +363,22 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
         {connectionState === 'connecting' && (
           <Button disabled size="lg" className="px-10">Connecting...</Button>
         )}
-        {connectionState === 'active' && (
+        {connectionState === 'active' && isThoughtPartner && !isPaused && (
+          <Button onClick={pauseSession} variant="outline" size="lg" className="px-10">
+            <PauseCircle className="h-4 w-4 mr-2" /> Pause
+          </Button>
+        )}
+        {connectionState === 'active' && isThoughtPartner && isPaused && (
+          <div className="flex flex-col items-center gap-3">
+            <Button onClick={resumeSession} size="lg" className="px-10">
+              <PlayCircle className="h-4 w-4 mr-2" /> Resume
+            </Button>
+            <Button onClick={stopSession} variant="ghost" size="sm" className="text-red-500 hover:text-red-600">
+              <MicOff className="h-4 w-4 mr-1" /> End Session
+            </Button>
+          </div>
+        )}
+        {connectionState === 'active' && !isThoughtPartner && (
           <Button onClick={stopSession} variant="destructive" size="lg" className="px-10">
             <MicOff className="h-4 w-4 mr-2" /> End Session
           </Button>
