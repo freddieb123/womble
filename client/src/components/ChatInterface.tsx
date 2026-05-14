@@ -16,6 +16,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import MessageBubble from "./MessageBubble";
 import UserNameModal from "./UserNameModal";
 import LeaderboardModal from "./LeaderboardModal";
+import ThinkingMapModal from "./ThinkingMapModal";
 import type { Message, ChatState, AdminConfig, MessageContent } from "@/lib/types";
 import {
   AlertDialog,
@@ -42,7 +43,7 @@ interface Props {
   sessionId: string;
   userName: string | null;
   isViewOnly: boolean;
-  onUserNameSubmit: (name: string) => string;
+  onUserNameSubmit: (name: string, mode?: 'typed' | 'spoken') => string;
 }
 
 interface LeaderboardEntry {
@@ -58,12 +59,18 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardTopN, setLeaderboardTopN] = useState(3);
   const [userRank, setUserRank] = useState<number>();
   const inputRef = useRef<HTMLInputElement>(null);
   const [feedbackData, setFeedbackData] = useState<{ bullets: string[]; score?: number; summary?: string }>({ bullets: [] });
   const [isGettingHint, setIsGettingHint] = useState(false);
-  const [isConfirmingFeedback, setIsConfirmingFeedback] = useState(false); // Added state
+  const [isConfirmingFeedback, setIsConfirmingFeedback] = useState(false);
   const [isGettingFeedback, setIsGettingFeedback] = useState(false);
+  const [isGettingSummary, setIsGettingSummary] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [summaryData, setSummaryData] = useState<any>(null);
+
+  const isThoughtPartner = (config.type as string) === 'thought-partner';
   const [instructionsOpen, setInstructionsOpen] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -122,32 +129,19 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
 
   const fetchLeaderboard = async () => {
     try {
-      const response = await fetch(`/api/conversations/${config.id}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch leaderboard data');
-      }
+      const params = new URLSearchParams();
+      if (sessionId) params.set('sessionId', sessionId);
+      if (userName) params.set('userName', userName);
+      const response = await fetch(`/api/final-leaderboard/${config.id}?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch leaderboard data');
 
-      const data = await response.json();
+      const { entries, topN } = await response.json();
+      setLeaderboardTopN(topN);
 
-      const scoredEntries = data
-        .filter((entry: any) => entry.feedback && entry.feedback.score !== null)
-        .map((entry: any) => ({
-          userName: entry.userName || 'Anonymous',
-          score: entry.feedback.score,
-          total: 10, // Feedback scores are out of 10
-          isCurrentUser: entry.userName === userName && entry.sessionId === sessionId
-        }));
+      const userRankIndex = entries.findIndex((e: LeaderboardEntry) => e.isCurrentUser);
+      if (userRankIndex !== -1) setUserRank(userRankIndex + 1);
 
-      const sortedEntries = scoredEntries.sort((a: LeaderboardEntry, b: LeaderboardEntry) =>
-        b.score - a.score
-      );
-
-      const userRankIndex = sortedEntries.findIndex((entry: LeaderboardEntry) => entry.isCurrentUser);
-      if (userRankIndex !== -1) {
-        setUserRank(userRankIndex + 1);
-      }
-
-      setLeaderboardData(sortedEntries);
+      setLeaderboardData(entries);
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
       toast({
@@ -163,6 +157,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
       const url = new URL("/api/messages", window.location.origin);
       url.searchParams.set('configId', config.id?.toString() || '');
       url.searchParams.set('sessionId', sessionId);
+      url.searchParams.set('chatMode', 'typed');
       if (userName) {
         url.searchParams.set('userName', userName);
       }
@@ -290,15 +285,55 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
 
     scrollToBottom();
 
-    const timeout = setTimeout(() => {
-      scrollToBottom();
-      if (!showNameModal && inputRef.current) {
-        inputRef.current.focus();
-      }
-    }, 100);
-
+    const timeout = setTimeout(scrollToBottom, 100);
     return () => clearTimeout(timeout);
-  }, [chatState.messages, showNameModal]);
+  }, [chatState.messages]);
+
+  // Register participant as soon as userName is known (empty row = "user has started")
+  useEffect(() => {
+    if (!userName || !config.id || !sessionId || isViewOnly) return;
+    fetch('/api/conversations/save-transcript', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ configId: config.id, sessionId, userName, chatMode: 'typed', messages: [] }),
+    }).catch(() => {});
+  }, [userName, config.id, sessionId, isViewOnly]);
+
+  // Restore focus to input whenever sending finishes or modal closes
+  useEffect(() => {
+    if (!sendMessage.isPending && !showNameModal) {
+      inputRef.current?.focus();
+    }
+  }, [sendMessage.isPending, showNameModal]);
+
+  const handleGetSummary = async () => {
+    if (!chatState.messages || chatState.messages.length < 2) {
+      toast({ title: "Not enough conversation yet", description: "Have a conversation first before generating a summary." });
+      return;
+    }
+    setIsGettingSummary(true);
+    try {
+      const response = await fetch('/api/thought-partner/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: chatState.messages,
+          userInstructions: config.userInstructions,
+          feedbackCriteria: config.feedbackCriteria,
+          configId: config.id,
+          sessionId,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to generate summary');
+      const data = await response.json();
+      setSummaryData(data);
+      setSummaryOpen(true);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to generate thinking map. Please try again.", variant: "destructive" });
+    } finally {
+      setIsGettingSummary(false);
+    }
+  };
 
   const handleGetFeedback = async () => {
     setIsConfirmingFeedback(true);
@@ -406,10 +441,9 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
       {showNameModal && (
         <UserNameModal
           open={showNameModal}
-          onSubmit={(name) => {
-            const newUrl = onUserNameSubmit(name);
+          onSubmit={(name, mode) => {
+            onUserNameSubmit(name, mode);
             setShowNameModal(false);
-            setTimeout(() => inputRef.current?.focus(), 0);
           }}
         />
       )}
@@ -455,6 +489,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
                 className="flex-1"
                 disabled={sendMessage.isPending || showNameModal}
                 ref={inputRef}
+                autoFocus
               />
               <Button
                 type="submit"
@@ -465,48 +500,58 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
             </form>
           </div>
           <div className="px-4 pb-4 space-y-2">
-            <div className="flex gap-2">
+            {isThoughtPartner ? (
               <Button
-                onClick={getHint}
-                variant="outline"
-                className="flex-1"
-                disabled={isGettingHint}
+                onClick={summaryData ? () => setSummaryOpen(true) : handleGetSummary}
+                disabled={isGettingSummary}
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
               >
-                <Lightbulb className="h-4 w-4 mr-2" />
-                {isGettingHint ? 'Getting hint...' : 'Get Hint'}
+                {isGettingSummary ? "Building thinking map..." : summaryData ? "View Thinking Map" : "Get Thinking Map"}
               </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button
+                  onClick={getHint}
+                  variant="outline"
+                  className="flex-1"
+                  disabled={isGettingHint}
+                >
+                  <Lightbulb className="h-4 w-4 mr-2" />
+                  {isGettingHint ? 'Getting hint...' : 'Get Hint'}
+                </Button>
 
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex-1">
-                      <Button
-                        onClick={feedbackData.score !== undefined 
-                          ? () => setFeedbackOpen(true) 
-                          : handleGetFeedback
-                        }
-                        variant="default"
-                        disabled={!hasEnoughMessages || isGettingFeedback}
-                        className={`w-full ${feedbackData.score !== undefined ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
-                      >
-                        {isGettingFeedback
-                          ? "Analyzing conversation..."
-                          : feedbackData.score !== undefined
-                            ? "View Feedback"
-                            : "Get Feedback"}
-                      </Button>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>
-                      {hasEnoughMessages
-                        ? "Get feedback on your conversation"
-                        : "Have a longer conversation (at least 5 messages) to get meaningful feedback"}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex-1">
+                        <Button
+                          onClick={feedbackData.score !== undefined
+                            ? () => setFeedbackOpen(true)
+                            : handleGetFeedback
+                          }
+                          variant="default"
+                          disabled={!hasEnoughMessages || isGettingFeedback}
+                          className={`w-full ${feedbackData.score !== undefined ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
+                        >
+                          {isGettingFeedback
+                            ? "Analyzing conversation..."
+                            : feedbackData.score !== undefined
+                              ? "View Feedback"
+                              : "Get Feedback"}
+                        </Button>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>
+                        {hasEnoughMessages
+                          ? "Get feedback on your conversation"
+                          : "Have a longer conversation (at least 5 messages) to get meaningful feedback"}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -552,8 +597,9 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
         onOpenChange={setShowLeaderboard}
         entries={leaderboardData}
         currentUserRank={userRank}
-        title="Conversation Leaderboard"
+        title="Final Leaderboard"
         maxScore={10}
+        topN={leaderboardTopN}
         onRefresh={fetchLeaderboard}
       />
       <AlertDialog open={isConfirmingFeedback} onOpenChange={setIsConfirmingFeedback}>
@@ -571,8 +617,14 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
         </AlertDialogContent>
       </AlertDialog>
       
+      <ThinkingMapModal
+        open={summaryOpen}
+        onOpenChange={setSummaryOpen}
+        summary={summaryData}
+      />
+
       <div className="mt-auto py-2 text-center text-xs text-gray-400">
-        This page is powered by <a href="https://www.womble.co" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700">Womble.co. </a> Your trainer has access to the transcript and feedback.
+        Your trainer has access to the transcript and feedback.
       </div>
     </div>
   );

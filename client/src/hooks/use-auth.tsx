@@ -9,7 +9,7 @@ import { signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/aut
 import type { SelectUser, InsertUser } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { auth, googleProvider } from "@/lib/firebase";
+import { auth, googleProvider, microsoftProvider } from "@/lib/firebase";
 
 type AuthContextType = {
   user: SelectUser | null;
@@ -20,6 +20,7 @@ type AuthContextType = {
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
   signInWithGoogle: () => Promise<void>;
+  signInWithMicrosoft: () => Promise<void>;
 };
 
 type LoginData = Pick<InsertUser, "email" | "password">;
@@ -66,8 +67,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return res.json();
     },
     onSuccess: (user) => {
+      localStorage.setItem('lastLoginMethod', 'email');
       queryClient.setQueryData(["/api/user"], user);
-      // Toast removed for successful login
       setLocation("/dashboard");
     },
     onError: (error: Error) => {
@@ -129,22 +130,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
-      console.log("Starting Google sign-in process...");
-
-      // Check if we're on an authorized domain
-      const currentDomain = window.location.hostname;
-      console.log("Current domain:", currentDomain);
-
       const result = await signInWithPopup(auth, googleProvider);
-      console.log("Google sign-in successful, getting ID token...");
       const idToken = await result.user.getIdToken();
-
-      // Extract first name and last name from display name
       const displayName = result.user.displayName || '';
       const [firstName = '', lastName = ''] = displayName.split(' ');
-
-      console.log("Extracted name information:", { firstName, lastName });
-      console.log("Sending token and user info to backend...");
 
       const res = await fetch("/api/auth/google", {
         method: "POST",
@@ -152,24 +141,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ idToken, firstName, lastName }),
       });
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Backend authentication failed:", errorText);
-        throw new Error("Failed to authenticate with server");
-      }
+      if (!res.ok) throw new Error("Failed to authenticate with server");
 
       const user = await res.json();
-      console.log("Backend authentication successful");
+      localStorage.setItem('lastLoginMethod', 'google');
       queryClient.setQueryData(["/api/user"], user);
       setLocation("/dashboard");
     } catch (error) {
-      console.error("Google sign-in error:", {
-        code: error instanceof Error ? (error as any).code : 'unknown',
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        domain: window.location.hostname
-      });
-
       if ((error as any)?.code === 'auth/unauthorized-domain') {
         toast({
           title: "Domain Not Authorized",
@@ -179,6 +157,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         toast({
           title: "Google Sign-in failed",
+          description: error instanceof Error ? error.message : "An error occurred",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const signInWithMicrosoft = async () => {
+    try {
+      const result = await signInWithPopup(auth, microsoftProvider);
+      const idToken = await result.user.getIdToken();
+      const displayName = result.user.displayName || '';
+      const [firstName = '', lastName = ''] = displayName.split(' ');
+
+      const res = await fetch("/api/auth/microsoft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken, firstName, lastName }),
+      });
+
+      if (!res.ok) throw new Error("Failed to authenticate with server");
+
+      const user = await res.json();
+      localStorage.setItem('lastLoginMethod', 'microsoft');
+      queryClient.setQueryData(["/api/user"], user);
+      setLocation("/dashboard");
+    } catch (error) {
+      if ((error as any)?.code === 'auth/unauthorized-domain') {
+        toast({
+          title: "Domain Not Authorized",
+          description: "This domain is not authorized for Microsoft Sign-in. Please contact the administrator.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Microsoft Sign-in failed",
           description: error instanceof Error ? error.message : "An error occurred",
           variant: "destructive",
         });
@@ -197,6 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logoutMutation,
         registerMutation,
         signInWithGoogle,
+        signInWithMicrosoft,
       }}
     >
       {children}

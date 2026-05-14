@@ -8,6 +8,7 @@ import { track, EventName } from "@/lib/mixpanel";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import AdminPanel from "@/components/AdminPanel";
+import CreateGptWizard from "@/components/CreateGptWizard";
 import type { AdminConfig } from "@/lib/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -36,7 +37,7 @@ import AdminNavbar from "@/components/AdminNavbar";
 type ChatConfig = {
   id: number;
   title: string;
-  type: 'chat' | 'upload' | 'quiz' | 'two-way-conversation';
+  type: 'chat' | 'upload' | 'quiz' | 'two-way-conversation' | 'teach-ai' | 'thought-partner';
   systemPrompt: string;
   userInstructions: string | null;
   feedbackCriteria: string | null;
@@ -64,6 +65,7 @@ type ChatConfig = {
 export default function Home() {
   const { logoutMutation, user } = useAuth();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [wizardPrefill, setWizardPrefill] = useState<AdminConfig | undefined>(undefined);
   const [isTemplateGalleryOpen, setIsTemplateGalleryOpen] = useState(false);
   const [isPreviewingTemplate, setIsPreviewingTemplate] = useState(false);
   const [editingConfig, setEditingConfig] = useState<ChatConfig | null>(null);
@@ -91,7 +93,7 @@ export default function Home() {
     queryFn: async () => {
       const response = await fetch(`/api/chat-configs?userId=${user?.id}${showDeleted ? '&showDeleted=true' : ''}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch GPTs');
+        throw new Error('Failed to fetch Agents');
       }
       const data = await response.json();
       console.log('Fetched configs:', data.map((c: ChatConfig) => ({
@@ -102,27 +104,36 @@ export default function Home() {
       })));
       return data;
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    refetchInterval: 15_000,
   });
 
   const saveConfig = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (configToSave?: AdminConfig) => {
+      const c = configToSave || config;
       const response = await fetch("/api/chat-configs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: config.title,
-          type: config.type,
-          systemPrompt: config.type === 'quiz' ? "Quiz Configuration" : config.systemPrompt,
-          userInstructions: config.type === 'quiz' ? "" : config.userInstructions || "",
-          feedbackCriteria: config.type === 'quiz' ? "" : config.feedbackCriteria || "",
-          questions: config.type === 'quiz' ? config.questions : undefined,
+          title: c.title,
+          type: c.type,
+          systemPrompt: c.type === 'quiz' ? "Quiz Configuration" : c.systemPrompt,
+          userInstructions: c.type === 'quiz' ? "" : c.userInstructions || "",
+          feedbackCriteria: c.type === 'quiz' ? "" : c.feedbackCriteria || "",
+          questions: c.type === 'quiz' ? c.questions : undefined,
+          participant1Role: c.participant1Role ?? null,
+          participant2Role: c.participant2Role ?? null,
+          knowledgeLevel: c.knowledgeLevel ?? null,
+          attitude: c.attitude ?? null,
+          coachingStyle: c.coachingStyle ?? null,
+          referenceContent: c.referenceContent ?? null,
+          referenceImages: c.referenceImages ?? null,
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to save GPT");
+        throw new Error(errorData.error || "Failed to save Agent");
       }
 
       return response.json();
@@ -149,7 +160,7 @@ export default function Home() {
         questions: []
       });
       toast({
-        description: "GPT saved successfully!",
+        description: "Agent saved successfully!",
       });
     },
     onError: (error: Error) => {
@@ -171,7 +182,7 @@ export default function Home() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update GPT");
+        throw new Error(errorData.error || "Failed to update Agent");
       }
 
       return response.json();
@@ -180,7 +191,7 @@ export default function Home() {
       queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
       setEditingConfig(null);
       toast({
-        description: "GPT updated successfully!",
+        description: "Agent updated successfully!",
       });
     },
     onError: (error: Error) => {
@@ -200,7 +211,7 @@ export default function Home() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to delete GPT");
+        throw new Error(error.error || "Failed to delete Agent");
       }
 
       return response.json();
@@ -209,7 +220,7 @@ export default function Home() {
       queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
       setDeletingConfig(null);
       toast({
-        description: "GPT deleted successfully!",
+        description: "Agent deleted successfully!",
       });
     },
     onError: (error: Error) => {
@@ -229,7 +240,7 @@ export default function Home() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to restore GPT");
+        throw new Error(error.error || "Failed to restore Agent");
       }
 
       return response.json();
@@ -237,7 +248,7 @@ export default function Home() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
       toast({
-        description: "GPT restored successfully!",
+        description: "Agent restored successfully!",
       });
     },
     onError: (error: Error) => {
@@ -269,7 +280,7 @@ export default function Home() {
       });
       toast({
         title: 'Saved as template',
-        description: 'Your GPT is now available as a public template.',
+        description: 'Your Agent is now available as a public template.',
       });
       setSavingAsTemplate(null);
     },
@@ -301,7 +312,7 @@ export default function Home() {
       });
       toast({
         title: 'Removed from templates',
-        description: 'Your GPT is no longer available as a public template.',
+        description: 'Your Agent is no longer available as a public template.',
       });
     },
     onError: (error) => {
@@ -317,10 +328,15 @@ export default function Home() {
     try {
       const url = `${window.location.origin}/chat?configId=${configId}`;
       await navigator.clipboard.writeText(url);
-      
+
       // Track GPT share link event
       track(EventName.GPT_SHARE_LINK, { configId });
-      
+
+      // Record share time so we can poll for new activity over the next 20 mins
+      const stored = JSON.parse(localStorage.getItem('womble_shared_links') || '{}');
+      stored[configId] = Date.now();
+      localStorage.setItem('womble_shared_links', JSON.stringify(stored));
+
       toast({
         description: "Link copied to clipboard!",
       });
@@ -352,7 +368,7 @@ export default function Home() {
         fullConfig = await response.json();
       }
 
-      setConfig({
+      setWizardPrefill({
         title: `${fullConfig.title} (Copy)`,
         type: fullConfig.type,
         systemPrompt: fullConfig.systemPrompt,
@@ -368,7 +384,7 @@ export default function Home() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to duplicate GPT",
+        description: "Failed to duplicate Agent",
       });
     }
   };
@@ -384,7 +400,7 @@ export default function Home() {
         fullConfig = await response.json();
       }
 
-      setConfig({
+      setWizardPrefill({
         title: `${fullConfig.title} (Copy)`,
         type: fullConfig.type,
         systemPrompt: fullConfig.systemPrompt,
@@ -408,23 +424,17 @@ export default function Home() {
 
   const handleCreateModalClose = (open: boolean) => {
     setIsCreateOpen(open);
-    if (!open && isPreviewingTemplate) {
-      setIsPreviewingTemplate(false);
-      setIsTemplateGalleryOpen(true);
+    if (!open) {
+      setWizardPrefill(undefined);
+      if (isPreviewingTemplate) {
+        setIsPreviewingTemplate(false);
+        setIsTemplateGalleryOpen(true);
+      }
     }
   };
 
   const handleStartFromScratch = () => {
-    setConfig({
-      title: "",
-      type: "chat",
-      systemPrompt: "Act as a...",
-      userInstructions: "",
-      feedbackCriteria: "",
-      temperature: 0.7,
-      maxTokens: 1000,
-      questions: []
-    });
+    setWizardPrefill(undefined);
     setIsTemplateGalleryOpen(false);
     setIsCreateOpen(true);
   };
@@ -451,7 +461,7 @@ export default function Home() {
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
         <div className="max-w-4xl mx-auto">
           <Card className="p-6">
-            <CardContent>Loading GPTs...</CardContent>
+            <CardContent>Loading Agents...</CardContent>
           </Card>
         </div>
       </div>
@@ -468,7 +478,7 @@ export default function Home() {
       <AdminNavbar 
         title="Admin Home" 
         showNewButton={true}
-        newButtonText="New GPT"
+        newButtonText="New Agent"
         onNewButtonClick={() => {
           track(EventName.GPT_CREATE_CLICK, { location: 'admin_navbar' });
           setIsTemplateGalleryOpen(true);
@@ -481,7 +491,7 @@ export default function Home() {
           <div className="max-w-4xl mx-auto w-full mt-4 mb-6">
             <input
               type="text"
-              placeholder="Search GPTs..."
+              placeholder="Search Agents..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
@@ -502,7 +512,7 @@ export default function Home() {
                     <path d="M12 8V12L14.5 14.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                   </svg>
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">Get Started with GPTs</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">Get Started with Agents</h2>
                 <p className="text-gray-600 max-w-md mb-8">
                   Start getting bespoke formative feedback to your participants. You can create quizzes, give feedback on screenshots of documents or create practice conversations.
                 </p>
@@ -515,7 +525,7 @@ export default function Home() {
                   className="bg-blue-600 hover:bg-blue-700"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Create your first GPT
+                  Create your first Agent
                 </Button>
               </div>
             ) : (
@@ -531,22 +541,26 @@ export default function Home() {
                           <CardTitle>{config.title}</CardTitle>
                           <Badge
                             variant={
-                              config.type === 'chat' ? 'default' : 
-                              config.type === 'upload' ? 'secondary' : 
-                              config.type === 'two-way-conversation' ? 'destructive' : 
+                              config.type === 'chat' ? 'default' :
+                              config.type === 'upload' ? 'secondary' :
+                              config.type === 'two-way-conversation' ? 'destructive' :
                               'outline'
                             }
                             className={
                               config.type === 'chat' ? 'bg-green-100 text-green-800' :
                               config.type === 'upload' ? 'bg-purple-100 text-purple-800' :
                               config.type === 'two-way-conversation' ? 'bg-orange-100 text-orange-800' :
-                              'bg-blue-100 text-blue-800'
+                              config.type === 'teach-ai' ? 'bg-blue-100 text-blue-800' :
+                              config.type === 'thought-partner' ? 'bg-teal-100 text-teal-800' :
+                              'bg-gray-100 text-gray-800'
                             }
                           >
-                            {config.type === 'chat' ? 'Chat with a GPT' :
-                             config.type === 'upload' ? 'upload' : 
-                             config.type === 'two-way-conversation' ? 'two-way conversation' : 
-                             'quiz'}
+                            {config.type === 'chat' ? 'Chat with an Agent' :
+                             config.type === 'upload' ? 'Upload' :
+                             config.type === 'two-way-conversation' ? 'Two-way Conversation' :
+                             config.type === 'teach-ai' ? 'Teach an AI' :
+                             config.type === 'thought-partner' ? 'Thought Partner' :
+                             'Quiz'}
                           </Badge>
                           {config.isTemplate && (
                             <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 flex items-center gap-1">
@@ -639,17 +653,23 @@ export default function Home() {
                         <div className="flex gap-2">
                           <Button size="sm" onClick={() => handleCopyLink(config.id)}>
                             <Share2 className="h-4 w-4 mr-2" />
-                            Share GPT
+                            Share Agent
                           </Button>
                           <Button
                             size="sm"
                             variant="secondary"
                             onClick={() => handleViewFeedback(config)}
-                            disabled={config.type === 'chat' ? (!config.feedbackCriteria || config.conversationCount === 0) : config.conversationCount === 0}
+                            disabled={config.conversationCount === 0}
                           >
                             <BarChart2 className="h-4 w-4 mr-2" />
-                            <span className="md:hidden">View Feedback</span>
-                            <span className="hidden md:inline">View Current Feedback</span>
+                            {config.type === 'thought-partner' ? (
+                              <span>View Activity</span>
+                            ) : (
+                              <>
+                                <span className="md:hidden">View Feedback</span>
+                                <span className="hidden md:inline">View Current Feedback</span>
+                              </>
+                            )}
                           </Button>
                         </div>
                         <span className="hidden md:inline text-sm text-muted-foreground">
@@ -684,8 +704,8 @@ export default function Home() {
       </Dialog>
 
       {/* Create GPT Dialog */}
-      <Dialog 
-        open={isCreateOpen} 
+      <Dialog
+        open={isCreateOpen}
         onOpenChange={(open) => {
           handleCreateModalClose(open);
           if (!open) {
@@ -693,24 +713,24 @@ export default function Home() {
           }
         }}
       >
-        <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
+        <DialogContent className="max-w-2xl h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Create New GPT</DialogTitle>
+            <DialogTitle>Create New Agent</DialogTitle>
           </DialogHeader>
           <ScrollArea className="flex-1 -mx-6 px-6">
             <div className="py-4">
-              <AdminPanel config={config} onConfigChange={setConfig} />
+              <CreateGptWizard
+                key={isCreateOpen ? 'open' : 'closed'}
+                onSave={(finalConfig) => saveConfig.mutate(finalConfig)}
+                isSaving={saveConfig.isPending}
+                prefill={wizardPrefill}
+              />
             </div>
           </ScrollArea>
-          <div className="pt-4 border-t flex justify-end">
-            <Button onClick={() => saveConfig.mutate()} disabled={saveConfig.isPending}>
-              Save GPT
-            </Button>
-          </div>
         </DialogContent>
       </Dialog>
 
-      {/* Edit GPT Dialog */}
+      {/* Edit Agent Dialog */}
       {editingConfig && (
         <Dialog 
           open={editingConfig !== null} 
@@ -723,9 +743,9 @@ export default function Home() {
         >
           <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
             <DialogHeader>
-              <DialogTitle>Edit GPT</DialogTitle>
+              <DialogTitle>Edit Agent</DialogTitle>
               <DialogDescription>
-                Modify your GPT configuration below.
+                Modify your Agent configuration below.
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="flex-1 -mx-6 px-6">
@@ -786,7 +806,7 @@ export default function Home() {
                 onClick={() => editingConfig && updateConfig.mutate(editingConfig)}
                 disabled={updateConfig.isPending}
               >
-                Update GPT
+                Update Agent
               </Button>
             </div>
           </DialogContent>
@@ -806,7 +826,7 @@ export default function Home() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the GPT
+              This action cannot be undone. This will permanently delete the Agent
               "{deletingConfig?.title}" and all associated conversations.
             </AlertDialogDescription>
           </AlertDialogHeader>

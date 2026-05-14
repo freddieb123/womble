@@ -212,19 +212,16 @@ export function setupAuth(app: Express) {
 
       let user;
       if (existingUser) {
-        // Update existing user's name if provided
         [user] = await db
           .update(users)
           .set({
             firstName: firstName || existingUser.firstName,
             lastName: lastName || existingUser.lastName,
+            lastLoginMethod: 'google',
           })
           .where(eq(users.id, existingUser.id))
           .returning();
-        console.log("Updated existing user account");
       } else {
-        // Create new user
-        console.log("Creating new user account with name:", { firstName, lastName });
         const randomPassword = randomBytes(16).toString('hex');
         [user] = await db
           .insert(users)
@@ -233,34 +230,77 @@ export function setupAuth(app: Express) {
             password: await hashPassword(randomPassword),
             firstName,
             lastName,
+            lastLoginMethod: 'google',
           })
           .returning();
-        console.log("New user created successfully");
       }
 
-      // Log the user in
-      console.log("Logging in user...");
       req.login(user, (err) => {
-        if (err) {
-          console.error("Login error:", err);
-          return res.status(500).json({ error: "Failed to login", details: err.message });
-        }
-        console.log("User logged in successfully");
+        if (err) return res.status(500).json({ error: "Failed to login", details: err.message });
         res.status(200).json(user);
       });
     } catch (error) {
       console.error("Google auth error:", error);
-      console.error("Complete error details:", {
-        name: error instanceof Error ? error.name : 'Unknown',
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
-      });
       res.status(401).json({ error: "Invalid token", details: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
-  app.post("/api/login", passport.authenticate("local"), (req, res) => {
-    res.status(200).json(req.user);
+  app.post("/api/auth/microsoft", async (req, res) => {
+    try {
+      const { idToken, firstName, lastName } = req.body;
+      if (!idToken) return res.status(400).json({ error: "No token provided" });
+
+      const decodedToken = await getAuth().verifyIdToken(idToken);
+      const { email } = decodedToken;
+      if (!email) return res.status(400).json({ error: "No email provided" });
+
+      const [existingUser] = await getUserByEmail(email);
+      let user;
+      if (existingUser) {
+        [user] = await db
+          .update(users)
+          .set({
+            firstName: firstName || existingUser.firstName,
+            lastName: lastName || existingUser.lastName,
+            lastLoginMethod: 'microsoft',
+          })
+          .where(eq(users.id, existingUser.id))
+          .returning();
+      } else {
+        const randomPassword = randomBytes(16).toString('hex');
+        [user] = await db
+          .insert(users)
+          .values({
+            email,
+            password: await hashPassword(randomPassword),
+            firstName,
+            lastName,
+            lastLoginMethod: 'microsoft',
+          })
+          .returning();
+      }
+
+      req.login(user, (err) => {
+        if (err) return res.status(500).json({ error: "Failed to login", details: err.message });
+        res.status(200).json(user);
+      });
+    } catch (error) {
+      console.error("Microsoft auth error:", error);
+      res.status(401).json({ error: "Invalid token", details: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.post("/api/login", passport.authenticate("local"), async (req, res) => {
+    try {
+      const [updated] = await db
+        .update(users)
+        .set({ lastLoginMethod: 'email' })
+        .where(eq(users.id, req.user!.id))
+        .returning();
+      res.status(200).json(updated);
+    } catch {
+      res.status(200).json(req.user);
+    }
   });
 
   app.post("/api/logout", (req, res, next) => {

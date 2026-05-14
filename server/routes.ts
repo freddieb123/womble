@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
-import { db } from "@db";
+import { db, pool } from "@db";
 import { chatConfigs, conversations, uploads, quizQuestions, quizResponses, dualConversations, type Message, type ConversationFeedback, type UploadFeedback, type DualConversationFeedback } from "@db/schema";
 import { eq, and, or, desc, count } from "drizzle-orm";
 import { saveAudio, handleSaveAudio, transcribeAudio, generateFeedback } from "./routes/dual-conversation";
@@ -28,17 +28,83 @@ const quizQuestionSchema = z.object({
 
 const chatConfigSchema = z.object({
   title: z.string().min(1, "Title is required"),
-  type: z.enum(['chat', 'upload', 'quiz', 'two-way-conversation']).default('chat'),
-  systemPrompt: z.string().min(1, "System prompt is required"),
+  type: z.enum(['chat', 'upload', 'quiz', 'two-way-conversation', 'teach-ai', 'thought-partner']).default('chat'),
+  systemPrompt: z.string().optional().default(''),
   userInstructions: z.string().nullable(),
   feedbackCriteria: z.string().nullable(),
-  questions: z.array(quizQuestionSchema).optional()
+  questions: z.array(quizQuestionSchema).optional(),
+  participant1Role: z.string().nullable().optional(),
+  participant2Role: z.string().nullable().optional(),
+  knowledgeLevel: z.number().int().min(0).max(4).nullable().optional(),
+  attitude: z.number().int().min(0).max(4).nullable().optional(),
+  coachingStyle: z.number().int().min(0).max(4).nullable().optional(),
+  referenceContent: z.string().nullable().optional(),
+  referenceImages: z.array(z.string()).nullable().optional(),
 });
+
+const KNOWLEDGE_LABELS = ['a complete beginner with no prior knowledge', 'a novice with some basic awareness', 'someone with intermediate understanding', 'an advanced learner with solid knowledge', 'an expert who already knows most of the subject'];
+const ATTITUDE_LABELS = ['very enthusiastic and eager to learn', 'curious and engaged', 'neutral and professional', 'somewhat skeptical and questioning', 'very skeptical and challenging'];
+
+function buildTeachAiSystemPrompt(userInstructions: string | null, knowledgeLevel: number, attitude: number): string {
+  return `You are playing the role of a learner. The person you are talking to is going to teach you something. Your only job is to be taught — not to teach, explain, or demonstrate knowledge.
+
+The topic you are being taught about:
+${userInstructions || 'A topic the user will explain to you.'}
+
+Your knowledge level: You are ${KNOWLEDGE_LABELS[knowledgeLevel]}. This means you know ${knowledgeLevel === 0 ? 'nothing at all' : knowledgeLevel === 1 ? 'very little' : knowledgeLevel === 2 ? 'a small amount' : knowledgeLevel === 3 ? 'quite a lot already' : 'almost everything'} about this topic.
+
+Your attitude: You are ${ATTITUDE_LABELS[attitude]}.
+
+OPENING MESSAGE RULE (critical):
+Your very first message — no matter what the user says to open — must be a simple, natural invitation for them to teach you. Use the topic name from the instructions above. For example: "Oh great, please help me learn about [topic]! Where should I start?" or "I'd love to understand [topic] better — can you explain it to me?" Keep it short and enthusiastic (even if your general attitude is skeptical — save the skepticism for after they've explained something).
+
+STRICT BEHAVIOURAL RULES — these override everything else:
+1. NEVER give explanations, definitions, or answers. You are here to receive knowledge, not share it.
+2. NEVER summarise or repeat back information in a way that could teach the user. If you reflect understanding, you may get things slightly wrong — that is fine and realistic.
+3. Keep every response to 1–3 sentences maximum. You are the learner; the user should be doing most of the talking.
+4. React to what the user tells you: ask one follow-up question at a time, or say you don't understand and ask them to explain further.
+5. Your confusion and questions must match your knowledge level — a beginner asks very basic questions; an expert pushes back with more specific challenges.
+6. Never break character or acknowledge you are an AI.
+7. Do not list things, give structured responses, or use bullet points — speak naturally as a learner would.`;
+}
+
+const COACHING_STYLE_LABELS = [
+  'a pure coach — you ask open-ended, exploratory questions only. You never give opinions, recommendations, or direct advice. You help the person find their own answers through powerful questions.',
+  'a coaching-led partner — you mostly ask questions, but occasionally offer a relevant framework or model to help structure thinking. You hold back your own views.',
+  'a balanced thought partner — you mix open questions with occasional suggestions and frameworks. You share perspectives but always anchor them to the person\'s specific context.',
+  'a thoughtful advisor — you lean towards sharing frameworks, observations and recommendations, but always invite the person to test them against their own situation.',
+  'a direct advisor — you offer clear recommendations and frameworks. You are directive and confident in your guidance, while remaining open to the person\'s context.',
+];
+
+function buildThoughtPartnerSystemPrompt(userInstructions: string | null, referenceContent: string | null, coachingStyle: number): string {
+  const styleLabel = COACHING_STYLE_LABELS[coachingStyle];
+  return `You are a thought partner helping someone think through a topic, idea, or challenge in the context of their own situation. You are ${styleLabel}
+
+THE TOPIC / FOCUS AREA:
+${userInstructions || 'A topic the user will share with you at the start.'}
+
+${referenceContent ? `REFERENCE MATERIAL — use this to inform your questions and responses:
+${referenceContent}` : ''}
+
+OPENING MESSAGE RULE (critical):
+Your very first message must introduce the topic briefly and invite the person to share their context. For example: "I'm here to help you think through ${userInstructions || 'this topic'}. To make this as useful as possible — tell me a bit about your situation and where you're starting from." Keep it warm and concise.
+
+BEHAVIOURAL RULES:
+1. Always anchor your responses to the person's specific context — don't give generic advice.
+2. Never lecture or give long explanations unprompted.
+3. Ask one thing at a time — don't stack multiple questions.
+4. Build on what the person has said; don't repeat questions they've already answered.
+5. If you reference a framework or model from the reference material, introduce it briefly and ask how it applies to their situation.
+6. Keep responses concise — 2–4 sentences maximum unless you're introducing a framework.
+7. Never break character or acknowledge you are an AI.`;
+}
 
 const configSchema = z.object({
   systemPrompt: z.string(),
   temperature: z.number().min(0).max(2).default(0.7),
-  maxTokens: z.number().min(100).max(4000).default(1000)
+  maxTokens: z.number().min(100).max(4000).default(1000),
+  referenceImages: z.array(z.string()).nullable().optional(),
+  type: z.string().optional(),
 });
 
 // Add this near other schema definitions
@@ -66,6 +132,9 @@ const openai = new OpenAI({
 const sessions: Record<string, Message[]> = {};
 
 export function registerRoutes(app: Express): Server {
+  // Add chat_mode column if it doesn't exist yet
+  pool.query(`ALTER TABLE conversations ADD COLUMN IF NOT EXISTS chat_mode TEXT`).catch(() => {});
+
   // Set up authentication routes and middleware
   setupAuth(app);
 
@@ -120,7 +189,7 @@ export function registerRoutes(app: Express): Server {
           responseCount = config.uploads.length;
         } else if (config.type === 'quiz') {
           responseCount = config.quizResponses.length;
-        } else if (config.type === 'dual-conversation') {
+        } else if (config.type === 'two-way-conversation') {
           responseCount = config.dualConversations?.length || 0;
         } else {
           responseCount = config.conversations.length;
@@ -196,7 +265,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/chat-configs", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { title, type, systemPrompt, userInstructions, feedbackCriteria, questions } = chatConfigSchema.parse(req.body);
+      const { title, type, systemPrompt, userInstructions, feedbackCriteria, questions, participant1Role, participant2Role, knowledgeLevel, attitude, coachingStyle, referenceContent, referenceImages } = chatConfigSchema.parse(req.body);
 
       // Get the user ID from the authenticated request
       const userId = req.user?.id;
@@ -209,12 +278,30 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Quiz type requires at least one question" });
       }
 
+      const autoGeneratedTypes = ['teach-ai', 'thought-partner'];
+      if (!autoGeneratedTypes.includes(type) && !systemPrompt?.trim()) {
+        return res.status(400).json({ error: "System prompt is required" });
+      }
+
+      const resolvedSystemPrompt = type === 'teach-ai'
+        ? buildTeachAiSystemPrompt(userInstructions, knowledgeLevel ?? 2, attitude ?? 2)
+        : type === 'thought-partner'
+        ? buildThoughtPartnerSystemPrompt(userInstructions, referenceContent ?? null, coachingStyle ?? 2)
+        : systemPrompt!;
+
       const newConfig = await db.insert(chatConfigs).values({
         title,
         type,
-        systemPrompt,
+        systemPrompt: resolvedSystemPrompt,
         userInstructions,
         feedbackCriteria,
+        participant1Role: participant1Role ?? null,
+        participant2Role: participant2Role ?? null,
+        knowledgeLevel: knowledgeLevel ?? null,
+        attitude: attitude ?? null,
+        coachingStyle: coachingStyle ?? null,
+        referenceContent: referenceContent ?? null,
+        referenceImages: referenceImages ?? null,
         userId,
         deleted: false,
         createdAt: new Date()
@@ -266,15 +353,33 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ error: "You don't have permission to modify this configuration" });
       }
 
-      const { title, type, systemPrompt, userInstructions, feedbackCriteria, questions } = chatConfigSchema.parse(req.body);
+      const { title, type, systemPrompt, userInstructions, feedbackCriteria, questions, participant1Role, participant2Role, knowledgeLevel, attitude, coachingStyle, referenceContent, referenceImages } = chatConfigSchema.parse(req.body);
+
+      const autoGeneratedTypes = ['teach-ai', 'thought-partner'];
+      if (!autoGeneratedTypes.includes(type) && !systemPrompt?.trim()) {
+        return res.status(400).json({ error: "System prompt is required" });
+      }
+
+      const resolvedSystemPrompt = type === 'teach-ai'
+        ? buildTeachAiSystemPrompt(userInstructions, knowledgeLevel ?? 2, attitude ?? 2)
+        : type === 'thought-partner'
+        ? buildThoughtPartnerSystemPrompt(userInstructions, referenceContent ?? null, coachingStyle ?? 2)
+        : systemPrompt!;
 
       const updatedConfig = await db.update(chatConfigs)
         .set({
           title,
           type,
-          systemPrompt,
+          systemPrompt: resolvedSystemPrompt,
           userInstructions,
           feedbackCriteria,
+          participant1Role: participant1Role ?? null,
+          participant2Role: participant2Role ?? null,
+          knowledgeLevel: knowledgeLevel ?? null,
+          attitude: attitude ?? null,
+          coachingStyle: coachingStyle ?? null,
+          referenceContent: referenceContent ?? null,
+          referenceImages: referenceImages ?? null,
         })
         .where(and(
           eq(chatConfigs.id, configId),
@@ -312,6 +417,275 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/configs/generate-with-ai", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { prompt, type } = req.body;
+      if (!prompt) return res.status(400).json({ error: "Prompt is required" });
+
+      const typeDescriptions: Record<string, string> = {
+        chat: 'a one-to-one conversation between a learner and an AI playing a specific role',
+        'two-way-conversation': 'a two-way conversation exercise between two human participants (the AI is not in the conversation — it observes and gives feedback afterwards)',
+        'teach-ai': 'a "teach an AI" exercise where the learner explains a topic to an AI playing the role of a learner',
+        'thought-partner': 'a thought partner session where an AI helps a learner think through how a concept or idea applies to their own context',
+      };
+      const typeLabel = typeDescriptions[type] || 'a conversation with an AI assistant';
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-5.4-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are helping an admin create a workplace training exercise. Based on their description, generate the configuration for ${typeLabel}.
+
+Return a JSON object with exactly these four fields:
+
+"title": A short, punchy title (4–7 words max).
+
+"systemPrompt": A detailed, well-structured AI system prompt. Format it clearly using:
+- A clear opening statement of the AI's role
+- Numbered or bulleted sections for key behaviours and rules
+- Line breaks between sections
+- Plain English, no jargon
+For two-way-conversation type, this prompt guides a feedback AI that analyses the conversation after it happens — write it accordingly.
+For teach-ai type, leave this blank ("") — it is auto-generated.
+For thought-partner type, leave this blank ("") — it is auto-generated.
+
+"userInstructions": Instructions shown to the learner before they start. Format using:
+- A short intro sentence
+- A bullet list of what they need to do / key points to cover
+- Any context they need about the scenario
+Keep it concise and actionable.
+
+"feedbackCriteria": The criteria the AI uses when generating feedback. Format as a numbered or bulleted list of specific, observable behaviours. Each criterion should be one clear sentence. Include 4–6 criteria.
+
+Return only valid JSON — no markdown fences, no extra keys.`
+          },
+          { role: "user", content: prompt }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.7,
+      });
+
+      const content = completion.choices[0].message.content;
+      if (!content) throw new Error("Empty response from OpenAI");
+      const raw = JSON.parse(content);
+      console.log("generate-with-ai raw response:", JSON.stringify(raw, null, 2));
+      const toString = (v: any): string | null =>
+        v == null ? null : typeof v === 'object' ? JSON.stringify(v) : String(v);
+      // Normalise field names (model sometimes returns snake_case) and flatten any nested objects
+      res.json({
+        title: toString(raw.title),
+        systemPrompt: toString(raw.systemPrompt ?? raw.system_prompt),
+        userInstructions: toString(raw.userInstructions ?? raw.user_instructions),
+        feedbackCriteria: toString(raw.feedbackCriteria ?? raw.feedback_criteria),
+      });
+    } catch (error: any) {
+      console.error("Error generating config with AI:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/configs/enhance-prompt", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { prompt, type } = req.body;
+      if (!prompt) return res.status(400).json({ error: "Prompt is required" });
+
+      const typeDescriptions: Record<string, string> = {
+        chat: 'a one-to-one conversation between a learner and an AI playing a specific role',
+        'two-way-conversation': 'a two-way conversation exercise between two human participants',
+        'teach-ai': 'a "teach an AI" exercise where the learner explains a topic to an AI playing the role of a learner',
+        'thought-partner': 'a thought partner session where an AI helps a learner think through how a concept applies to their context',
+      };
+      const typeLabel = typeDescriptions[type] || 'a conversation with an AI assistant';
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are helping an admin describe a workplace learning activity of type: ${typeLabel}.
+
+Their description may be brief or vague. Expand it into a richer, more detailed description that will produce a high-quality learning activity. Keep the same scenario and intent, but add:
+- More context about the scenario and setting
+- The specific skills or behaviours being practised
+- What a good performance looks like for the learner
+- Any relevant constraints, nuances, or edge cases to practise
+
+Keep the tone conversational and direct. Write in the same voice as the original. Return only the enhanced description — no headings, no preamble, no explanation.`
+          },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.7,
+      });
+
+      const enhanced = completion.choices[0].message.content;
+      if (!enhanced) throw new Error("Empty response from OpenAI");
+      res.json({ enhanced });
+    } catch (error: any) {
+      console.error("Error enhancing prompt:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/realtime/session", async (req: Request, res: Response) => {
+    try {
+      const { configId } = req.body;
+      if (!configId) return res.status(400).json({ error: "configId is required" });
+
+      const [config] = await db.select().from(chatConfigs).where(eq(chatConfigs.id, configId));
+      if (!config) return res.status(404).json({ error: "Config not found" });
+
+      const sessionRes = await fetch("https://api.openai.com/v1/realtime/sessions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-realtime-preview-2024-12-17",
+          instructions: config.systemPrompt,
+          voice: "alloy",
+        }),
+      });
+
+      if (!sessionRes.ok) {
+        const err = await sessionRes.text();
+        throw new Error(`OpenAI session error: ${err}`);
+      }
+
+      const data = await sessionRes.json();
+      res.json({ ...data, systemPrompt: config.systemPrompt });
+    } catch (error: any) {
+      console.error("Error creating realtime session:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/thought-partner/summary", async (req: Request, res: Response) => {
+    try {
+      const { messages, userInstructions, feedbackCriteria, configId, sessionId } = req.body;
+
+      let allMessages = messages || [];
+      let sessionCount = 1;
+
+      // If configId provided, aggregate all stored conversations for this GPT
+      if (configId) {
+        const storedConversations = await db.query.conversations.findMany({
+          where: eq(conversations.configId, parseInt(configId)),
+          orderBy: [conversations.createdAt],
+        });
+
+        if (storedConversations.length > 0) {
+          // Combine all messages from all sessions, adding session breaks
+          const combined: any[] = [];
+          storedConversations.forEach((conv, idx) => {
+            if (idx > 0) combined.push({ role: 'system-divider', sessionNumber: idx + 1 });
+            combined.push(...(conv.messages || []));
+          });
+          // Merge with any unsaved messages from current session
+          const storedIds = new Set(storedConversations.flatMap(c => (c.messages || []).map((m: any) => m.id)));
+          const unsavedCurrentMessages = allMessages.filter((m: any) => !storedIds.has(m.id));
+          if (unsavedCurrentMessages.length > 0) {
+            if (combined.length > 0) combined.push({ role: 'system-divider', sessionNumber: storedConversations.length + 1 });
+            combined.push(...unsavedCurrentMessages);
+          }
+          allMessages = combined;
+          sessionCount = storedConversations.length + (unsavedCurrentMessages.length > 0 ? 1 : 0);
+          sessionCount = Math.max(sessionCount, storedConversations.length);
+        }
+      }
+
+      const conversationMessages = allMessages.filter((m: any) => m.role !== 'system-divider');
+      if (conversationMessages.length === 0) {
+        return res.status(400).json({ error: "No conversation to summarise" });
+      }
+
+      let transcript = '';
+      let currentSession = 1;
+      allMessages.forEach((m: any) => {
+        if (m.role === 'system-divider') {
+          transcript += `\n--- Conversation ${m.sessionNumber} ---\n`;
+          currentSession = m.sessionNumber;
+        } else {
+          const speaker = m.role === 'user' ? 'Learner' : 'Thought Partner';
+          const text = typeof m.content === 'string' ? m.content : m.content?.text || '';
+          transcript += `${speaker}: ${text}\n`;
+        }
+      });
+
+      const summaryFocus = feedbackCriteria
+        ? `Pay particular attention to: ${feedbackCriteria}`
+        : '';
+
+      const prompt = `You are analysing ${sessionCount > 1 ? `${sessionCount} thought partner conversations` : 'a thought partner conversation'} about the following topic: "${userInstructions || 'a topic'}".
+
+${summaryFocus}
+
+Here is the conversation transcript:
+${transcript}
+
+Create a structured thinking map covering all conversations. Return valid JSON in exactly this format:
+{
+  "keyThemes": ["theme 1", "theme 2", "theme 3"],
+  "insights": ["insight 1", "insight 2", "insight 3"],
+  "openQuestions": ["question still to explore 1", "question 2"],
+  "nextSteps": ["suggested next step 1", "suggested next step 2", "suggested next step 3"]
+}
+
+Guidelines:
+- keyThemes: the main concepts and areas explored across all conversations (3-5 items)
+- insights: concrete realisations or positions the learner reached (2-4 items)
+- openQuestions: threads that came up but weren't fully resolved (2-3 items)
+- nextSteps: practical actions or further thinking the learner could do (2-4 items)
+Return only the JSON object, no other text.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }],
+        max_completion_tokens: 800,
+        temperature: 0.4,
+      });
+
+      const raw = response.choices[0]?.message?.content || '{}';
+      const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const summary = JSON.parse(cleaned);
+
+      // Save a concise per-conversation summary so the admin view can show it
+      if (sessionId && configId) {
+        try {
+          const parsedConfigId = parseInt(String(configId));
+          const summaryBullets: string[] = [
+            ...(summary.insights || []).slice(0, 2),
+            ...(summary.keyThemes || []).slice(0, 2),
+          ].slice(0, 4);
+
+          const feedbackPayload = { bullets: summaryBullets, score: null, summary: null };
+
+          // Upsert: update if exists, insert if not
+          await db
+            .insert(conversations)
+            .values({
+              configId: parsedConfigId,
+              sessionId: String(sessionId),
+              messages: [],
+              feedback: feedbackPayload as any,
+            })
+            .onConflictDoUpdate({
+              target: [conversations.configId, conversations.sessionId],
+              set: { feedback: feedbackPayload as any },
+            });
+        } catch (saveErr) {
+          console.error("Failed to save thought-partner summary to conversation:", saveErr);
+        }
+      }
+
+      res.json({ ...summary, sessionCount });
+    } catch (error: any) {
+      console.error("Error generating thought partner summary:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/chat-hint", async (req: Request, res: Response) => {
     try {
       const { feedbackCriteria, userInstructions, messages } = req.body;
@@ -323,7 +697,7 @@ export function registerRoutes(app: Express): Server {
       const prompt = `Based on these criteria:\n${feedbackCriteria}\n\nAnd these instructions:\n${userInstructions || 'No specific instructions'}\n\nAnalyze the current conversation and provide a helpful hint for the user to improve their responses. Keep the hint concise and specific. \nWrite the hint straight out - don't include "Hint:" at the beginning of your response.\n Limit the response to 2 sentences.`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-5.4-mini",
         messages: [
           {
             role: "system",
@@ -335,7 +709,7 @@ export function registerRoutes(app: Express): Server {
           }
         ],
         temperature: 0.7,
-        max_tokens: 2000,
+        max_completion_tokens: 2000,
       });
 
       const hint = completion.choices[0]?.message?.content;
@@ -394,6 +768,7 @@ export function registerRoutes(app: Express): Server {
       const configId = parseInt(req.query.configId as string);
       const sessionId = req.query.sessionId as string || crypto.randomUUID();
       const userName = req.query.userName as string || null;
+      const chatMode = (req.query.chatMode as string) || 'typed';
 
       if (!content) {
         return res.status(400).json({ error: "Message content is required" });
@@ -434,6 +809,7 @@ export function registerRoutes(app: Express): Server {
             configId,
             sessionId,
             userName,
+            chatMode,
             messages: sessions[sessionId],
           })
           .onConflictDoUpdate({
@@ -455,6 +831,19 @@ export function registerRoutes(app: Express): Server {
       const apiMessages: ChatCompletionMessageParam[] = [
         { role: "system", content: enhancedSystemPrompt }
       ];
+
+      // For thought-partner: inject reference images as context before conversation
+      if (parsedConfig.type === 'thought-partner' && parsedConfig.referenceImages?.length) {
+        const imageContent: any[] = [
+          { type: 'text', text: 'Here is my reference material for this session:' },
+          ...parsedConfig.referenceImages.map(img => ({
+            type: 'image_url',
+            image_url: { url: img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}` }
+          }))
+        ];
+        apiMessages.push({ role: 'user', content: imageContent });
+        apiMessages.push({ role: 'assistant', content: "Thank you — I have your reference material. I'll use it to inform our conversation." });
+      }
 
       for (const m of sessions[sessionId]) {
         if (typeof m.content === 'string') {
@@ -491,10 +880,10 @@ export function registerRoutes(app: Express): Server {
 
       try {
         const stream = await openai.chat.completions.create({
-          model: "gpt-4o",
+          model: "gpt-5.4-mini",
           messages: apiMessages,
           temperature: parsedConfig.temperature,
-          max_tokens: parsedConfig.maxTokens,
+          max_completion_tokens: parsedConfig.maxTokens,
           stream: true,
         });
 
@@ -558,7 +947,7 @@ export function registerRoutes(app: Express): Server {
       const prompt = `Context:\n${config.systemPrompt}\n\nAnalyze the uploaded screenshot based on these criteria:\n${config.feedbackCriteria}\n\nAddress the user as 'you' in your response (and do not just say 'the user').\n\nPlease provide your analysis in exactly this format, ensuring you are evaluating the user's side of the conversation (i.e. the person who first types, NOT the GPT (which is you as the bot):\n\n• [3 bullet points focusing on how well the screenshot meets the criteria. Keep each bullet to 1 sentence]\n\nScore: [1-10]\n[Brief one-line summary of overall quality]`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-5.4-mini",
         messages: [
           {
             role: "system",
@@ -575,7 +964,7 @@ export function registerRoutes(app: Express): Server {
             ]
           }
         ],
-        max_tokens: 5000,
+        max_completion_tokens: 5000,
       });
 
       const response = completion.choices[0]?.message?.content;
@@ -675,7 +1064,7 @@ export function registerRoutes(app: Express): Server {
 
         try {
           const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
+            model: "gpt-5.4-mini",
             messages: [
               {
                 role: "system",
@@ -790,7 +1179,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/chat-feedback", async (req: Request, res: Response) => {
     try {
-      const { configId, sessionId, messages } = req.body;
+      const { configId, sessionId, messages, userName, chatMode } = req.body;
 
       if (!configId || !sessionId || !messages) {
         return res.status(400).json({ error: "Missing required parameters" });
@@ -816,7 +1205,7 @@ export function registerRoutes(app: Express): Server {
       ).join('\n');
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-5.4-mini",
         messages: [
           {
             role: "system",
@@ -828,7 +1217,7 @@ export function registerRoutes(app: Express): Server {
           }
         ],
         temperature: 0.7,
-        max_tokens: 5000,
+        max_completion_tokens: 5000,
       });
 
       const response = completion.choices[0]?.message?.content;
@@ -851,18 +1240,24 @@ export function registerRoutes(app: Express): Server {
       const feedbackData: ConversationFeedback = {
         bullets,
         score,
-        summary
+        summary,
+        manual: true,
       };
 
       await db
-        .update(conversations)
-        .set({
-          feedback: feedbackData
+        .insert(conversations)
+        .values({
+          configId,
+          sessionId,
+          userName: userName || null,
+          chatMode: chatMode || 'typed',
+          messages: messages || [],
+          feedback: feedbackData,
         })
-        .where(and(
-          eq(conversations.configId, configId),
-          eq(conversations.sessionId, sessionId)
-        ));
+        .onConflictDoUpdate({
+          target: [conversations.configId, conversations.sessionId],
+          set: { feedback: feedbackData }
+        });
 
       res.json(feedbackData);
     } catch (error: any) {
@@ -949,6 +1344,7 @@ export function registerRoutes(app: Express): Server {
         const conversationsWithMetadata = conversationData.map(conv => ({
           sessionId: conv.sessionId,
           userName: conv.userName,
+          chatMode: conv.chatMode,
           messages: conv.messages,
           feedback: conv.feedback
         }));
@@ -1004,7 +1400,7 @@ export function registerRoutes(app: Express): Server {
     - REMEMBER TO FORMAT THE RESPONSE IN JSON AS ABOVE`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-5.4-mini",
         messages: [
           {
             role: "system",
@@ -1016,7 +1412,7 @@ export function registerRoutes(app: Express): Server {
           }
         ],
         temperature: 0.7,
-        max_tokens: 5000,
+        max_completion_tokens: 5000,
       });
 
       const response = completion.choices[0]?.message?.content;
@@ -1077,8 +1473,7 @@ export function registerRoutes(app: Express): Server {
         .set({
           isTemplate: true,
           templateDescription: templateDescription || null,
-          // Optionally, you can reassign userId if needed:
-          // userId: req.user?.id
+          referenceImages: null,  // strip reference images from templates
         })
         .where(and(
           eq(chatConfigs.id, configId),
@@ -1262,6 +1657,168 @@ export function registerRoutes(app: Express): Server {
       res.json(templatesWithCount);
     } catch (error: any) {
       console.error("Error fetching templates:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Save transcript without grading (used by VoiceChatInterface to persist in real-time)
+  app.post("/api/conversations/save-transcript", async (req: Request, res: Response) => {
+    try {
+      const { configId, sessionId, userName, chatMode, messages } = req.body;
+      if (!configId || !sessionId || !Array.isArray(messages)) {
+        return res.status(400).json({ error: "Missing required params" });
+      }
+      await db
+        .insert(conversations)
+        .values({ configId, sessionId, userName: userName || null, chatMode: chatMode || 'spoken', messages })
+        .onConflictDoUpdate({
+          target: [conversations.configId, conversations.sessionId],
+          set: { messages, userName: userName || null },
+        });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error saving transcript:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Final leaderboard: only manually-graded entries, dynamic top N by session size
+  app.get("/api/final-leaderboard/:configId", async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.configId);
+      if (isNaN(configId)) return res.status(400).json({ error: "Invalid config ID" });
+
+      const sessionId = req.query.sessionId as string | undefined;
+      const userName = req.query.userName as string | undefined;
+
+      const convData = await db.query.conversations.findMany({
+        where: eq(conversations.configId, configId),
+      });
+
+      const totalParticipants = convData.length;
+      const topN = totalParticipants >= 16 ? 10 : totalParticipants >= 8 ? 5 : 3;
+
+      const allManual = withMessages
+        .filter(c => c.feedback && (c.feedback as any).manual === true)
+        .map(c => ({
+          userName: c.userName || 'Anonymous',
+          score: c.feedback!.score,
+          total: 10,
+          isCurrentUser: !!(userName && sessionId && c.userName === userName && c.sessionId === sessionId),
+        }))
+        .sort((a, b) => b.score - a.score);
+
+      res.json({ entries: allManual, topN });
+    } catch (error: any) {
+      console.error("Error in final-leaderboard:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Live stats: participant count + top 3 names from already-graded conversations
+  app.get("/api/live-stats/:configId", async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.configId);
+      if (isNaN(configId)) return res.status(400).json({ error: "Invalid config ID" });
+
+      const convData = await db.query.conversations.findMany({
+        where: eq(conversations.configId, configId),
+      });
+
+      const participantCount = convData.length;
+      const topN = participantCount >= 16 ? 10 : participantCount >= 8 ? 5 : 3;
+
+      const leaderboard = convData
+        .filter(c => c.feedback && c.feedback.score !== null)
+        .sort((a, b) => (b.feedback!.score ?? 0) - (a.feedback!.score ?? 0))
+        .slice(0, topN)
+        .map(c => c.userName || 'Anonymous');
+
+      res.json({ participantCount, leaderboard, topN });
+    } catch (error: any) {
+      console.error("Error in live-stats:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Auto-grade: grade all ungraded conversations, return updated stats
+  app.post("/api/auto-grade/:configId", async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.configId);
+      if (isNaN(configId)) return res.status(400).json({ error: "Invalid config ID" });
+
+      const config = await db.query.chatConfigs.findFirst({
+        where: eq(chatConfigs.id, configId),
+      });
+
+      if (!config || !config.feedbackCriteria) {
+        const convData = await db.query.conversations.findMany({
+          where: eq(conversations.configId, configId),
+        });
+        const participantCount = convData.filter(c => c.messages && c.messages.length > 0).length;
+        return res.json({ participantCount, leaderboard: [] });
+      }
+
+      const convData = await db.query.conversations.findMany({
+        where: eq(conversations.configId, configId),
+      });
+
+      const ungraded = convData.filter(
+        c => c.messages && c.messages.length >= 2 && (!c.feedback || c.feedback.score === null)
+      );
+
+      const prompt = `Context:\n${config.systemPrompt}\n\nAnalyze the conversation based on these criteria:\n${config.feedbackCriteria}\n\nIMPORTANT: Focus only on the user's contributions. Address them directly as 'you'. Never say 'the user' or 'they'.\n\nFormat:\n• [3 bullet points]\n\nScore: [1-10]\n[One-line summary]`;
+
+      await Promise.all(ungraded.map(async (conv) => {
+        try {
+          const conversation = conv.messages.map((m: Message) =>
+            `${m.role}: ${typeof m.content === 'string' ? m.content : (m.content as any).text}`
+          ).join('\n');
+
+          const completion = await openai.chat.completions.create({
+            model: "gpt-5.4-mini",
+            messages: [
+              { role: "system", content: "You are an expert at analyzing conversations and providing constructive feedback." },
+              { role: "user", content: `${prompt}\n\nConversation:\n${conversation}` }
+            ],
+            temperature: 0.7,
+            max_completion_tokens: 2000,
+          });
+
+          const response = completion.choices[0]?.message?.content;
+          if (!response) return;
+
+          const scoreMatch = response.match(/Score:\s*(\d+)/i);
+          const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
+          const summaryMatch = response.match(/Score:\s*\d+\s*\n([^\n]+)/i);
+          const summary = summaryMatch ? summaryMatch[1].trim() : null;
+          const bullets = response.split(/Score:/i)[0].split(/[•\-\*]\s+/).filter((b: string) => b.trim()).map((b: string) => b.trim());
+
+          const feedbackData: ConversationFeedback = { bullets, score, summary };
+          await db.update(conversations)
+            .set({ feedback: feedbackData })
+            .where(and(eq(conversations.configId, configId), eq(conversations.sessionId, conv.sessionId)));
+        } catch (err) {
+          console.error(`Error auto-grading conversation ${conv.sessionId}:`, err);
+        }
+      }));
+
+      const updated = await db.query.conversations.findMany({
+        where: eq(conversations.configId, configId),
+      });
+
+      const withMessages = updated.filter(c => c.messages && c.messages.length > 0);
+      const participantCount = withMessages.length;
+      const topN = participantCount >= 16 ? 10 : participantCount >= 8 ? 5 : 3;
+      const leaderboard = withMessages
+        .filter(c => c.feedback && c.feedback.score !== null)
+        .sort((a, b) => (b.feedback!.score ?? 0) - (a.feedback!.score ?? 0))
+        .slice(0, topN)
+        .map(c => c.userName || 'Anonymous');
+
+      res.json({ participantCount, leaderboard, topN });
+    } catch (error: any) {
+      console.error("Error in auto-grade:", error);
       res.status(500).json({ error: error.message });
     }
   });

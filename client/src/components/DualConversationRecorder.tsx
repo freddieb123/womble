@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,6 +19,7 @@ interface TwoWayConversationRecorderProps {
   participant1Name?: string;
   participant2Name?: string;
   onTranscriptReady?: (transcript: any[]) => void;
+  autoStart?: boolean;
 }
 
 interface TranscriptEntry {
@@ -33,6 +34,7 @@ export default function DualConversationRecorder({
   participant1Name: propParticipant1Name,
   participant2Name: propParticipant2Name,
   onTranscriptReady,
+  autoStart,
 }: TwoWayConversationRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -46,25 +48,34 @@ export default function DualConversationRecorder({
     propParticipant2Name || "",
   );
 
+  // Refs so startRecording always sees the latest names even before state syncs
+  const p1NameRef = useRef(propParticipant1Name || "");
+  const p2NameRef = useRef(propParticipant2Name || "");
+  const autoStartedRef = useRef(false);
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const { toast } = useToast();
 
-  // Update local state when prop values change
+  // Update local state and refs when prop values change
   useEffect(() => {
     if (propParticipant1Name) {
       setParticipant1Name(propParticipant1Name);
+      p1NameRef.current = propParticipant1Name;
     }
     if (propParticipant2Name) {
       setParticipant2Name(propParticipant2Name);
+      p2NameRef.current = propParticipant2Name;
     }
   }, [propParticipant1Name, propParticipant2Name]);
 
-  const startRecording = async () => {
+  const startRecording = useCallback(async () => {
     try {
-      if (!participant1Name || !participant2Name) {
+      const p1 = participant1Name || p1NameRef.current;
+      const p2 = participant2Name || p2NameRef.current;
+      if (!p1 || !p2) {
         toast({
           title: "Missing participant names",
           description: "Please enter names for both participants.",
@@ -230,7 +241,15 @@ export default function DualConversationRecorder({
         duration: 6000,
       });
     }
-  };
+  }, [participant1Name, participant2Name, toast]);
+
+  // Auto-start recording when names are provided and autoStart flag is set
+  useEffect(() => {
+    if (autoStart && !autoStartedRef.current && p1NameRef.current && p2NameRef.current && !isRecording && !audioBlob) {
+      autoStartedRef.current = true;
+      startRecording();
+    }
+  }, [autoStart, propParticipant1Name, propParticipant2Name, startRecording]);
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
@@ -423,7 +442,21 @@ export default function DualConversationRecorder({
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardContent className="space-y-4">
-        {audioUrl && transcript.length === 0 && (
+        {/* Recording orb — shown while actively recording */}
+        {isRecording && (
+          <div className="flex flex-col items-center gap-3 py-6">
+            <div className="relative flex items-center justify-center">
+              <div className="absolute rounded-full w-36 h-36 bg-green-200 opacity-30 animate-ping" />
+              <div className="absolute rounded-full w-28 h-28 bg-green-200 opacity-40 animate-ping [animation-delay:200ms]" />
+              <div className="relative rounded-full w-24 h-24 bg-green-100 shadow-lg flex items-center justify-center">
+                <Mic className="h-9 w-9 text-green-600" />
+              </div>
+            </div>
+            <p className="text-sm text-gray-500">Listening...</p>
+          </div>
+        )}
+
+        {audioUrl && !isRecording && transcript.length === 0 && (
           <div className="pt-2">
             <Label>Recording</Label>
             <audio src={audioUrl} controls className="w-full mt-2" />
@@ -444,9 +477,6 @@ export default function DualConversationRecorder({
       {/* Only show card footer with buttons if transcript is not ready */}
       {transcript.length === 0 && (
         <CardFooter className="flex flex-col space-y-3">
-          <div className="w-full text-center">
-            <p className="text-xs text-gray-500 mb-2"></p>
-          </div>
           {!audioBlob ? (
             <div className="w-full flex flex-col">
               <Button
@@ -465,13 +495,15 @@ export default function DualConversationRecorder({
                   </>
                 )}
               </Button>
-              <p className="text-xs text-gray-500 mt-2 text-center">
-                A transcript will be saved, but not the audio recording. Your
-                trainer has access to your transcript. Powered by{" "}
-                <a href="https://womble.co" style={{ color: "blue" }}>
-                  Womble.co
-                </a>
-              </p>
+              {!isRecording && (
+                <p className="text-xs text-gray-500 mt-2 text-center">
+                  A transcript will be saved, but not the audio recording. Your
+                  trainer has access to your transcript. Powered by{" "}
+                  <a href="https://womble.co" style={{ color: "blue" }}>
+                    Womble.co
+                  </a>
+                </p>
+              )}
             </div>
           ) : (
             <div className="w-full flex justify-between gap-2">

@@ -4,6 +4,8 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, MessageSquare } from 'lucide-react';
+import WombleHeader from '@/components/WombleHeader';
+import WombleFooter from '@/components/WombleFooter';
 
 interface TranscriptEntry {
   role: 'transcript';
@@ -98,38 +100,42 @@ export default function StaticTranscriptView() {
   const { participant1Name, participant2Name, transcript } = conversation;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="container mx-auto max-w-4xl px-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Conversation Transcript</span>
-              <Button variant="outline" size="sm" onClick={() => window.close()}>
-                Close
-              </Button>
-            </CardTitle>
-            <div className="text-sm text-muted-foreground">
-              <span className="font-medium">Full Conversation Transcript</span>
-            </div>
-          </CardHeader>
-          
-          <CardContent>
-            <ScrollArea className="h-[70vh]">
-              <div className="p-4 rounded-lg bg-gray-50 border">
-                <div className="text-sm leading-relaxed whitespace-pre-wrap">
-                  {transcript.map((entry) => entry.content).join(' ')}
-                </div>
+    <div className="min-h-screen flex flex-col">
+      <WombleHeader />
+      <div className="flex-1 bg-gray-50 py-8">
+        <div className="container mx-auto max-w-4xl px-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>Conversation Transcript</span>
+                <Button variant="outline" size="sm" onClick={() => window.close()}>
+                  Close
+                </Button>
+              </CardTitle>
+              <div className="text-sm text-muted-foreground">
+                <span className="font-medium">Full Conversation Transcript</span>
               </div>
-            </ScrollArea>
-          </CardContent>
-          
-          <CardFooter className="justify-end border-t pt-4">
-            <Button variant="outline" onClick={() => window.print()}>
-              Print Transcript
-            </Button>
-          </CardFooter>
-        </Card>
+            </CardHeader>
+
+            <CardContent>
+              <ScrollArea className="h-[70vh]">
+                <div className="p-4 rounded-lg bg-gray-50 border">
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                    {transcript.map((entry) => entry.content).join(' ')}
+                  </div>
+                </div>
+              </ScrollArea>
+            </CardContent>
+
+            <CardFooter className="justify-end border-t pt-4">
+              <Button variant="outline" onClick={() => window.print()}>
+                Print Transcript
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
+      <WombleFooter />
     </div>
   );
 }

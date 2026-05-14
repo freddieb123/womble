@@ -1,8 +1,13 @@
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import ChatInterface from "@/components/ChatInterface";
+import VoiceChatInterface from "@/components/VoiceChatInterface";
 import UploadInterface from "@/components/UploadInterface";
 import QuizInterface from "@/components/QuizInterface";
+import WombleHeader from "@/components/WombleHeader";
+import WombleFooter from "@/components/WombleFooter";
+import { ParticipantCount, LiveLeaderboard } from "@/components/LiveActivityPanel";
 import { AdminConfig } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle } from "lucide-react";
@@ -13,7 +18,8 @@ export default function UserView() {
   const searchParams = new URLSearchParams(window.location.search);
   const configId = searchParams.get('configId');
   const sessionId = searchParams.get('sessionId') || crypto.randomUUID();
-  const userName = searchParams.get('userName');
+  const [userName, setUserName] = useState<string | null>(searchParams.get('userName'));
+  const [chatMode, setChatMode] = useState<'typed' | 'spoken' | null>(searchParams.get('mode') as 'typed' | 'spoken' | null);
   const isViewOnly = searchParams.get('viewOnly') === 'true';
 
   const { data: savedConfig, isLoading, error } = useQuery<SelectChatConfig & { questions?: Array<{ question: string; expectedAnswer: string }> }>({
@@ -23,18 +29,16 @@ export default function UserView() {
     staleTime: Infinity,
   });
 
-  const updateUrlWithUserName = (name: string) => {
+  const updateUrlWithUserName = (name: string, mode?: 'typed' | 'spoken') => {
     const newParams = new URLSearchParams(window.location.search);
     newParams.set('userName', name);
-    if (!newParams.has('sessionId')) {
-      newParams.set('sessionId', sessionId);
-    }
-    if (!newParams.has('configId') && configId) {
-      newParams.set('configId', configId);
-    }
+    if (mode) newParams.set('mode', mode);
+    if (!newParams.has('sessionId')) newParams.set('sessionId', sessionId);
+    if (!newParams.has('configId') && configId) newParams.set('configId', configId);
     const newUrl = `${window.location.pathname}?${newParams.toString()}`;
     window.history.replaceState({}, '', newUrl);
-    window.location.reload();
+    setUserName(name);
+    if (mode) setChatMode(mode);
     return newUrl;
   };
 
@@ -95,7 +99,12 @@ export default function UserView() {
     maxTokens: 1000,
     userInstructions: savedConfig.userInstructions || "",
     feedbackCriteria: savedConfig.feedbackCriteria || "",
-    questions: savedConfig.questions || []
+    questions: savedConfig.questions || [],
+    knowledgeLevel: (savedConfig as any).knowledgeLevel ?? undefined,
+    attitude: (savedConfig as any).attitude ?? undefined,
+    coachingStyle: (savedConfig as any).coachingStyle ?? undefined,
+    referenceImages: (savedConfig as any).referenceImages ?? undefined,
+    referenceContent: (savedConfig as any).referenceContent ?? undefined,
   };
 
   console.log('Transformed config:', config);
@@ -117,36 +126,80 @@ export default function UserView() {
     );
   }
 
+  const showLivePanels = (config.type === 'chat' || config.type === 'teach-ai') && !isViewOnly;
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
-        <Card className="p-6">
-          {config.type === 'upload' ? (
-            <UploadInterface
-              config={config}
-              sessionId={sessionId}
-              userName={userName}
-              onUserNameSubmit={updateUrlWithUserName}
-            />
-          ) : config.type === 'quiz' ? (
-            <QuizInterface
-              config={config}
-              sessionId={sessionId}
-              userName={userName}
-              onUserNameSubmit={updateUrlWithUserName}
-              isViewOnly={isViewOnly}
-            />
-          ) : (
-            <ChatInterface
-              config={config}
-              sessionId={sessionId}
-              userName={userName}
-              isViewOnly={isViewOnly}
-              onUserNameSubmit={updateUrlWithUserName}
-            />
-          )}
-        </Card>
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex flex-col">
+      <WombleHeader />
+      <div className="flex-1 p-4 md:p-8">
+        {showLivePanels ? (
+          <div className="flex gap-4 max-w-6xl mx-auto items-start">
+            <div className="hidden lg:block w-40 flex-shrink-0 pt-2">
+              <ParticipantCount configId={config.id!} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <Card className="p-6">
+                {chatMode === 'spoken' ? (
+                  <VoiceChatInterface
+                    config={config}
+                    sessionId={sessionId}
+                    userName={userName}
+                    onUserNameSubmit={updateUrlWithUserName}
+                  />
+                ) : (
+                  <ChatInterface
+                    config={config}
+                    sessionId={sessionId}
+                    userName={userName}
+                    isViewOnly={isViewOnly}
+                    onUserNameSubmit={updateUrlWithUserName}
+                  />
+                )}
+              </Card>
+            </div>
+            <div className="hidden lg:block w-40 flex-shrink-0 pt-2">
+              <LiveLeaderboard configId={config.id!} />
+            </div>
+          </div>
+        ) : (
+          <div className="max-w-4xl mx-auto">
+            <Card className="p-6">
+              {config.type === 'upload' ? (
+                <UploadInterface
+                  config={config}
+                  sessionId={sessionId}
+                  userName={userName}
+                  onUserNameSubmit={updateUrlWithUserName}
+                />
+              ) : config.type === 'quiz' ? (
+                <QuizInterface
+                  config={config}
+                  sessionId={sessionId}
+                  userName={userName}
+                  onUserNameSubmit={updateUrlWithUserName}
+                  isViewOnly={isViewOnly}
+                />
+              ) : chatMode === 'spoken' ? (
+                <VoiceChatInterface
+                  config={config}
+                  sessionId={sessionId}
+                  userName={userName}
+                  onUserNameSubmit={updateUrlWithUserName}
+                />
+              ) : (
+                <ChatInterface
+                  config={config}
+                  sessionId={sessionId}
+                  userName={userName}
+                  isViewOnly={isViewOnly}
+                  onUserNameSubmit={updateUrlWithUserName}
+                />
+              )}
+            </Card>
+          </div>
+        )}
       </div>
+      <WombleFooter />
     </div>
   );
 }

@@ -14,7 +14,7 @@ interface AdminHeaderProps {
 export default function AdminHeader({ 
   title, 
   showNewButton = true, 
-  newButtonText = "New GPT", 
+  newButtonText = "New Agent", 
   newButtonLink = "/admin/new" 
 }: AdminHeaderProps) {
   return (
@@ -24,8 +24,8 @@ export default function AdminHeader({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <div className="flex items-center gap-2 cursor-pointer">
-                <img src="/Womble_new_logo_full.png" alt="Womble Logo" className="h-8 w-8" />
-                <span className="text-xl font-bold text-primary"></span>
+                <img src="/womble-icon.svg" alt="Womble" className="h-8 w-8" />
+                <span className="text-xl font-bold text-green-700">Womble</span>
               </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-72 p-3">

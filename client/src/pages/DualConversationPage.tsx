@@ -10,6 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 import DualConversationRecorder from '@/components/DualConversationRecorder';
 import ParticipantsNameModal from '@/components/ParticipantsNameModal';
 import FeedbackModal from '@/components/FeedbackModal';
+import WombleHeader from '@/components/WombleHeader';
+import WombleFooter from '@/components/WombleFooter';
 import { v4 as uuidv4 } from 'uuid';
 
 interface DualConversationPageProps {}
@@ -29,6 +31,7 @@ export default function DualConversationPage({}: DualConversationPageProps) {
   const [participant1Name, setParticipant1Name] = useState("");
   const [participant2Name, setParticipant2Name] = useState("");
   const [instructionsOpen, setInstructionsOpen] = useState(true);
+  const [autoStartRecording, setAutoStartRecording] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -75,11 +78,7 @@ export default function DualConversationPage({}: DualConversationPageProps) {
     }
     
     setShowNamesModal(false);
-    
-    toast({
-      title: "Names Saved",
-      description: `Participants: ${names.participant1Name} and ${names.participant2Name}`,
-    });
+    setAutoStartRecording(true);
   };
 
   const generateFeedback = async () => {
@@ -162,11 +161,15 @@ export default function DualConversationPage({}: DualConversationPageProps) {
   }
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="min-h-screen flex flex-col">
+      <WombleHeader />
+    <div className="container mx-auto py-6 flex-1">
       {/* Names modal - always shown on page load */}
-      <ParticipantsNameModal 
-        open={showNamesModal} 
-        onSubmit={handleNameSubmit} 
+      <ParticipantsNameModal
+        open={showNamesModal}
+        onSubmit={handleNameSubmit}
+        participant1Role={config?.participant1Role}
+        participant2Role={config?.participant2Role}
       />
       
       {/* Feedback modal - shown when feedback is available and modal is open */}
@@ -215,12 +218,13 @@ export default function DualConversationPage({}: DualConversationPageProps) {
               </Collapsible>
             )}
             
-            <DualConversationRecorder 
-              configId={parsedConfigId || 0} 
+            <DualConversationRecorder
+              configId={parsedConfigId || 0}
               sessionId={sessionId}
               participant1Name={participant1Name}
               participant2Name={participant2Name}
               onTranscriptReady={handleTranscriptReady}
+              autoStart={autoStartRecording}
             />
             
             {transcript.length > 0 && (
@@ -238,6 +242,8 @@ export default function DualConversationPage({}: DualConversationPageProps) {
           </div>
         </CardContent>
       </Card>
+    </div>
+    <WombleFooter />
     </div>
   );
 }

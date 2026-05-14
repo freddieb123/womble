@@ -1,4 +1,4 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Brain, Zap, Award, Users, Server, Database, BarChart, LogOut, CameraIcon } from "lucide-react";
 
@@ -11,6 +11,12 @@ import { track, EventName } from "@/lib/mixpanel";
 
 export default function LandingPage() {
   const { user, logoutMutation } = useAuth();
+  const [, navigate] = useLocation();
+
+  if (user) {
+    navigate("/dashboard");
+    return null;
+  }
   
   // Structured data for rich snippets
   const structuredData = {
@@ -41,7 +47,8 @@ export default function LandingPage() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <span className="text-2xl font-bold text-primary flex items-center cursor-pointer">
-                  <img src="/Womble_new_logo_full.png" alt="Womble Logo" className="h-20 w-50 mr-2" />
+                  <img src="/womble-icon.svg" alt="Womble" className="h-10 w-10 mr-2" />
+                  <span className="text-green-700">Womble</span>
                 </span>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-72 p-3">
@@ -578,8 +585,9 @@ export default function LandingPage() {
             <div>
               <div className="flex items-center">
                 <span className="text-2xl font-bold text-primary flex items-center">
-                  <img src="/Womble_new_logo_full.png" alt="Womble Logo" className="h-14 w-29 mr-2" />
-                  
+                  <img src="/womble-icon.svg" alt="Womble" className="h-9 w-9 mr-2" />
+                  <span className="text-green-700">Womble</span>
+
                 </span>
               </div>
             </div>

@@ -22,6 +22,7 @@ interface Props {
   currentUserRank?: number;
   title: string;
   maxScore: number;
+  topN?: number;
   onRefresh?: () => void;
 }
 
@@ -32,13 +33,12 @@ export default function LeaderboardModal({
   currentUserRank,
   title,
   maxScore,
+  topN = 3,
   onRefresh
 }: Props) {
-  // Get top 3 entries
-  const topEntries = entries.slice(0, 3);
+  const topEntries = entries.slice(0, topN);
 
-  // Get current user entry if not in top 3
-  const currentUserEntry = currentUserRank && currentUserRank > 3
+  const currentUserEntry = currentUserRank && currentUserRank > topN
     ? entries.find(entry => entry.isCurrentUser)
     : null;
 
@@ -81,7 +81,7 @@ export default function LeaderboardModal({
                     </span>
                   </div>
                   <span className="font-bold">
-                    {((entry.score / maxScore) * 100).toFixed(1)}%
+                    {entry.score}/{maxScore}
                   </span>
                 </div>
               </Card>
@@ -103,7 +103,7 @@ export default function LeaderboardModal({
                     </span>
                   </div>
                   <span className="font-bold">
-                    {((currentUserEntry.score / maxScore) * 100).toFixed(1)}%
+                    {currentUserEntry.score}/{maxScore}
                   </span>
                 </div>
               </Card>

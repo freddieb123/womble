@@ -453,6 +453,8 @@ export async function generateFeedback(req: Request, res: Response) {
     const transcript = req.body.transcript || [];
     const participant1Name = req.body.participant1Name || req.query.participant1Name as string || 'Person 1';
     const participant2Name = req.body.participant2Name || req.query.participant2Name as string || 'Person 2';
+    const participant1Role = req.body.participant1Role as string | undefined;
+    const participant2Role = req.body.participant2Role as string | undefined;
 
     if (isNaN(configId) || !sessionId) {
       return res.status(400).json({ error: "Valid config ID and session ID are required" });
@@ -473,48 +475,43 @@ export async function generateFeedback(req: Request, res: Response) {
       }
       
       // Use default feedback criteria if none is provided
-      const feedbackCriteria = config.feedbackCriteria || 
+      const feedbackCriteria = config.feedbackCriteria ||
         "Evaluate the conversation for clarity, engagement, and effective communication. Consider turn-taking, active listening, and how well each participant expresses their ideas.";
-      
+
       console.log("Generating feedback using OpenAI API");
-      
+
       // Format the conversation for GPT analysis - just combine all content
       const conversationText = transcript.map((entry: { content: string }) => {
         return entry.content;
       }).join('\n');
-      
+
+      const roleContext = participant1Role && participant2Role
+        ? `The conversation involves two roles: "${participant1Role}" (${participant1Name}) and "${participant2Role}" (${participant2Name}). Infer who is playing which role from the content before giving feedback.`
+        : `The participants are ${participant1Name} and ${participant2Name}.`;
+
       // Prepare the system prompt with instructions
       const systemPrompt = `
-You are an expert in analyzing conversations. You'll be evaluating a transcribed conversation for feedback.
+You are an expert in analyzing conversations. Evaluate the transcribed conversation below and provide concise, constructive feedback.
 
+${roleContext}
+
+Evaluation criteria:
 ${feedbackCriteria}
 
-After analyzing the conversation, provide constructive feedback in this exact JSON structure:
+Respond with ONLY this JSON structure — no other keys:
 {
   "overall": {
-    "bullets": [array of 5-7 specific feedback points about the conversation],
-    "score": [numerical score from 1-10 for the overall quality of the conversation],
-    "summary": [2-3 sentence summary of the overall conversation with key strengths and areas for improvement]
-  },
-  "communication_skills": {
-    "bullets": [array of 3-5 points about communication effectiveness in the conversation],
-    "score": [numerical score from 1-10],
-    "summary": [1-2 sentence summary of communication quality]
-  },
-  "content_quality": {
-    "bullets": [array of 3-5 points about the substance and content of the conversation],
-    "score": [numerical score from 1-10],
-    "summary": [1-2 sentence summary of content quality]
+    "bullets": [exactly 3-4 specific, actionable feedback points. Use the participants' actual names (${participant1Name} and ${participant2Name}) where relevant],
+    "score": [integer from 1-10],
+    "summary": [1-2 sentence summary of the conversation quality]
   }
 }
-
-Make sure your feedback is specific, actionable, and balanced between strengths and areas for improvement.
 `;
 
       // Use our retry function for the OpenAI API call
       const completion = await retryOpenAICall(async () => {
         return await openai.chat.completions.create({
-          model: "gpt-4o",
+          model: "gpt-4o-mini",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: conversationText }
@@ -534,20 +531,37 @@ Make sure your feedback is specific, actionable, and balanced between strengths 
       // Parse the JSON response
       const feedbackData = JSON.parse(responseContent);
       
-      // Store the feedback in the database
+      // Store the feedback in the database (upsert)
       try {
-        // Update the existing record with the feedback
-        await db.update(dualConversations)
-          .set({
-            feedback: feedbackData as any // Type assertion to avoid TS error
-          })
+        const existingRecord = await db.select()
+          .from(dualConversations)
           .where(and(
             eq(dualConversations.configId, configId),
             eq(dualConversations.sessionId, sessionId)
           ))
           .execute();
-          
-        console.log(`Updated record with feedback for session ${sessionId}`);
+
+        if (existingRecord.length > 0) {
+          await db.update(dualConversations)
+            .set({ feedback: feedbackData as any })
+            .where(and(
+              eq(dualConversations.configId, configId),
+              eq(dualConversations.sessionId, sessionId)
+            ))
+            .execute();
+        } else {
+          await db.insert(dualConversations)
+            .values([{
+              configId,
+              sessionId,
+              participant1Name,
+              participant2Name,
+              transcript: transcript as any,
+              feedback: feedbackData as any,
+            }])
+            .execute();
+        }
+        console.log(`Saved feedback for session ${sessionId}`);
       } catch (dbError) {
         console.error("Database error saving feedback:", dbError);
         // Continue even if DB save fails - we'll still return the data to the client
@@ -581,21 +595,8 @@ Make sure your feedback is specific, actionable, and balanced between strengths 
         }
       }
       
-      // For API issues, return a clean error without dummy data
-      
-      // Send a detailed error response to the client with empty feedback structure
       const emptyFeedback = {
         overall: {
-          bullets: [],
-          score: null,
-          summary: null
-        },
-        communication_skills: {
-          bullets: [],
-          score: null, 
-          summary: null
-        },
-        content_quality: {
           bullets: [],
           score: null,
           summary: null

@@ -16,7 +16,7 @@ interface AdminNavbarProps {
 export default function AdminNavbar({ 
   title, 
   showNewButton = true, 
-  newButtonText = "New GPT", 
+  newButtonText = "New Agent", 
   newButtonLink = "#",
   onNewButtonClick
 }: AdminNavbarProps) {
@@ -53,8 +53,8 @@ export default function AdminNavbar({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <div className="flex items-center gap-2 cursor-pointer">
-                <img src="/Womble_new_logo_full.png" alt="Womble Logo" className="h-20 w-35" />
-                <span className="text-xl font-bold text-primary"></span>
+                <img src="/womble-icon.svg" alt="Womble" className="h-10 w-10" />
+                <span className="text-2xl font-bold text-green-700">Womble</span>
               </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-72 p-3">
@@ -79,7 +79,7 @@ export default function AdminNavbar({
           {/* Page Title - Center aligned, hidden on mobile */}
           <h1 className="text-2xl font-bold text-primary hidden md:block">{title}</h1>
           
-          {/* New GPT Button and User Profile - Right aligned */}
+          {/* New Agent Button and User Profile - Right aligned */}
           <div className="flex items-center gap-4">
             {showNewButton && (
               newButtonLink === "#" && onNewButtonClick ? (

@@ -18,7 +18,7 @@ function AdminPage() {
           className="bg-purple-600 hover:bg-purple-700"
         >
           <Plus className="h-5 w-5 mr-2" />
-          New GPT
+          New Agent
         </Button>
       </main>
     </div>

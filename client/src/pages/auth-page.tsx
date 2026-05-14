@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SiGoogle } from "react-icons/si";
+import { TbBrandWindows } from "react-icons/tb";
 import { track, EventName } from "@/lib/mixpanel";
 
 const authSchema = z.object({
@@ -19,8 +20,13 @@ const authSchema = z.object({
 type AuthForm = z.infer<typeof authSchema>;
 
 export default function AuthPage() {
-  const { user, loginMutation, registerMutation, signInWithGoogle } = useAuth();
+  const { user, loginMutation, registerMutation, signInWithGoogle, signInWithMicrosoft } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
+  const [lastMethod, setLastMethod] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLastMethod(localStorage.getItem('lastLoginMethod'));
+  }, []);
 
   const form = useForm<AuthForm>({
     resolver: zodResolver(authSchema),
@@ -36,15 +42,11 @@ export default function AuthPage() {
     return <Redirect to="/dashboard" />;
   }
   
-  // Set login/register mode based on URL parameter
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const mode = searchParams.get('mode');
-    if (mode === 'register') {
-      setIsLogin(false);
-    } else if (mode === 'login') {
-      setIsLogin(true);
-    }
+    if (mode === 'register') setIsLogin(false);
+    else if (mode === 'login') setIsLogin(true);
   }, []);
 
   const onSubmit = (data: AuthForm) => {
@@ -69,7 +71,10 @@ export default function AuthPage() {
     <div className="min-h-screen bg-gradient-to-b from-background to-muted flex flex-col p-4">
       <div className="w-full p-4">
         <Link href="/">
-          <img src="/Womble_new_logo_full.png" alt="Womble Logo" className="h-16 cursor-pointer" />
+          <div className="flex items-center gap-2">
+            <img src="/womble-icon.svg" alt="Womble" className="h-10 w-10" />
+            <span className="text-2xl font-bold text-green-700">Womble</span>
+          </div>
         </Link>
       </div>
       <div className="flex-1 flex items-center justify-center">
@@ -118,10 +123,15 @@ export default function AuthPage() {
               <div className="space-y-2">
                 <Button
                   type="submit"
-                  className="w-full"
+                  className="w-full flex items-center justify-between"
                   disabled={loginMutation.isPending || registerMutation.isPending}
                 >
-                  {isLogin ? "Login" : "Register"}
+                  <span>{isLogin ? "Login" : "Register"}</span>
+                  {lastMethod === 'email' && isLogin && (
+                    <span className="text-xs bg-white/20 rounded-full px-2 py-0.5 font-medium">
+                      Last used
+                    </span>
+                  )}
                 </Button>
                 <div className="relative my-4">
                   <div className="absolute inset-0 flex items-center">
@@ -136,14 +146,37 @@ export default function AuthPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full flex items-center gap-2"
+                  className="w-full flex items-center justify-between gap-2"
                   onClick={() => {
                     track(EventName.USER_GOOGLE_LOGIN);
                     signInWithGoogle();
                   }}
                 >
-                  <SiGoogle className="h-4 w-4" />
-                  Sign in with Google
+                  <span className="flex items-center gap-2">
+                    <SiGoogle className="h-4 w-4" />
+                    Sign in with Google
+                  </span>
+                  {lastMethod === 'google' && (
+                    <span className="text-xs bg-green-100 text-green-700 rounded-full px-2 py-0.5 font-medium">
+                      Last used
+                    </span>
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full flex items-center justify-between gap-2"
+                  onClick={() => signInWithMicrosoft()}
+                >
+                  <span className="flex items-center gap-2">
+                    <TbBrandWindows className="h-4 w-4" />
+                    Sign in with Microsoft
+                  </span>
+                  {lastMethod === 'microsoft' && (
+                    <span className="text-xs bg-green-100 text-green-700 rounded-full px-2 py-0.5 font-medium">
+                      Last used
+                    </span>
+                  )}
                 </Button>
                 <Button
                   type="button"

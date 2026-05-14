@@ -3,10 +3,11 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, TrendingUp, ChevronDown } from "lucide-react";
+import { MessageSquare, TrendingUp, ChevronDown, Mic, Keyboard } from "lucide-react";
 import type { Message, AdminConfig } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import QuizResponseView from "@/components/QuizResponseView";
+import { ParticipantCount, LiveLeaderboard } from "@/components/LiveActivityPanel";
 import {
   Collapsible,
   CollapsibleContent,
@@ -33,6 +34,7 @@ interface ConversationData {
   messages: Message[];
   userName: string;
   sessionId: string;
+  chatMode: string | null;
   feedback: ConversationFeedback;
 }
 
@@ -51,7 +53,7 @@ export default function ConversationAnalysis() {
   const [quizResponses, setQuizResponses] = useState<QuizResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [summary, setSummary] = useState<FeedbackSummary | null>(null);
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
 
   const searchParams = new URLSearchParams(window.location.search);
@@ -169,7 +171,13 @@ export default function ConversationAnalysis() {
             }
           }));
 
-          setConversations(transformedData);
+          // Sort by score descending (no feedback goes to the bottom)
+          const sorted = [...transformedData].sort((a, b) => {
+            const sa = a.feedback?.score ?? -1;
+            const sb = b.feedback?.score ?? -1;
+            return sb - sa;
+          });
+          setConversations(sorted);
           const summaryData = await generateSummary(transformedData);
           setSummary(summaryData);
         }
@@ -202,157 +210,198 @@ export default function ConversationAnalysis() {
     );
   }
 
+  const showLiveStats = config?.type === 'chat' || config?.type === 'teach-ai';
+  const isThoughtPartner = config?.type === 'thought-partner';
+
+  const centerContent = (
+    <>
+      <div className="sticky top-0 z-10 pb-4">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-blue-900">
+            {config?.type === 'upload' ? 'Upload Analysis'
+              : config?.type === 'quiz' ? 'Quiz Analysis'
+              : config?.type === 'thought-partner' ? 'Thought Partner Activity'
+              : 'Chat with an Agent Analysis'}
+          </h1>
+        </div>
+
+        {summary && config?.type !== 'quiz' && !isThoughtPartner && (
+          <Card className="mb-2 bg-white">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-blue-600" />
+                <h2 className="text-xl font-semibold">Analysis Summary</h2>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium text-gray-500">Feedback Coverage</h3>
+                    <p className="text-2xl font-bold text-blue-900">{summary.feedbackCount}/{summary.totalCount}</p>
+                    <p className="text-sm text-gray-600">conversations with feedback</p>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
+                    <p className="text-2xl font-bold text-blue-900">
+                      {summary.averageScore.toFixed(1)}/10
+                    </p>
+                    <p className="text-sm text-gray-600">across all feedback</p>
+                  </div>
+                </div>
+                <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+                  <div className="border-t pt-4">
+                    <CollapsibleTrigger className="flex items-center justify-between w-full mb-3">
+                      <h3 className="text-sm font-medium text-gray-500">Key Themes</h3>
+                      <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'transform rotate-180' : ''}`} />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-medium text-green-600">Positive theme:</h4>
+                          <div className="text-sm text-gray-900">{summary.keyThemes.positive}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-medium text-amber-600">Constructive theme:</h4>
+                          <div className="text-sm text-gray-900">{summary.keyThemes.constructive}</div>
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </div>
+                </Collapsible>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      <div className="pb-8">
+        {isLoading ? (
+          <Card>
+            <CardContent className="p-6">
+              <div className="animate-pulse text-center">
+                {config?.type === 'upload' ? 'Analyzing uploads...' : config?.type === 'quiz' ? 'Loading quiz responses...' : 'Analyzing chats...'}
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <ScrollArea className="h-[calc(100vh-16rem)]">
+            <div className="space-y-4">
+              {config?.type === 'quiz' ? (
+                <Card>
+                  <CardContent className="p-6">
+                    {quizResponses.length > 0 ? (
+                      <QuizResponseView config={config} responses={quizResponses} />
+                    ) : (
+                      <div className="text-center text-muted-foreground">No quiz responses available yet.</div>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                conversations.map((conversation, index) => {
+                  const hasFeedback = conversation.feedback?.bullets?.length > 0 || conversation.feedback?.score !== null;
+                  const displayName = conversation.userName ||
+                    `Anonymous ${config?.type === 'upload' ? 'Upload' : 'Participant'} ${index + 1}`;
+
+                  return (
+                    <Collapsible key={conversation.sessionId || index}>
+                      <Card>
+                        <CollapsibleTrigger asChild>
+                          <CardHeader className="flex flex-row items-center justify-between cursor-pointer hover:bg-gray-50/80 transition-colors rounded-t-lg py-4">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <h2 className="text-base font-semibold truncate">{displayName}</h2>
+                              {conversation.chatMode === 'spoken' ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 flex-shrink-0">
+                                  <Mic className="h-3 w-3" />Voice
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 flex-shrink-0">
+                                  <Keyboard className="h-3 w-3" />Typed
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                              {!isThoughtPartner && conversation.feedback?.score !== null ? (
+                                <span className="text-lg font-bold text-blue-900">
+                                  {conversation.feedback.score}/10
+                                </span>
+                              ) : !hasFeedback ? (
+                                <span className="text-xs text-muted-foreground">No feedback yet</span>
+                              ) : null}
+                              <ChevronDown className="h-4 w-4 text-gray-400 transition-transform [[data-state=open]_&]:rotate-180" />
+                            </div>
+                          </CardHeader>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <CardContent className="pt-0 pb-4">
+                            <div className="border-t pt-4 space-y-3">
+                              {conversation.feedback?.bullets && Array.isArray(conversation.feedback.bullets) && conversation.feedback.bullets.length > 0 ? (
+                                <div className="space-y-2">
+                                  {isThoughtPartner && (
+                                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Session Summary</p>
+                                  )}
+                                  {conversation.feedback.bullets.map((bullet, bulletIndex) => (
+                                    <div key={bulletIndex} className="flex items-start gap-2 text-sm">
+                                      <span className="text-gray-400 mt-0.5">•</span><span>{bullet}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : isThoughtPartner ? (
+                                <p className="text-sm text-muted-foreground italic">No summary yet — user hasn't generated one.</p>
+                              ) : null}
+                              {!isThoughtPartner && conversation.feedback?.summary && (
+                                <p className="text-sm text-blue-700 italic">{conversation.feedback.summary}</p>
+                              )}
+                              {config?.type === 'chat' && (
+                                <div className="pt-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex items-center gap-2"
+                                    onClick={() => window.open(`/conversation?configId=${configId}&sessionId=${conversation.sessionId}&viewOnly=true`, '_blank')}
+                                  >
+                                    <MessageSquare className="h-4 w-4" />
+                                    View Chat
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </CollapsibleContent>
+                      </Card>
+                    </Collapsible>
+                  );
+                })
+              )}
+            </div>
+          </ScrollArea>
+        )}
+      </div>
+    </>
+  );
+
+  if (showLiveStats && configId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+        <div className="flex gap-4 max-w-6xl mx-auto p-4 md:p-8 items-start">
+          <div className="hidden lg:block w-44 flex-shrink-0 sticky top-8 pt-14">
+            <ParticipantCount configId={parseInt(configId)} />
+          </div>
+          <div className="flex-1 min-w-0">
+            {centerContent}
+          </div>
+          <div className="hidden lg:block w-44 flex-shrink-0 sticky top-8 pt-14">
+            <LiveLeaderboard configId={parseInt(configId)} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      <div className="max-w-4xl mx-auto">
-        <div className="sticky top-0 z-10 p-4 md:p-8 pb-4">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold text-blue-900">
-              {config?.type === 'upload' ? 'Upload Analysis' : config?.type === 'quiz' ? 'Quiz Analysis' : 'Chat with a GPT Analysis'}
-            </h1>
-          </div>
-
-          {summary && config?.type !== 'quiz' && (
-            <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-              <Card className="mb-2 bg-white">
-                <CardHeader className="pb-4">
-                  <CollapsibleTrigger className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5 text-blue-600" />
-                      <h2 className="text-xl font-semibold">Analysis Summary</h2>
-                    </div>
-                    <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'transform rotate-180' : ''}`} />
-                  </CollapsibleTrigger>
-                </CardHeader>
-                <CollapsibleContent>
-                  <CardContent>
-                    <div className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-medium text-gray-500">Feedback Coverage</h3>
-                          <p className="text-2xl font-bold text-blue-900">{summary.feedbackCount}/{summary.totalCount}</p>
-                          <p className="text-sm text-gray-600">conversations with feedback</p>
-                        </div>
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
-                          <p className="text-2xl font-bold text-blue-900">
-                            {summary.averageScore.toFixed(1)}/10
-                          </p>
-                          <p className="text-sm text-gray-600">across all feedback</p>
-                        </div>
-                      </div>
-                      <div className="border-t pt-4">
-                        <h3 className="text-sm font-medium text-gray-500 mb-3">Key Themes</h3>
-                        <div className="space-y-3">
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-medium text-green-600">Positive theme:</h4>
-                            <div className="text-sm text-gray-900">
-                              {summary.keyThemes.positive}
-                            </div>
-                          </div>
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-medium text-amber-600">Constructive theme:</h4>
-                            <div className="text-sm text-gray-900">
-                              {summary.keyThemes.constructive}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </CollapsibleContent>
-              </Card>
-            </Collapsible>
-          )}
-        </div>
-
-        <div className="px-4 md:px-8 pb-8">
-          {isLoading ? (
-            <Card>
-              <CardContent className="p-6">
-                <div className="animate-pulse text-center">
-                  {config?.type === 'upload' ? 'Analyzing uploads...' : config?.type === 'quiz' ? 'Loading quiz responses...' : 'Analyzing chats...'}
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <ScrollArea className="h-[calc(100vh-16rem)]">
-              <div className="space-y-4">
-                {config?.type === 'quiz' ? (
-                  <Card>
-                    <CardContent className="p-6">
-                      {quizResponses.length > 0 ? (
-                        <QuizResponseView
-                          config={config}
-                          responses={quizResponses}
-                        />
-                      ) : (
-                        <div className="text-center text-muted-foreground">
-                          No quiz responses available yet.
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ) : (
-                  conversations.map((conversation, index) => (
-                    <Card key={conversation.sessionId || index}>
-                      <CardHeader className="flex flex-row items-center justify-between">
-                        <h2 className="text-lg font-semibold">
-                          {conversation.userName ?
-                            `${conversation.userName}'s ${config?.type === 'upload' ? 'Upload' : 'Chat with a GPT'}` :
-                            `Anonymous ${config?.type === 'upload' ? 'Upload' : 'Chat with a GPT'} ${index + 1}`}
-                        </h2>
-                        {config?.type === 'chat' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex items-center gap-2"
-                            onClick={() => {
-                              window.open(`/conversation?configId=${configId}&sessionId=${conversation.sessionId}&viewOnly=true`, '_blank');
-                            }}
-                          >
-                            <MessageSquare className="h-4 w-4" />
-                            View Chat
-                          </Button>
-                        )}
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-4">
-                          {conversation.feedback?.bullets && Array.isArray(conversation.feedback.bullets) && (
-                            <div className="space-y-2">
-                              {conversation.feedback.bullets.map((bullet, bulletIndex) => (
-                                <div key={bulletIndex} className="flex items-start gap-2 text-sm">
-                                  <span>•</span>
-                                  <span>{bullet}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {(conversation.feedback?.score !== null || conversation.feedback?.summary) && (
-                            <div className="border-t pt-4">
-                              <div className="flex flex-col gap-2 bg-blue-50 p-4 rounded-lg">
-                                {conversation.feedback?.score !== null && (
-                                  <span className="text-2xl font-bold text-blue-900">
-                                    {conversation.feedback.score}/10
-                                  </span>
-                                )}
-                                {conversation.feedback?.summary && (
-                                  <p className="text-sm text-blue-700">
-                                    {conversation.feedback.summary}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          )}
-        </div>
+      <div className="max-w-4xl mx-auto p-4 md:p-8">
+        {centerContent}
       </div>
     </div>
   );

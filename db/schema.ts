@@ -9,12 +9,13 @@ export const users = pgTable("users", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastLoginMethod: text("last_login_method"),
 });
 
 export const chatConfigs = pgTable("chat_configs", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
-  type: text("type", { enum: ['chat', 'upload', 'quiz', 'two-way-conversation'] }).default('chat').notNull(),
+  type: text("type", { enum: ['chat', 'upload', 'quiz', 'two-way-conversation', 'teach-ai', 'thought-partner'] }).default('chat').notNull(),
   title: text("title").notNull(),
   systemPrompt: text("system_prompt").notNull(),
   userInstructions: text("user_instructions"),
@@ -24,6 +25,13 @@ export const chatConfigs = pgTable("chat_configs", {
   deletedAt: timestamp("deleted_at"),
   isTemplate: boolean("is_template").default(false).notNull(),
   templateDescription: text("template_description"),
+  participant1Role: text("participant1_role"),
+  participant2Role: text("participant2_role"),
+  knowledgeLevel: integer("knowledge_level"),
+  attitude: integer("attitude"),
+  coachingStyle: integer("coaching_style"),
+  referenceContent: text("reference_content"),
+  referenceImages: jsonb("reference_images").$type<string[]>(),
 });
 
 export const quizQuestions = pgTable("quiz_questions", {
@@ -41,6 +49,7 @@ export const conversations = pgTable("conversations", {
   configId: integer("config_id").notNull().references(() => chatConfigs.id),
   sessionId: text("session_id").notNull(),
   userName: text("user_name"),
+  chatMode: text("chat_mode"),
   messages: jsonb("messages").$type<Message[]>().notNull().default([]),
   feedback: jsonb("feedback").$type<ConversationFeedback>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -88,6 +97,7 @@ export interface ConversationFeedback {
   bullets: string[];
   score: number;
   summary: string | null;
+  manual?: boolean;
 }
 
 export interface DualConversationFeedback {

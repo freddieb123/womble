@@ -27,7 +27,7 @@ export interface QuizQuestion {
 export interface BaseConfig {
   id?: number;
   title: string;
-  type: 'chat' | 'upload' | 'quiz' | 'two-way-conversation';
+  type: 'chat' | 'upload' | 'quiz' | 'two-way-conversation' | 'teach-ai' | 'thought-partner';
   systemPrompt: string;
   userInstructions: string | null;
   feedbackCriteria: string | null;
@@ -43,6 +43,13 @@ export interface AdminConfig extends BaseConfig {
   deleted?: boolean;
   deletedAt?: string | null;
   conversationCount?: number;
+  participant1Role?: string;
+  participant2Role?: string;
+  knowledgeLevel?: number;
+  attitude?: number;
+  coachingStyle?: number;
+  referenceContent?: string;
+  referenceImages?: string[];
 }
 
 // Template specific configuration

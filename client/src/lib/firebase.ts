@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, OAuthProvider, signInWithRedirect, getRedirectResult } from "firebase/auth";
 
 // Validate required environment variables
 const requiredEnvVars = {
@@ -63,14 +63,16 @@ if (!isValidDomain) {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
 
-// Configure Google Provider
+export const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope('email');
 googleProvider.addScope('profile');
-googleProvider.setCustomParameters({
-  prompt: 'select_account'
-});
+googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+export const microsoftProvider = new OAuthProvider('microsoft.com');
+microsoftProvider.addScope('email');
+microsoftProvider.addScope('profile');
+microsoftProvider.setCustomParameters({ prompt: 'select_account' });
 
 export async function handleGoogleRedirect() {
   try {
