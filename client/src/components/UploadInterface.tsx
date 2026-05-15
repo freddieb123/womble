@@ -230,10 +230,11 @@ export default function UploadInterface({
   };
 
   return (
-    <div className="flex flex-col h-[800px]">
+    <div className="flex flex-col h-full">
       {showNameModal && (
         <UserNameModal
           open={showNameModal}
+          interactionMode="typed"
           onSubmit={(name) => {
             onUserNameSubmit(name);
             setLocalUserName(name);

@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Users, GraduationCap, Brain, ArrowLeft, ArrowRight, Sparkles, Loader2, Upload, X, Mic, MicOff } from "lucide-react";
+import { MessageSquare, Users, GraduationCap, Brain, ArrowLeft, ArrowRight, Sparkles, Loader2, Upload, X, Mic, MicOff, Keyboard } from "lucide-react";
 import type { AdminConfig } from "@/lib/types";
 
 interface Props {
@@ -343,6 +343,33 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
           onChange={(e) => setConfig(prev => ({ ...prev, title: e.target.value }))}
           placeholder="Give your activity a title"
         />
+      </div>
+
+      {/* Interaction mode selector */}
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground uppercase tracking-wide">Interaction Mode</Label>
+        <div className="inline-flex items-center gap-1 rounded-md border p-1">
+          {([
+            { value: 'typed', label: 'Typed only', icon: <Keyboard className="h-4 w-4" /> },
+            { value: 'spoken', label: 'Voice only', icon: <Mic className="h-4 w-4" /> },
+            { value: 'both', label: "Voice or typed — user's choice", icon: <><Keyboard className="h-4 w-4" /><Mic className="h-4 w-4 ml-0.5" /></> },
+          ] as const).map(({ value, label, icon }) => (
+            <button
+              key={value}
+              type="button"
+              title={label}
+              onClick={() => setConfig(prev => ({ ...prev, interactionMode: value }))}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded text-sm font-medium transition-colors
+                ${(config.interactionMode ?? 'both') === value
+                  ? 'bg-green-100 text-green-800'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }`}
+            >
+              {icon}
+              <span className="ml-1">{value === 'both' ? 'Both' : value === 'typed' ? 'Typed' : 'Voice'}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {isTwoWay && (

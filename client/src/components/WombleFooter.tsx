@@ -2,7 +2,7 @@ import React from 'react';
 
 export const WombleFooter: React.FC = () => {
   return (
-    <div className="py-3 text-center text-xs text-gray-400 border-t border-gray-100 mt-4">
+    <div className="py-1.5 text-center text-xs text-gray-400 border-t border-gray-100">
       Enjoyed this activity?{' '}
       <a
         href="https://womble.co"

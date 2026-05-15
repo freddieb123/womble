@@ -3,7 +3,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import { Sparkles, X, Upload } from "lucide-react";
+import { Sparkles, X, Upload, Keyboard, Mic, Lock } from "lucide-react";
 import type { AdminConfig } from "@/lib/types";
 import { useState, useRef } from "react";
 
@@ -96,40 +96,79 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
   return (
     <div className="space-y-6">
       {/* Type selector */}
+      {isEditMode ? (
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground uppercase tracking-wide">Agent Type</Label>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-50 border border-gray-200 w-fit">
+            <Lock className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+            <span className="text-sm font-medium text-gray-700">
+              {config.type === 'chat' ? 'Conversation with AI' :
+               config.type === 'two-way-conversation' ? 'Two-way Conversation' :
+               config.type === 'teach-ai' ? 'Teach an AI' :
+               'Thought Partner'}
+            </span>
+            <span className="text-xs text-gray-400 ml-1">— cannot be changed</span>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          <div className="inline-flex items-center justify-start space-x-px rounded-md border overflow-hidden flex-wrap">
+            <button
+              type="button"
+              className={`px-4 py-2 text-sm font-medium focus:outline-none ${config.type === 'chat' ? "bg-green-200 text-green-900" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+              onClick={() => handleTypeChange('chat')}
+            >
+              Conversation with AI
+            </button>
+            <button
+              type="button"
+              className={`px-4 py-2 text-sm font-medium focus:outline-none ${config.type === 'two-way-conversation' ? "bg-green-200 text-green-900" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+              onClick={() => handleTypeChange('two-way-conversation')}
+            >
+              Two-way Conversation
+            </button>
+            <button
+              type="button"
+              className={`px-4 py-2 text-sm font-medium focus:outline-none ${isTeachAi ? "bg-green-200 text-green-900" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+              onClick={() => handleTypeChange('teach-ai')}
+            >
+              Teach an AI
+            </button>
+            <button
+              type="button"
+              className={`px-4 py-2 text-sm font-medium focus:outline-none ${isThoughtPartner ? "bg-green-200 text-green-900" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+              onClick={() => handleTypeChange('thought-partner')}
+            >
+              Thought Partner
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Interaction mode selector */}
       <div className="space-y-1">
-        <div className="inline-flex items-center justify-start space-x-px rounded-md border overflow-hidden flex-wrap">
-          <button
-            type="button"
-            disabled={isEditMode}
-            className={`px-4 py-2 text-sm font-medium focus:outline-none ${config.type === 'chat' ? "bg-green-200 text-green-900" : "bg-white text-gray-700"}`}
-            onClick={() => handleTypeChange('chat')}
-          >
-            Conversation with AI
-          </button>
-          <button
-            type="button"
-            disabled={isEditMode}
-            className={`px-4 py-2 text-sm font-medium focus:outline-none ${config.type === 'two-way-conversation' ? "bg-green-200 text-green-900" : "bg-white text-gray-700"}`}
-            onClick={() => handleTypeChange('two-way-conversation')}
-          >
-            Two-way Conversation
-          </button>
-          <button
-            type="button"
-            disabled={isEditMode}
-            className={`px-4 py-2 text-sm font-medium focus:outline-none ${isTeachAi ? "bg-green-200 text-green-900" : "bg-white text-gray-700"}`}
-            onClick={() => handleTypeChange('teach-ai')}
-          >
-            Teach an AI
-          </button>
-          <button
-            type="button"
-            disabled={isEditMode}
-            className={`px-4 py-2 text-sm font-medium focus:outline-none ${isThoughtPartner ? "bg-green-200 text-green-900" : "bg-white text-gray-700"}`}
-            onClick={() => handleTypeChange('thought-partner')}
-          >
-            Thought Partner
-          </button>
+        <Label className="text-xs text-muted-foreground uppercase tracking-wide">Interaction Mode</Label>
+        <div className="inline-flex items-center gap-1 rounded-md border p-1">
+          {([
+            { value: 'typed', label: 'Typed only', icon: <Keyboard className="h-4 w-4" /> },
+            { value: 'spoken', label: 'Voice only', icon: <Mic className="h-4 w-4" /> },
+            { value: 'both', label: 'Voice or typed — user\'s choice', icon: <><Keyboard className="h-4 w-4" /><Mic className="h-4 w-4 ml-0.5" /></> },
+          ] as const).map(({ value, label, icon }) => (
+            <button
+              key={value}
+              type="button"
+              title={label}
+              onClick={() => onConfigChange({ ...config, interactionMode: value })}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded text-sm font-medium transition-colors
+                ${(config.interactionMode ?? 'both') === value
+                  ? 'bg-green-100 text-green-800'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }`}
+            >
+              {icon}
+              <span className="ml-1">{value === 'both' ? 'Both' : value === 'typed' ? 'Typed' : 'Voice'}</span>
+            </button>
+          ))}
         </div>
       </div>
 

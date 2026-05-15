@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Copy, MoreVertical, BarChart2, Trash2, ArrowUpCircle, Flag, Share2, EyeOff } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Plus, Pencil, Copy, MoreVertical, BarChart2, Trash2, ArrowUpCircle, Flag, Share2, EyeOff, Keyboard, Mic, MessageSquare, Users, GraduationCap, Brain, HelpCircle, Upload, LogOut, LayoutGrid } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { track, EventName } from "@/lib/mixpanel";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -10,7 +11,7 @@ import { useAuth } from "@/hooks/use-auth";
 import AdminPanel from "@/components/AdminPanel";
 import CreateGptWizard from "@/components/CreateGptWizard";
 import type { AdminConfig } from "@/lib/types";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   DropdownMenu,
@@ -28,11 +29,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Switch } from "@/components/ui/switch";
 import TemplateGallery from "@/components/TemplateGallery";
 import QuizEditor from "@/components/QuizEditor";
 import type { Template } from "@/lib/types";
-import AdminNavbar from "@/components/AdminNavbar";
+
+const FILTER_TYPES = [
+  { type: 'all', label: 'All Agents', icon: LayoutGrid },
+  { type: 'chat', label: 'Conversation with AI', icon: MessageSquare },
+  { type: 'two-way-conversation', label: 'Two-way Conversation', icon: Users },
+  { type: 'teach-ai', label: 'Teach an AI', icon: GraduationCap },
+  { type: 'thought-partner', label: 'Thought Partner', icon: Brain },
+] as const;
+
+type FilterType = typeof FILTER_TYPES[number]['type'];
 
 type ChatConfig = {
   id: number;
@@ -60,6 +69,7 @@ type ChatConfig = {
   temperature?: number;
   maxTokens?: number;
   userId?: number;
+  interactionMode?: 'typed' | 'spoken' | 'both';
 };
 
 export default function Home() {
@@ -70,8 +80,17 @@ export default function Home() {
   const [isPreviewingTemplate, setIsPreviewingTemplate] = useState(false);
   const [editingConfig, setEditingConfig] = useState<ChatConfig | null>(null);
   const [deletingConfig, setDeletingConfig] = useState<ChatConfig | null>(null);
-  const [showDeleted, setShowDeleted] = useState(false);
+  const [showDeleted] = useState(false);
   const [viewingFeedbackConfig, setViewingFeedbackConfig] = useState<ChatConfig | null>(null);
+  const [typeFilter, setTypeFilter] = useState<FilterType>('all');
+
+  const getInitials = (): string => {
+    if (!user) return 'U';
+    if (user.firstName) {
+      return `${user.firstName.charAt(0)}${(user.lastName || '').charAt(0)}`.toUpperCase();
+    }
+    return user.email?.charAt(0).toUpperCase() ?? 'U';
+  };
   const [config, setConfig] = useState<AdminConfig>({
     title: "",
     type: "chat",
@@ -128,6 +147,7 @@ export default function Home() {
           coachingStyle: c.coachingStyle ?? null,
           referenceContent: c.referenceContent ?? null,
           referenceImages: c.referenceImages ?? null,
+          interactionMode: c.interactionMode ?? 'both',
         }),
       });
 
@@ -349,6 +369,16 @@ export default function Home() {
     }
   };
 
+  const handleCopyMiroLink = async (configId: number) => {
+    try {
+      const url = `${window.location.origin}/miro?configId=${configId}`;
+      await navigator.clipboard.writeText(url);
+      toast({ description: "Miro link copied to clipboard!" });
+    } catch {
+      toast({ variant: "destructive", title: "Error", description: "Failed to copy Miro link" });
+    }
+  };
+
   const handleViewFeedback = (configToView: ChatConfig) => {
     if (configToView.type === 'two-way-conversation') {
       window.open(`${window.location.origin}/dual-analysis?configId=${configToView.id}`, '_blank');
@@ -468,222 +498,297 @@ export default function Home() {
     );
   }
 
-  const filteredConfigs = configs?.filter(config =>
-    config.title.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const filteredConfigs = (configs || []).filter(c => {
+    const matchesSearch = c.title.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = typeFilter === 'all' || c.type === typeFilter;
+    return matchesSearch && matchesType;
+  });
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      {/* Admin Navbar */}
-      <AdminNavbar 
-        title="Admin Home" 
-        showNewButton={true}
-        newButtonText="New Agent"
-        onNewButtonClick={() => {
-          track(EventName.GPT_CREATE_CLICK, { location: 'admin_navbar' });
-          setIsTemplateGalleryOpen(true);
-        }}
-      />
+    <div className="flex h-screen overflow-hidden bg-gray-50">
 
-      <div className="max-w-7xl mx-auto p-4 md:p-8">
-        {/* Search Bar */}
-        {configs && configs.length > 4 && (
-          <div className="max-w-4xl mx-auto w-full mt-4 mb-6">
-            <input
-              type="text"
-              placeholder="Search Agents..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
+      {/* ── Left Sidebar ─────────────────────────────────────── */}
+      <aside className="w-64 flex-shrink-0 flex flex-col bg-white border-r border-gray-200">
+
+        {/* Logo */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-2.5 px-4 py-5 border-b border-gray-100 w-full hover:bg-gray-50 transition-colors">
+              <img src="/womble-icon.svg" alt="Womble" className="h-8 w-8" />
+              <span className="text-xl font-bold text-green-700">Womble</span>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-72 p-3 ml-2" side="right" align="start">
+            <div className="space-y-2">
+              <h4 className="font-bold">Womble</h4>
+              <p className="text-sm">
+                <span className="italic text-muted-foreground">noun</span>
+                <br />
+                A fictional animal inhabiting Wimbledon Common in London, characterised as clearing up litter.
+              </p>
+              <p className="text-sm">
+                <span className="italic text-muted-foreground">verb (informal)</span>
+                <br />
+                Wander in a casual or relaxed way.
+                <br />
+                <span className="italic">"once we'd arrived back in Cambridge, we wombled quietly home"</span>
+              </p>
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* New Agent button */}
+        <div className="px-3 pt-4 pb-2">
+          <button
+            onClick={() => {
+              track(EventName.GPT_CREATE_CLICK, { location: 'sidebar' });
+              setIsTemplateGalleryOpen(true);
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm font-medium text-gray-700 transition-colors"
+          >
+            <Plus className="h-4 w-4 flex-shrink-0" />
+            New Agent
+          </button>
+        </div>
+
+        {/* Type filters */}
+        <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-2 mb-2 mt-2">Filter by type</p>
+          {FILTER_TYPES.map(({ type, label, icon: Icon }) => {
+            const count = (configs || []).filter(c => type === 'all' ? true : c.type === type).length;
+            const isActive = typeFilter === type;
+            if (type !== 'all' && count === 0) return null;
+            return (
+              <button
+                key={type}
+                onClick={() => setTypeFilter(type)}
+                className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-sm transition-colors
+                  ${isActive
+                    ? 'bg-gray-100 text-gray-900 font-medium'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+              >
+                <Icon className="h-4 w-4 flex-shrink-0" />
+                <span className="flex-1 text-left truncate">{label}</span>
+                <span className={`text-xs tabular-nums ${isActive ? 'text-gray-500' : 'text-gray-400'}`}>{count}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* User + logout */}
+        <div className="border-t border-gray-200 p-3">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-8 w-8 flex-shrink-0">
+              <AvatarFallback className="bg-green-600 text-white text-xs font-medium">
+                {getInitials()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">
+                {user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user?.email}
+              </p>
+              {user?.firstName && (
+                <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+              )}
+            </div>
+            <button
+              onClick={() => logoutMutation.mutate()}
+              title="Log out"
+              className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
-        )}
+        </div>
+      </aside>
 
-        {/* Toggle removed as requested */}
+      {/* ── Main Content ──────────────────────────────────────── */}
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto px-8 py-8">
 
-        {/* Main Content */}
-        <ScrollArea className="h-[calc(100vh-12rem)]">
+          {/* Page header */}
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-gray-900">
+              {typeFilter === 'all' ? 'All Agents' : FILTER_TYPES.find(f => f.type === typeFilter)?.label}
+            </h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {filteredConfigs.length} agent{filteredConfigs.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+
+          {/* Search */}
+          {configs && configs.length > 3 && (
+            <div className="mb-6">
+              <input
+                type="text"
+                placeholder="Search agents..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+          )}
+
+          {/* Agent list */}
           <div className="space-y-4">
-            {(!filteredConfigs || filteredConfigs.length === 0) ? (
-              <div className="flex flex-col items-center justify-center h-[60vh] text-center">
-                <div className="w-48 h-48 mb-6 relative">
-                  <svg viewBox="0 0 24 24" fill="none" className="w-full h-full text-blue-100">
-                    <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2"/>
-                    <path d="M12 8V12L14.5 14.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
+            {filteredConfigs.length === 0 ? (
+              configs?.length === 0 ? (
+                /* True empty state — no agents at all */
+                <div className="flex flex-col items-center justify-center py-24 text-center">
+                  <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                    <Plus className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-2">Create your first agent</h2>
+                  <p className="text-sm text-gray-500 max-w-sm mb-6">
+                    Build practice conversations, quizzes, or document review activities for your learners.
+                  </p>
+                  <Button
+                    onClick={() => {
+                      track(EventName.GPT_CREATE_CLICK, { location: 'empty_state' });
+                      setIsTemplateGalleryOpen(true);
+                    }}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Agent
+                  </Button>
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">Get Started with Agents</h2>
-                <p className="text-gray-600 max-w-md mb-8">
-                  Start getting bespoke formative feedback to your participants. You can create quizzes, give feedback on screenshots of documents or create practice conversations.
-                </p>
-                <Button 
-                  size="lg"
-                  onClick={() => {
-                    track(EventName.GPT_CREATE_CLICK, { location: 'empty_state' });
-                    setIsTemplateGalleryOpen(true);
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create your first Agent
-                </Button>
-              </div>
+              ) : (
+                /* Filter/search returned nothing */
+                <div className="text-center py-16 text-gray-400 text-sm">
+                  No agents match this filter.
+                </div>
+              )
             ) : (
               filteredConfigs.map((config) => (
                 <Card
                   key={config.id}
-                  className={`p-6 ${config.deleted ? 'opacity-60' : ''}`}
+                  className={`${config.deleted ? 'opacity-60' : ''}`}
                 >
-                  <CardHeader className="pb-4">
+                  <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <CardTitle>{config.title}</CardTitle>
+                      <div className="min-w-0 flex-1 mr-4">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <CardTitle className="text-base">{config.title}</CardTitle>
                           <Badge
-                            variant={
-                              config.type === 'chat' ? 'default' :
-                              config.type === 'upload' ? 'secondary' :
-                              config.type === 'two-way-conversation' ? 'destructive' :
-                              'outline'
-                            }
+                            variant="outline"
                             className={
-                              config.type === 'chat' ? 'bg-green-100 text-green-800' :
-                              config.type === 'upload' ? 'bg-purple-100 text-purple-800' :
-                              config.type === 'two-way-conversation' ? 'bg-orange-100 text-orange-800' :
-                              config.type === 'teach-ai' ? 'bg-blue-100 text-blue-800' :
-                              config.type === 'thought-partner' ? 'bg-teal-100 text-teal-800' :
-                              'bg-gray-100 text-gray-800'
+                              config.type === 'chat' ? 'bg-green-50 text-green-700 border-green-200' :
+                              config.type === 'upload' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                              config.type === 'two-way-conversation' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                              config.type === 'teach-ai' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                              config.type === 'thought-partner' ? 'bg-teal-50 text-teal-700 border-teal-200' :
+                              'bg-gray-50 text-gray-600 border-gray-200'
                             }
                           >
-                            {config.type === 'chat' ? 'Chat with an Agent' :
-                             config.type === 'upload' ? 'Upload' :
+                            {config.type === 'chat' ? 'Conversation with AI' :
+                             config.type === 'upload' ? 'Document Review' :
                              config.type === 'two-way-conversation' ? 'Two-way Conversation' :
                              config.type === 'teach-ai' ? 'Teach an AI' :
                              config.type === 'thought-partner' ? 'Thought Partner' :
                              'Quiz'}
                           </Badge>
+                          {/* Interaction mode indicator */}
+                          {(() => {
+                            const mode = config.interactionMode ?? 'both';
+                            const label = mode === 'typed' ? 'Typed only' : mode === 'spoken' ? 'Voice only' : 'Voice or typed — user\'s choice';
+                            return (
+                              <span title={label} className="inline-flex items-center gap-0.5 text-gray-400">
+                                {(mode === 'typed' || mode === 'both') && <Keyboard className="h-3.5 w-3.5" />}
+                                {(mode === 'spoken' || mode === 'both') && <Mic className="h-3.5 w-3.5" />}
+                              </span>
+                            );
+                          })()}
                           {config.isTemplate && (
-                            <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 flex items-center gap-1">
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 flex items-center gap-1">
                               <Flag className="h-3 w-3" />
                               Public Template
                             </Badge>
                           )}
                         </div>
-                        <CardDescription>
-                          Created on: {new Date(config.createdAt).toLocaleDateString()}
+                        <CardDescription className="mt-1">
+                          Created {new Date(config.createdAt).toLocaleDateString()}
                           {config.deleted && config.deletedAt && (
                             <span className="text-red-500 ml-2">
-                              (Deleted on: {new Date(config.deletedAt).toLocaleDateString()})
+                              · Deleted {new Date(config.deletedAt).toLocaleDateString()}
                             </span>
                           )}
                         </CardDescription>
                       </div>
-                      <div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {!config.deleted ? (
-                              <>
-                                <DropdownMenuItem onClick={() => handleEditConfig(config)}>
-                                  <Pencil className="h-4 w-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDuplicate(config)}>
-                                  <Copy className="h-4 w-4 mr-2" />
-                                  Duplicate
-                                </DropdownMenuItem>
-                                {!config.isTemplate && (
-                                  <DropdownMenuItem onClick={() => setSavingAsTemplate(config)}>
-                                    <Flag className="h-4 w-4 mr-2" />
-                                    Save as Public Template
-                                  </DropdownMenuItem>
-                                )}
-                                {config.isTemplate && (
-                                  <DropdownMenuItem onClick={() => removeFromTemplates.mutate(config.id)}>
-                                    <EyeOff className="h-4 w-4 mr-2" />
-                                    Remove from Templates
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuItem
-                                  className="text-red-600"
-                                  onClick={() => setDeletingConfig(config)}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </>
-                            ) : (
-                              <DropdownMenuItem
-                                onClick={() => restoreConfig.mutate(config)}
-                              >
-                                <ArrowUpCircle className="h-4 w-4 mr-2" />
-                                Restore
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-600">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {!config.deleted ? (
+                            <>
+                              <DropdownMenuItem onClick={() => handleEditConfig(config)}>
+                                <Pencil className="h-4 w-4 mr-2" />Edit
                               </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                              <DropdownMenuItem onClick={() => handleDuplicate(config)}>
+                                <Copy className="h-4 w-4 mr-2" />Duplicate
+                              </DropdownMenuItem>
+                              {!config.isTemplate && (
+                                <DropdownMenuItem onClick={() => setSavingAsTemplate(config)}>
+                                  <Flag className="h-4 w-4 mr-2" />Save as Public Template
+                                </DropdownMenuItem>
+                              )}
+                              {config.isTemplate && (
+                                <DropdownMenuItem onClick={() => removeFromTemplates.mutate(config.id)}>
+                                  <EyeOff className="h-4 w-4 mr-2" />Remove from Templates
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem className="text-red-600" onClick={() => setDeletingConfig(config)}>
+                                <Trash2 className="h-4 w-4 mr-2" />Delete
+                              </DropdownMenuItem>
+                            </>
+                          ) : (
+                            <DropdownMenuItem onClick={() => restoreConfig.mutate(config)}>
+                              <ArrowUpCircle className="h-4 w-4 mr-2" />Restore
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div>
-                        {config.type === 'quiz' ? (
-                          <>
-                            
-                            
-                          </>
-                        ) : (
-                          <>
-                            
-                          </>
-                        )}
+                  <CardContent className="pt-0">
+                    {config.userInstructions && (
+                      <p className="text-sm text-gray-500 mb-4 line-clamp-2">{config.userInstructions}</p>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => handleCopyLink(config.id)}>
+                          <Share2 className="h-3.5 w-3.5 mr-1.5" />
+                          Share
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleCopyMiroLink(config.id)}>
+                          <img src="/miro-icon.svg" className="h-3.5 w-3.5 mr-1.5" alt="" />
+                          Miro
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleViewFeedback(config)}
+                          disabled={config.conversationCount === 0}
+                        >
+                          <BarChart2 className="h-3.5 w-3.5 mr-1.5" />
+                          {config.type === 'thought-partner' ? 'View Activity' : 'View Feedback'}
+                        </Button>
                       </div>
-                      {config.userInstructions && (
-                        <div>
-                          <h3 className="font-semibold mb-1">User Instructions</h3>
-                          <p className="text-sm text-gray-600">{config.userInstructions}</p>
-                        </div>
-                      )}
-                      <div className="flex justify-between items-center">
-                        <div className="flex gap-2">
-                          <Button size="sm" onClick={() => handleCopyLink(config.id)}>
-                            <Share2 className="h-4 w-4 mr-2" />
-                            Share Agent
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => handleViewFeedback(config)}
-                            disabled={config.conversationCount === 0}
-                          >
-                            <BarChart2 className="h-4 w-4 mr-2" />
-                            {config.type === 'thought-partner' ? (
-                              <span>View Activity</span>
-                            ) : (
-                              <>
-                                <span className="md:hidden">View Feedback</span>
-                                <span className="hidden md:inline">View Current Feedback</span>
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                        <span className="hidden md:inline text-sm text-muted-foreground">
-                          {config.conversationCount} submission{config.conversationCount !== 1 ? 's' : ''}
-                        </span>
-                      </div>
+                      <span className="text-xs text-gray-400 tabular-nums">
+                        {config.conversationCount} submission{config.conversationCount !== 1 ? 's' : ''}
+                      </span>
                     </div>
                   </CardContent>
                 </Card>
               ))
             )}
           </div>
-        </ScrollArea>
-      </div>
+        </div>
+      </main>
 
       {/* Template Gallery Dialog */}
       <Dialog 
@@ -783,7 +888,8 @@ export default function Home() {
                       feedbackCriteria: editingConfig.feedbackCriteria || "",
                       temperature: 0.7,
                       maxTokens: 1000,
-                      questions: editingConfig.questions || []
+                      questions: editingConfig.questions || [],
+                      interactionMode: editingConfig.interactionMode ?? 'both',
                     }}
                     onConfigChange={(updatedConfig) => {
                       setEditingConfig({
@@ -793,7 +899,8 @@ export default function Home() {
                         systemPrompt: updatedConfig.systemPrompt,
                         userInstructions: updatedConfig.userInstructions || null,
                         feedbackCriteria: updatedConfig.feedbackCriteria || null,
-                        questions: updatedConfig.questions || []
+                        questions: updatedConfig.questions || [],
+                        interactionMode: updatedConfig.interactionMode ?? 'both',
                       });
                     }}
                     isEditMode={true}

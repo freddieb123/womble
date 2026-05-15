@@ -33,6 +33,7 @@ export interface BaseConfig {
   feedbackCriteria: string | null;
   temperature?: number;
   maxTokens?: number;
+  interactionMode?: 'typed' | 'spoken' | 'both';
 }
 
 // Admin specific configuration

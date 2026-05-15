@@ -44,7 +44,7 @@ export default function UserView() {
 
   if (!configId) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
+      <div className="min-h-screen bg-gray-50 p-4 md:p-8">
         <div className="max-w-4xl mx-auto">
           <Card className="p-6">
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
@@ -59,7 +59,7 @@ export default function UserView() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
+      <div className="min-h-screen bg-gray-50 p-4 md:p-8">
         <div className="max-w-4xl mx-auto">
           <Card className="p-6">
             <div className="flex items-center justify-center h-[600px]">
@@ -73,7 +73,7 @@ export default function UserView() {
 
   if (error || !savedConfig) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
+      <div className="min-h-screen bg-gray-50 p-4 md:p-8">
         <div className="max-w-4xl mx-auto">
           <Card className="p-6">
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
@@ -105,6 +105,7 @@ export default function UserView() {
     coachingStyle: (savedConfig as any).coachingStyle ?? undefined,
     referenceImages: (savedConfig as any).referenceImages ?? undefined,
     referenceContent: (savedConfig as any).referenceContent ?? undefined,
+    interactionMode: ((savedConfig as any).interactionMode ?? 'both') as 'typed' | 'spoken' | 'both',
   };
 
   console.log('Transformed config:', config);
@@ -114,7 +115,7 @@ export default function UserView() {
     // Redirect to DualConversationPage
     window.location.href = `/dual-conversation/${configId}?sessionId=${sessionId}${userName ? `&userName=${encodeURIComponent(userName)}` : ''}`;
     return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
+      <div className="min-h-screen bg-gray-50 p-4 md:p-8">
         <div className="max-w-4xl mx-auto">
           <Card className="p-6">
             <div className="flex items-center justify-center h-[600px]">
@@ -129,16 +130,16 @@ export default function UserView() {
   const showLivePanels = (config.type === 'chat' || config.type === 'teach-ai') && !isViewOnly;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex flex-col">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       <WombleHeader />
-      <div className="flex-1 p-4 md:p-8">
+      <div className="flex-1 overflow-hidden px-4 py-3 md:px-6">
         {showLivePanels ? (
-          <div className="flex gap-4 max-w-6xl mx-auto items-start">
-            <div className="hidden lg:block w-40 flex-shrink-0 pt-2">
+          <div className="flex gap-4 max-w-6xl mx-auto h-full items-stretch">
+            <div className="hidden lg:flex lg:flex-col w-40 flex-shrink-0 pt-1">
               <ParticipantCount configId={config.id!} />
             </div>
-            <div className="flex-1 min-w-0">
-              <Card className="p-6">
+            <div className="flex-1 min-w-0 flex flex-col">
+              <Card className="flex-1 flex flex-col overflow-hidden p-4">
                 {chatMode === 'spoken' ? (
                   <VoiceChatInterface
                     config={config}
@@ -157,13 +158,13 @@ export default function UserView() {
                 )}
               </Card>
             </div>
-            <div className="hidden lg:block w-40 flex-shrink-0 pt-2">
+            <div className="hidden lg:flex lg:flex-col w-40 flex-shrink-0 pt-1">
               <LiveLeaderboard configId={config.id!} />
             </div>
           </div>
         ) : (
-          <div className="max-w-4xl mx-auto">
-            <Card className="p-6">
+          <div className="max-w-5xl mx-auto h-full flex flex-col">
+            <Card className="flex-1 flex flex-col overflow-hidden p-4">
               {config.type === 'upload' ? (
                 <UploadInterface
                   config={config}

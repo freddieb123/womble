@@ -9,11 +9,13 @@ export type ChatMode = 'typed' | 'spoken';
 interface UserNameModalProps {
   open: boolean;
   onSubmit: (name: string, mode: ChatMode) => void;
+  interactionMode?: 'typed' | 'spoken' | 'both';
 }
 
-export default function UserNameModal({ open, onSubmit }: UserNameModalProps) {
+export default function UserNameModal({ open, onSubmit, interactionMode = 'both' }: UserNameModalProps) {
   const [name, setName] = useState("");
-  const [mode, setMode] = useState<ChatMode>('typed');
+  const fixedMode = interactionMode === 'typed' ? 'typed' : interactionMode === 'spoken' ? 'spoken' : null;
+  const [mode, setMode] = useState<ChatMode>(fixedMode ?? 'typed');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,31 +40,33 @@ export default function UserNameModal({ open, onSubmit }: UserNameModalProps) {
             autoFocus
           />
 
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">How would you like to interact?</p>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setMode('typed')}
-                className={`flex flex-col items-center gap-2 rounded-lg border p-4 text-sm transition-colors
-                  ${mode === 'typed' ? 'border-green-500 bg-green-50 text-green-800' : 'border-gray-200 hover:border-gray-300'}`}
-              >
-                <Keyboard className="h-5 w-5" />
-                <span className="font-medium">Typed</span>
-                <span className="text-xs text-muted-foreground">Chat by typing</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode('spoken')}
-                className={`flex flex-col items-center gap-2 rounded-lg border p-4 text-sm transition-colors
-                  ${mode === 'spoken' ? 'border-green-500 bg-green-50 text-green-800' : 'border-gray-200 hover:border-gray-300'}`}
-              >
-                <Mic className="h-5 w-5" />
-                <span className="font-medium">Spoken</span>
-                <span className="text-xs text-muted-foreground">Talk out loud</span>
-              </button>
+          {fixedMode === null && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">How would you like to interact?</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setMode('typed')}
+                  className={`flex flex-col items-center gap-2 rounded-lg border p-4 text-sm transition-colors
+                    ${mode === 'typed' ? 'border-green-500 bg-green-50 text-green-800' : 'border-gray-200 hover:border-gray-300'}`}
+                >
+                  <Keyboard className="h-5 w-5" />
+                  <span className="font-medium">Typed</span>
+                  <span className="text-xs text-muted-foreground">Chat by typing</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode('spoken')}
+                  className={`flex flex-col items-center gap-2 rounded-lg border p-4 text-sm transition-colors
+                    ${mode === 'spoken' ? 'border-green-500 bg-green-50 text-green-800' : 'border-gray-200 hover:border-gray-300'}`}
+                >
+                  <Mic className="h-5 w-5" />
+                  <span className="font-medium">Spoken</span>
+                  <span className="text-xs text-muted-foreground">Talk out loud</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           <Button type="submit" className="w-full" disabled={!name.trim()}>
             {mode === 'spoken' ? 'Start Voice Session' : 'Start Chat'}

@@ -304,10 +304,11 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
     }[activityState];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {showNameModal && (
         <UserNameModal
           open={showNameModal}
+          interactionMode={config.interactionMode}
           onSubmit={(name, mode) => onUserNameSubmit(name, mode)}
         />
       )}
@@ -322,13 +323,26 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <p className="text-sm text-muted-foreground px-2 py-3 whitespace-pre-wrap">{config.userInstructions}</p>
+            <div className="text-sm text-muted-foreground px-2 py-3 space-y-1">
+              {config.userInstructions!.split('\n').map((line, i) => {
+                const bullet = line.match(/^[-–•]\s+(.*)/);
+                if (bullet) {
+                  return (
+                    <div key={i} className="flex gap-2">
+                      <span className="text-gray-400 mt-0.5">•</span>
+                      <span>{bullet[1]}</span>
+                    </div>
+                  );
+                }
+                return line.trim() ? <p key={i} className="font-medium text-gray-700">{line}</p> : null;
+              })}
+            </div>
           </CollapsibleContent>
         </Collapsible>
       )}
 
       {/* Orb */}
-      <div className="flex flex-col items-center gap-6 py-10">
+      <div className="flex flex-col items-center gap-4 py-4">
         <div className="relative flex items-center justify-center">
           {/* Outer ripple rings when active */}
           {connectionState === 'active' && activityState !== 'idle' && (
@@ -505,6 +519,10 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
         onOpenChange={setSummaryOpen}
         summary={summaryData}
       />
+
+      <div className="mt-auto py-2 text-center text-xs text-gray-400">
+        Your trainer has access to the transcript and feedback.
+      </div>
     </div>
   );
 }

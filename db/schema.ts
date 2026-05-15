@@ -32,6 +32,7 @@ export const chatConfigs = pgTable("chat_configs", {
   coachingStyle: integer("coaching_style"),
   referenceContent: text("reference_content"),
   referenceImages: jsonb("reference_images").$type<string[]>(),
+  interactionMode: text("interaction_mode", { enum: ['typed', 'spoken', 'both'] }).default('both'),
 });
 
 export const quizQuestions = pgTable("quiz_questions", {

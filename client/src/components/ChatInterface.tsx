@@ -408,7 +408,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
   };
 
   return (
-    <div className="flex flex-col h-[800px]">
+    <div className="flex flex-col h-full">
       {config.userInstructions && !isViewOnly && (
         <Collapsible open={instructionsOpen} onOpenChange={setInstructionsOpen} className="mb-4">
           <div className={`border rounded-lg ${instructionsOpen ? 'rounded-b-none border-b-0' : ''}`}>
@@ -441,6 +441,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
       {showNameModal && (
         <UserNameModal
           open={showNameModal}
+          interactionMode={config.interactionMode}
           onSubmit={(name, mode) => {
             onUserNameSubmit(name, mode);
             setShowNameModal(false);
