@@ -9,7 +9,6 @@ import DualConversationPage from "./pages/DualConversationPage";
 import AuthPage from "./pages/auth-page";
 import ResetPasswordPage from "./pages/reset-password-page";
 import LandingPage from "./pages/LandingPage";
-import MiroPanel from "./pages/MiroPanel";
 import { AuthProvider } from "./hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
@@ -24,8 +23,7 @@ function App() {
         <Route path="/reset-password" component={ResetPasswordPage} />
         <ProtectedRoute path="/dashboard" component={Home} />
         <Route path="/chat" component={UserView} />
-        <Route path="/miro" component={MiroPanel} />
-        <Route path="/dual-conversation/:id" component={DualConversationPage} />
+<Route path="/dual-conversation/:id" component={DualConversationPage} />
         <ProtectedRoute path="/analysis" component={ConversationAnalysis} />
         <ProtectedRoute path="/dual-analysis" component={DualConversationAnalysis} />
         <Route path="/conversation" component={StaticConversationView} />

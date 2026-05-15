@@ -369,16 +369,6 @@ export default function Home() {
     }
   };
 
-  const handleCopyMiroLink = async (configId: number) => {
-    try {
-      const url = `${window.location.origin}/miro?configId=${configId}`;
-      await navigator.clipboard.writeText(url);
-      toast({ description: "Miro link copied to clipboard!" });
-    } catch {
-      toast({ variant: "destructive", title: "Error", description: "Failed to copy Miro link" });
-    }
-  };
-
   const handleViewFeedback = (configToView: ChatConfig) => {
     if (configToView.type === 'two-way-conversation') {
       window.open(`${window.location.origin}/dual-analysis?configId=${configToView.id}`, '_blank');
@@ -763,10 +753,6 @@ export default function Home() {
                         <Button size="sm" onClick={() => handleCopyLink(config.id)}>
                           <Share2 className="h-3.5 w-3.5 mr-1.5" />
                           Share
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => handleCopyMiroLink(config.id)}>
-                          <img src="/miro-icon.svg" className="h-3.5 w-3.5 mr-1.5" alt="" />
-                          Miro
                         </Button>
                         <Button
                           size="sm"
