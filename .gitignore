@@ -8,4 +8,4 @@ vite.config.ts.*
 .env.local
 uploads/
 old_data/
-scripts/
+scripts/womble/
