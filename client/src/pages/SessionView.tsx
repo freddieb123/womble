@@ -226,13 +226,13 @@ export default function SessionView() {
         </div>
 
         {/* Main content */}
-        <div className="flex-1 overflow-hidden p-4">
+        <div className="flex-1 overflow-hidden p-4 flex justify-center">
           {!selectedConfig ? (
             <div className="h-full flex items-center justify-center text-gray-400 text-sm">
               Select an activity from the sidebar to get started.
             </div>
           ) : (
-            <Card className="h-full flex flex-col overflow-hidden p-4">
+            <Card className="h-full w-full max-w-3xl flex flex-col overflow-hidden p-4">
               {chatMode === 'spoken' ? (
                 <VoiceChatInterface
                   config={adminConfig!}
