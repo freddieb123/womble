@@ -9,3 +9,4 @@ vite.config.ts.*
 uploads/
 old_data/
 scripts/womble/
+womble/
