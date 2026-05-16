@@ -12,6 +12,13 @@ export const users = pgTable("users", {
   lastLoginMethod: text("last_login_method"),
 });
 
+export const sessions = pgTable("sessions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  shareToken: text("share_token").unique().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const chatConfigs = pgTable("chat_configs", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
@@ -33,6 +40,9 @@ export const chatConfigs = pgTable("chat_configs", {
   referenceContent: text("reference_content"),
   referenceImages: jsonb("reference_images").$type<string[]>(),
   interactionMode: text("interaction_mode", { enum: ['typed', 'spoken', 'both'] }).default('both'),
+  sessionId: integer("session_id").references(() => sessions.id),
+  sessionOrder: integer("session_order"),
+  isLive: boolean("is_live").default(false),
 });
 
 export const quizQuestions = pgTable("quiz_questions", {
@@ -127,12 +137,22 @@ export interface UploadFeedback {
 
 export const userRelations = relations(users, ({ many }) => ({
   chatConfigs: many(chatConfigs),
+  sessions: many(sessions),
+}));
+
+export const sessionsRelations = relations(sessions, ({ one, many }) => ({
+  user: one(users, { fields: [sessions.userId], references: [users.id] }),
+  chatConfigs: many(chatConfigs),
 }));
 
 export const chatConfigsRelations = relations(chatConfigs, ({ one, many }) => ({
   user: one(users, {
     fields: [chatConfigs.userId],
     references: [users.id],
+  }),
+  session: one(sessions, {
+    fields: [chatConfigs.sessionId],
+    references: [sessions.id],
   }),
   conversations: many(conversations),
   uploads: many(uploads),
@@ -201,6 +221,10 @@ export const insertUploadSchema = createInsertSchema(uploads);
 export const selectUploadSchema = createSelectSchema(uploads);
 export const insertQuizResponseSchema = createInsertSchema(quizResponses);
 export const selectQuizResponseSchema = createSelectSchema(quizResponses);
+export const insertSessionSchema = createInsertSchema(sessions);
+export const selectSessionSchema = createSelectSchema(sessions);
+export type InsertSession = typeof sessions.$inferInsert;
+export type SelectSession = typeof sessions.$inferSelect;
 
 export type InsertUser = typeof users.$inferInsert;
 export type SelectUser = typeof users.$inferSelect;

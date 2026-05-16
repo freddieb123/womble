@@ -1,9 +1,26 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, Pencil, Copy, MoreVertical, BarChart2, Trash2, ArrowUpCircle, Flag, Share2, EyeOff, Keyboard, Mic, MessageSquare, Users, GraduationCap, Brain, HelpCircle, Upload, LogOut, LayoutGrid } from "lucide-react";
+import { Plus, Pencil, Copy, MoreVertical, BarChart2, Trash2, ArrowUpCircle, Flag, Share2, EyeOff, Keyboard, Mic, MessageSquare, Users, GraduationCap, Brain, HelpCircle, Upload, LogOut, LayoutGrid, GripVertical, Radio, Layers } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { track, EventName } from "@/lib/mixpanel";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -70,7 +87,91 @@ type ChatConfig = {
   maxTokens?: number;
   userId?: number;
   interactionMode?: 'typed' | 'spoken' | 'both';
+  sessionId?: number | null;
+  sessionOrder?: number | null;
+  isLive?: boolean;
 };
+
+type SessionData = {
+  id: number;
+  shareToken: string;
+  configs: ChatConfig[];
+};
+
+function SortableSessionCard({
+  config,
+  onToggleLive,
+  onRemoveFromSession,
+  onEdit,
+  onDelete,
+  onCopyLink,
+  onViewFeedback,
+}: {
+  config: ChatConfig;
+  onToggleLive: (isLive: boolean) => void;
+  onRemoveFromSession: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onCopyLink: () => void;
+  onViewFeedback: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: config.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-3 py-2.5 shadow-sm">
+      <button {...attributes} {...listeners} className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing flex-shrink-0">
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-800 truncate">{config.title}</span>
+          <Badge
+            variant="outline"
+            className={`text-xs flex-shrink-0 ${
+              config.type === 'chat' ? 'bg-green-50 text-green-700 border-green-200' :
+              config.type === 'teach-ai' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+              config.type === 'thought-partner' ? 'bg-teal-50 text-teal-700 border-teal-200' :
+              config.type === 'two-way-conversation' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+              'bg-gray-50 text-gray-600 border-gray-200'
+            }`}
+          >
+            {config.type === 'chat' ? 'Conversation' :
+             config.type === 'teach-ai' ? 'Teach an AI' :
+             config.type === 'thought-partner' ? 'Thought Partner' :
+             config.type === 'two-way-conversation' ? 'Two-way' :
+             config.type === 'quiz' ? 'Quiz' : 'Document Review'}
+          </Badge>
+        </div>
+      </div>
+      <button
+        onClick={() => onToggleLive(!config.isLive)}
+        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors flex-shrink-0 ${
+          config.isLive
+            ? 'bg-green-100 text-green-700 hover:bg-green-200'
+            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+        }`}
+      >
+        <Radio className={`h-3 w-3 ${config.isLive ? 'text-green-600' : 'text-gray-400'}`} />
+        {config.isLive ? 'Live' : 'Not live'}
+      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-400 hover:text-gray-600 flex-shrink-0">
+            <MoreVertical className="h-3.5 w-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={onEdit}><Pencil className="h-4 w-4 mr-2" />Edit</DropdownMenuItem>
+          <DropdownMenuItem onClick={onCopyLink}><Share2 className="h-4 w-4 mr-2" />Share link</DropdownMenuItem>
+          <DropdownMenuItem onClick={onViewFeedback}><BarChart2 className="h-4 w-4 mr-2" />View Feedback</DropdownMenuItem>
+          <DropdownMenuItem onClick={onRemoveFromSession}><Layers className="h-4 w-4 mr-2" />Remove from Session</DropdownMenuItem>
+          <DropdownMenuItem className="text-red-600" onClick={onDelete}><Trash2 className="h-4 w-4 mr-2" />Delete</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
 
 export default function Home() {
   const { logoutMutation, user } = useAuth();
@@ -127,6 +228,90 @@ export default function Home() {
     refetchInterval: 15_000,
   });
 
+  const { data: currentSession, refetch: refetchSession } = useQuery<SessionData | null>({
+    queryKey: ['/api/sessions/current'],
+    queryFn: async () => {
+      const res = await fetch('/api/sessions/current');
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!user?.id,
+    refetchInterval: 10_000,
+  });
+
+  const [sessionConfigOrder, setSessionConfigOrder] = useState<ChatConfig[]>([]);
+
+  // Keep local order in sync with server data
+  const sessionConfigs = sessionConfigOrder.length > 0 && currentSession
+    ? sessionConfigOrder
+    : (currentSession?.configs ?? []);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const toggleLive = useMutation({
+    mutationFn: async ({ configId, isLive }: { configId: number; isLive: boolean }) => {
+      await fetch(`/api/chat-configs/${configId}/live`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isLive }),
+      });
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/sessions/current'] }); },
+  });
+
+  const toggleSessionMembership = useMutation({
+    mutationFn: async ({ configId, inSession }: { configId: number; inSession: boolean }) => {
+      await fetch(`/api/chat-configs/${configId}/session`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inSession }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions/current'] });
+      setSessionConfigOrder([]);
+    },
+  });
+
+  const reorderSession = useMutation({
+    mutationFn: async (configIds: number[]) => {
+      await fetch('/api/sessions/current/order', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ configIds }),
+      });
+    },
+  });
+
+  const handleSessionDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = sessionConfigs.findIndex(c => c.id === active.id);
+    const newIndex = sessionConfigs.findIndex(c => c.id === over.id);
+    const reordered = arrayMove(sessionConfigs, oldIndex, newIndex);
+    setSessionConfigOrder(reordered);
+    reorderSession.mutate(reordered.map(c => c.id));
+  }, [sessionConfigs, reorderSession]);
+
+  const handleCopySessionLink = async () => {
+    if (!currentSession) return;
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/session?token=${currentSession.shareToken}`);
+      toast({ description: "Session link copied to clipboard!" });
+    } catch {
+      toast({ variant: "destructive", title: "Error", description: "Failed to copy session link" });
+    }
+  };
+
+  const handleViewSessionFeedback = () => {
+    if (!currentSession) return;
+    window.open(`${window.location.origin}/session-analysis?token=${currentSession.shareToken}`, '_blank');
+  };
+
   const saveConfig = useMutation({
     mutationFn: async (configToSave?: AdminConfig) => {
       const c = configToSave || config;
@@ -166,6 +351,8 @@ export default function Home() {
       });
       
       queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions/current'] });
+      setSessionConfigOrder([]);
       setIsCreateOpen(false);
       setIsPreviewingTemplate(false);
       setIsTemplateGalleryOpen(false);
@@ -620,6 +807,56 @@ export default function Home() {
             </div>
           )}
 
+          {/* Current Session area */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Layers className="h-4 w-4 text-green-600" />
+                <h2 className="text-base font-semibold text-gray-800">Current Session</h2>
+                <span className="text-xs text-gray-400">({sessionConfigs.length} agent{sessionConfigs.length !== 1 ? 's' : ''})</span>
+              </div>
+              <div className="flex gap-2">
+                {currentSession && (
+                  <>
+                    <Button size="sm" variant="outline" onClick={handleCopySessionLink}>
+                      <Share2 className="h-3.5 w-3.5 mr-1.5" />Share Session
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleViewSessionFeedback}>
+                      <BarChart2 className="h-3.5 w-3.5 mr-1.5" />Feedback
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {sessionConfigs.length === 0 ? (
+              <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-400">
+                No agents in this session yet. Create a new agent or add one from the list below.
+              </div>
+            ) : (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSessionDragEnd}>
+                <SortableContext items={sessionConfigs.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-2">
+                    {sessionConfigs.map((cfg) => (
+                      <SortableSessionCard
+                        key={cfg.id}
+                        config={cfg}
+                        onToggleLive={(isLive) => toggleLive.mutate({ configId: cfg.id, isLive })}
+                        onRemoveFromSession={() => toggleSessionMembership.mutate({ configId: cfg.id, inSession: false })}
+                        onEdit={() => handleEditConfig(cfg)}
+                        onDelete={() => setDeletingConfig(cfg)}
+                        onCopyLink={() => handleCopyLink(cfg.id)}
+                        onViewFeedback={() => handleViewFeedback(cfg)}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            )}
+          </div>
+
+          <div className="border-b border-gray-200 mb-6" />
+
           {/* Agent list */}
           <div className="space-y-4">
             {filteredConfigs.length === 0 ? (
@@ -721,6 +958,11 @@ export default function Home() {
                               <DropdownMenuItem onClick={() => handleDuplicate(config)}>
                                 <Copy className="h-4 w-4 mr-2" />Duplicate
                               </DropdownMenuItem>
+                              {!config.sessionId ? (
+                                <DropdownMenuItem onClick={() => toggleSessionMembership.mutate({ configId: config.id, inSession: true })}>
+                                  <Layers className="h-4 w-4 mr-2" />Add to Session
+                                </DropdownMenuItem>
+                              ) : null}
                               {!config.isTemplate && (
                                 <DropdownMenuItem onClick={() => setSavingAsTemplate(config)}>
                                   <Flag className="h-4 w-4 mr-2" />Save as Public Template

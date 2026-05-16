@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db, pool } from "@db";
-import { chatConfigs, conversations, uploads, quizQuestions, quizResponses, dualConversations, type Message, type ConversationFeedback, type UploadFeedback, type DualConversationFeedback } from "@db/schema";
+import { chatConfigs, conversations, uploads, quizQuestions, quizResponses, dualConversations, sessions, type Message, type ConversationFeedback, type UploadFeedback, type DualConversationFeedback } from "@db/schema";
 import { eq, and, or, desc, count } from "drizzle-orm";
 import { saveAudio, handleSaveAudio, transcribeAudio, generateFeedback } from "./routes/dual-conversation";
 import { z } from "zod";
@@ -129,14 +129,24 @@ const openai = new OpenAI({
   dangerouslyAllowBrowser: false
 });
 
-// Store sessions in memory
-const sessions: Record<string, Message[]> = {};
+// Store message sessions in memory
+const messageSessions: Record<string, Message[]> = {};
 
 export function registerRoutes(app: Express): Server {
   // Add chat_mode column if it doesn't exist yet
   pool.query(`ALTER TABLE conversations ADD COLUMN IF NOT EXISTS chat_mode TEXT`).catch(() => {});
   // Add interaction_mode column if it doesn't exist yet
   pool.query(`ALTER TABLE chat_configs ADD COLUMN IF NOT EXISTS interaction_mode TEXT DEFAULT 'both'`).catch(() => {});
+  // Sessions feature migrations
+  pool.query(`CREATE TABLE IF NOT EXISTS sessions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    share_token TEXT UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW() NOT NULL
+  )`).catch(() => {});
+  pool.query(`ALTER TABLE chat_configs ADD COLUMN IF NOT EXISTS session_id INTEGER REFERENCES sessions(id)`).catch(() => {});
+  pool.query(`ALTER TABLE chat_configs ADD COLUMN IF NOT EXISTS session_order INTEGER`).catch(() => {});
+  pool.query(`ALTER TABLE chat_configs ADD COLUMN IF NOT EXISTS is_live BOOLEAN DEFAULT false`).catch(() => {});
 
   // Set up authentication routes and middleware
   setupAuth(app);
@@ -292,6 +302,25 @@ export function registerRoutes(app: Express): Server {
         ? buildThoughtPartnerSystemPrompt(userInstructions, referenceContent ?? null, coachingStyle ?? 2)
         : systemPrompt!;
 
+      // Auto-create session for this user if one doesn't exist
+      let userSession = await db.query.sessions.findFirst({
+        where: eq(sessions.userId, userId as number),
+        orderBy: [desc(sessions.createdAt)],
+      });
+      if (!userSession) {
+        const [newSession] = await db.insert(sessions).values({
+          userId: userId as number,
+          shareToken: crypto.randomUUID(),
+          createdAt: new Date(),
+        }).returning();
+        userSession = newSession;
+      }
+      const existingSessionConfigs = await db.query.chatConfigs.findMany({
+        where: and(eq(chatConfigs.sessionId, userSession.id), eq(chatConfigs.deleted, false)),
+      });
+      const sessionConfigCount = existingSessionConfigs.length;
+      const isFirstInSession = sessionConfigCount === 0;
+
       const newConfig = await db.insert(chatConfigs).values({
         title,
         type,
@@ -308,7 +337,10 @@ export function registerRoutes(app: Express): Server {
         interactionMode: interactionMode ?? 'both',
         userId,
         deleted: false,
-        createdAt: new Date()
+        createdAt: new Date(),
+        sessionId: userSession.id,
+        sessionOrder: sessionConfigCount,
+        isLive: isFirstInSession,
       }).returning();
 
       // If this is a quiz type and questions were provided, save them
@@ -748,12 +780,12 @@ Return only the JSON object, no other text.`;
         ),
       });
 
-      if (!sessions[sessionId]) {
-        sessions[sessionId] = conversation?.messages || [];
+      if (!messageSessions[sessionId]) {
+        messageSessions[sessionId] = conversation?.messages || [];
       }
 
       res.json({
-        messages: sessions[sessionId],
+        messages: messageSessions[sessionId],
         isLoading: false,
         error: null
       });
@@ -785,14 +817,14 @@ Return only the JSON object, no other text.`;
 
       const parsedConfig = configSchema.parse(configData);
 
-      if (!sessions[sessionId]) {
+      if (!messageSessions[sessionId]) {
         const existingConversation = await db.query.conversations.findFirst({
           where: and(
             eq(conversations.configId, configId),
             eq(conversations.sessionId, sessionId)
           ),
         });
-        sessions[sessionId] = existingConversation?.messages || [];
+        messageSessions[sessionId] = existingConversation?.messages || [];
       }
 
       const userMessage: Message = {
@@ -805,7 +837,7 @@ Return only the JSON object, no other text.`;
         timestamp: Date.now(),
         sessionId
       };
-      sessions[sessionId].push(userMessage);
+      messageSessions[sessionId].push(userMessage);
 
       try {
         await db
@@ -815,12 +847,12 @@ Return only the JSON object, no other text.`;
             sessionId,
             userName,
             chatMode,
-            messages: sessions[sessionId],
+            messages: messageSessions[sessionId],
           })
           .onConflictDoUpdate({
             target: [conversations.configId, conversations.sessionId],
             set: {
-              messages: sessions[sessionId]
+              messages: messageSessions[sessionId]
             }
           });
       } catch (error) {
@@ -850,7 +882,7 @@ Return only the JSON object, no other text.`;
         apiMessages.push({ role: 'assistant', content: "Thank you — I have your reference material. I'll use it to inform our conversation." });
       }
 
-      for (const m of sessions[sessionId]) {
+      for (const m of messageSessions[sessionId]) {
         if (typeof m.content === 'string') {
           apiMessages.push({
             role: m.role,
@@ -907,12 +939,12 @@ Return only the JSON object, no other text.`;
           timestamp: Date.now(),
           sessionId
         };
-        sessions[sessionId].push(assistantMessage);
+        messageSessions[sessionId].push(assistantMessage);
 
         await db
           .update(conversations)
           .set({
-            messages: sessions[sessionId]
+            messages: messageSessions[sessionId]
           })
           .where(and(
             eq(conversations.configId, configId),
@@ -1846,6 +1878,173 @@ Score: [1-10 based on overall coverage and quality of explanation]
       res.json({ participantCount, leaderboard, topN });
     } catch (error: any) {
       console.error("Error in auto-grade:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ── Session endpoints ────────────────────────────────────────────────────
+
+  // GET current session with ordered configs
+  app.get("/api/sessions/current", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const session = await db.query.sessions.findFirst({
+        where: eq(sessions.userId, userId as number),
+        orderBy: [desc(sessions.createdAt)],
+      });
+
+      if (!session) return res.json(null);
+
+      const configs = await db.query.chatConfigs.findMany({
+        where: and(eq(chatConfigs.sessionId, session.id), eq(chatConfigs.deleted, false)),
+        orderBy: [chatConfigs.sessionOrder],
+      });
+
+      res.json({ ...session, configs });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PATCH reorder configs within session
+  app.patch("/api/sessions/current/order", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const { configIds } = req.body as { configIds: number[] };
+      if (!Array.isArray(configIds)) return res.status(400).json({ error: "configIds required" });
+
+      await Promise.all(
+        configIds.map((id, index) =>
+          db.update(chatConfigs)
+            .set({ sessionOrder: index })
+            .where(and(eq(chatConfigs.id, id), eq(chatConfigs.userId, userId)))
+        )
+      );
+
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PATCH toggle isLive for a config
+  app.patch("/api/chat-configs/:id/live", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.id);
+      const userId = req.user?.id;
+      const { isLive } = req.body as { isLive: boolean };
+      if (!userId || isNaN(configId)) return res.status(400).json({ error: "Bad request" });
+
+      await db.update(chatConfigs)
+        .set({ isLive })
+        .where(and(eq(chatConfigs.id, configId), eq(chatConfigs.userId, userId)));
+
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PATCH add/remove a config from session
+  app.patch("/api/chat-configs/:id/session", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.id);
+      const userId = req.user?.id;
+      const { inSession } = req.body as { inSession: boolean };
+      if (!userId || isNaN(configId)) return res.status(400).json({ error: "Bad request" });
+
+      if (inSession) {
+        // Find or create the user's session
+        let session = await db.query.sessions.findFirst({
+          where: eq(sessions.userId, userId as number),
+          orderBy: [desc(sessions.createdAt)],
+        });
+        if (!session) {
+          const [newSession] = await db.insert(sessions).values({
+            userId: userId as number,
+            shareToken: crypto.randomUUID(),
+            createdAt: new Date(),
+          }).returning();
+          session = newSession;
+        }
+        // Find current max order
+        const existing = await db.query.chatConfigs.findMany({
+          where: and(eq(chatConfigs.sessionId, session.id), eq(chatConfigs.deleted, false)),
+        });
+        const maxOrder = existing.length;
+        const isFirst = maxOrder === 0;
+        await db.update(chatConfigs)
+          .set({ sessionId: session.id, sessionOrder: maxOrder, isLive: isFirst })
+          .where(and(eq(chatConfigs.id, configId), eq(chatConfigs.userId, userId)));
+      } else {
+        await db.update(chatConfigs)
+          .set({ sessionId: null, sessionOrder: null, isLive: false })
+          .where(and(eq(chatConfigs.id, configId), eq(chatConfigs.userId, userId)));
+      }
+
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET session by share token (public)
+  app.get("/api/sessions/join/:token", async (req: Request, res: Response) => {
+    try {
+      const session = await db.query.sessions.findFirst({
+        where: eq(sessions.shareToken, req.params.token),
+      });
+      if (!session) return res.status(404).json({ error: "Session not found" });
+
+      const configs = await db.query.chatConfigs.findMany({
+        where: and(eq(chatConfigs.sessionId, session.id), eq(chatConfigs.deleted, false)),
+        orderBy: [chatConfigs.sessionOrder],
+      });
+
+      res.json({
+        id: session.id,
+        shareToken: session.shareToken,
+        configs: configs.map(c => ({
+          id: c.id,
+          title: c.title,
+          type: c.type,
+          isLive: c.isLive,
+          interactionMode: c.interactionMode,
+          userInstructions: c.userInstructions,
+          systemPrompt: c.systemPrompt,
+          feedbackCriteria: c.feedbackCriteria,
+          knowledgeLevel: c.knowledgeLevel,
+          attitude: c.attitude,
+          coachingStyle: c.coachingStyle,
+          referenceImages: c.referenceImages,
+          referenceContent: c.referenceContent,
+          sessionOrder: c.sessionOrder,
+        })),
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET live status poll (public, lightweight)
+  app.get("/api/sessions/join/:token/status", async (req: Request, res: Response) => {
+    try {
+      const session = await db.query.sessions.findFirst({
+        where: eq(sessions.shareToken, req.params.token),
+      });
+      if (!session) return res.status(404).json({ error: "Session not found" });
+
+      const configs = await db.query.chatConfigs.findMany({
+        where: and(eq(chatConfigs.sessionId, session.id), eq(chatConfigs.deleted, false)),
+        orderBy: [chatConfigs.sessionOrder],
+      });
+
+      res.json(configs.map(c => ({ configId: c.id, isLive: c.isLive ?? false })));
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });

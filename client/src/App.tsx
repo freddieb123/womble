@@ -5,6 +5,8 @@ import ConversationAnalysis from "./pages/ConversationAnalysis";
 import DualConversationAnalysis from "./pages/DualConversationAnalysis";
 import StaticConversationView from "./pages/StaticConversationView";
 import StaticTranscriptView from "./pages/StaticTranscriptView";
+import SessionView from "./pages/SessionView";
+import SessionAnalysis from "./pages/SessionAnalysis";
 import DualConversationPage from "./pages/DualConversationPage";
 import AuthPage from "./pages/auth-page";
 import ResetPasswordPage from "./pages/reset-password-page";
@@ -26,6 +28,8 @@ function App() {
 <Route path="/dual-conversation/:id" component={DualConversationPage} />
         <ProtectedRoute path="/analysis" component={ConversationAnalysis} />
         <ProtectedRoute path="/dual-analysis" component={DualConversationAnalysis} />
+        <Route path="/session" component={SessionView} />
+        <ProtectedRoute path="/session-analysis" component={SessionAnalysis} />
         <Route path="/conversation" component={StaticConversationView} />
         <Route path="/transcript/:configId/:sessionId" component={StaticTranscriptView} />
         <Route component={NotFound} />

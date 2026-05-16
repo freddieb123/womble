@@ -154,6 +154,16 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
 
   const sendMessage = useMutation({
     mutationFn: async (content: string) => {
+      // Register participant on first message (not on name entry)
+      if (!hasRegistered.current && userName && config.id && !isViewOnly) {
+        hasRegistered.current = true;
+        fetch('/api/conversations/save-transcript', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ configId: config.id, sessionId, userName, chatMode: 'typed', messages: [] }),
+        }).catch(() => {});
+      }
+
       const url = new URL("/api/messages", window.location.origin);
       url.searchParams.set('configId', config.id?.toString() || '');
       url.searchParams.set('sessionId', sessionId);
@@ -289,15 +299,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
     return () => clearTimeout(timeout);
   }, [chatState.messages]);
 
-  // Register participant as soon as userName is known (empty row = "user has started")
-  useEffect(() => {
-    if (!userName || !config.id || !sessionId || isViewOnly) return;
-    fetch('/api/conversations/save-transcript', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ configId: config.id, sessionId, userName, chatMode: 'typed', messages: [] }),
-    }).catch(() => {});
-  }, [userName, config.id, sessionId, isViewOnly]);
+  const hasRegistered = useRef(false);
 
   // Restore focus to input whenever sending finishes or modal closes
   useEffect(() => {

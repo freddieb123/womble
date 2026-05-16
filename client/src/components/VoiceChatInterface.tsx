@@ -58,16 +58,6 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
 
   const { toast } = useToast();
 
-  // Register participant as soon as userName is known (empty row = "user has started")
-  useEffect(() => {
-    if (!userName || !config.id || !sessionId) return;
-    fetch('/api/conversations/save-transcript', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ configId: config.id, sessionId, userName, chatMode: 'spoken', messages: [] }),
-    }).catch(() => {});
-  }, [userName, config.id, sessionId]);
-
   // Persist transcript to DB whenever it updates so live stats & admin count work
   useEffect(() => {
     if (transcript.length === 0 || !config.id || !sessionId) return;
