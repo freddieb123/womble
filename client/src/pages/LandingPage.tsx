@@ -1,623 +1,470 @@
-import { Link, useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
-import { CheckCircle, Brain, Zap, Award, Users, Server, Database, BarChart, LogOut, CameraIcon } from "lucide-react";
-
+import { useLocation } from "wouter";
 import { Helmet } from "react-helmet";
-
-import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"; // Added import
 import { track, EventName } from "@/lib/mixpanel";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  ArrowRight, CheckCircle2, Layers, MessageCircle, Users,
+  GraduationCap, Wand2, Sparkles, Copy, Trophy,
+  BarChart3, Tag, Check, MessageCircleQuestion, Plus, Mail,
+} from "lucide-react";
+import "./LandingPage.css";
 
 export default function LandingPage() {
-  const { user, logoutMutation } = useAuth();
+  const { user } = useAuth();
   const [, navigate] = useLocation();
 
   if (user) {
     navigate("/dashboard");
     return null;
   }
-  
-  // Structured data for rich snippets
+
+  const goRegister = (location: string) => {
+    track(EventName.LANDING_GET_STARTED_CLICK, { location });
+    window.location.href = "/auth?mode=register";
+  };
+
+  const goLogin = () => {
+    track(EventName.LANDING_LOGIN_CLICK, { location: "navbar" });
+    window.location.href = "/auth?mode=login";
+  };
+
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "Womble",
-    "applicationCategory": "EducationalApplication",
-    "offers": {
-      "@type": "Offer",
-      "price": "8.00",
-      "priceCurrency": "GBP"
-    },
-    "description": "Womble provides bespoke formative feedback for education and training through AI-powered activities.",
-    "operatingSystem": "Web"
+    name: "Womble",
+    applicationCategory: "EducationalApplication",
+    offers: { "@type": "Offer", price: "8.00", priceCurrency: "GBP" },
+    description: "Womble provides bespoke formative feedback for education and training through AI-powered activities.",
+    operatingSystem: "Web",
   };
 
   return (
-    <div className="min-h-screen flex flex-col landing-page-font">
+    <div className="lp">
       <Helmet>
-        <script type="application/ld+json">
-          {JSON.stringify(structuredData)}
-        </script>
+        <title>Womble — Every participant gets expert feedback. Instantly.</title>
+        <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
       </Helmet>
-      {/* Navigation */}
-      <nav className="border-b bg-white py-4 px-4 md:px-8">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <span className="text-2xl font-bold text-primary flex items-center cursor-pointer">
-                  <img src="/womble-icon.svg" alt="Womble" className="h-10 w-10 mr-2" />
-                  <span className="text-green-700">Womble</span>
-                </span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-72 p-3">
-                <div className="space-y-2">
-                  <h4 className="font-bold">Womble</h4>
-                  <p className="text-sm">
-                    <span className="font-italic text-muted-foreground">noun</span>
-                    <br />
-                    A fictional animal inhabiting Wimbledon Common in London, characterised as clearing up litter.
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-italic text-muted-foreground">verb (informal)</span>
-                    <br />
-                    Wander in a casual or relaxed way.
-                    <br />
-                    <span className="italic">"once we'd arrived back in Cambridge, we wombled quietly home"</span>
-                  </p>
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
+
+      {/* ── Nav ─────────────────────────────────────────────── */}
+      <nav className="lp-nav">
+        <div className="container lp-nav-inner">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <span className="lp-logo" style={{ cursor: "pointer" }}>
+                <img src="/womble-icon.svg" alt="Womble" />
+                <span className="lp-wordmark">Womble</span>
+              </span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-72 p-3">
+              <div className="space-y-2">
+                <h4 className="font-bold">Womble</h4>
+                <p className="text-sm">
+                  <span className="italic text-muted-foreground">noun</span><br />
+                  A fictional animal inhabiting Wimbledon Common in London, characterised as clearing up litter.
+                </p>
+                <p className="text-sm">
+                  <span className="italic text-muted-foreground">verb (informal)</span><br />
+                  Wander in a casual or relaxed way.<br />
+                  <span className="italic">"once we'd arrived back in Cambridge, we wombled quietly home"</span>
+                </p>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <div className="lp-nav-links">
+            <a href="#activities">Features</a>
+            <a href="#how">How it works</a>
+            <a href="#pricing">Pricing</a>
           </div>
-          <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="font-medium text-gray-600 hover:text-primary">Features</a>
-            <a href="#how-it-works" className="font-medium text-gray-600 hover:text-primary">How It Works</a>
-            <a href="#pricing" className="font-medium text-gray-600 hover:text-primary">Pricing</a>
-          </div>
-          <div className="flex items-center gap-4">
-            {user ? (
-              <>
-                <Button 
-                  variant="outline" 
-                  className="hidden md:inline-flex" 
-                  onClick={() => window.location.href = "/dashboard"}
-                >
-                  Dashboard
-                </Button>
-                <Button 
-                  className="bg-red-500 hover:bg-red-600 flex items-center gap-2" 
-                  onClick={() => logoutMutation.mutate()}
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span>Logout</span>
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button 
-                  variant="outline" 
-                  className="hidden md:inline-flex" 
-                  onClick={() => {
-                    track(EventName.LANDING_LOGIN_CLICK, { location: 'navbar' });
-                    window.location.href = "/auth?mode=login";
-                  }}
-                >
-                  Log In
-                </Button>
-                <Button 
-                  className="bg-primary hover:bg-primary/90" 
-                  onClick={() => {
-                    track(EventName.LANDING_GET_STARTED_CLICK, { location: 'navbar' });
-                    window.location.href = "/auth?mode=register";
-                  }}
-                >
-                  Get Started
-                </Button>
-              </>
-            )}
+          <div className="lp-nav-spacer" />
+          <div className="lp-cta-group">
+            <button className="btn btn-ghost" onClick={goLogin}>Log in</button>
+            <button className="btn btn-primary" onClick={() => goRegister("navbar")}>Start for free</button>
           </div>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-b from-blue-50 to-white py-20 px-4 md:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row items-center gap-12">
-            <div className="md:w-1/2">
-              <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight">
-                Timely, bespoke feedback.
-              </h1>
-              <p className="mt-6 text-xl text-gray-600">
-                Built by teachers, for teachers. Leverage AI in your sessions to give high quality formative feedback to your particpants.
-              </p>
-              <div className="mt-10 flex flex-col sm:flex-row gap-4">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ 
-                    type: "spring", 
-                    stiffness: 400, 
-                    damping: 10, 
-                    delay: 0.3 
-                  }}
-                >
-                  <Button 
-                    size="lg" 
-                    className="bg-primary hover:bg-primary/90 w-full sm:w-auto"
-                    onClick={() => {
-                      track(EventName.LANDING_START_CREATING_CLICK, { location: 'hero' });
-                      window.location.href = user ? "/dashboard" : "/auth?mode=register";
-                    }}
-                  >
-                    {user ? "Go to Dashboard" : "Start Creating"}
-                  </Button>
-                </motion.div>
-                <a href="#how-it-works">
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ 
-                      type: "spring", 
-                      stiffness: 400, 
-                      damping: 10, 
-                      delay: 0.5 
-                    }}
-                  >
-                    <Button 
-                      size="lg" 
-                      variant="outline" 
-                      className="w-full sm:w-auto"
-                      onClick={() => track(EventName.LANDING_HOW_IT_WORKS_CLICK, { location: 'hero' })}
-                    >
-                      See How It Works
-                    </Button>
-                  </motion.div>
-                </a>
-              </div>
-              <div className="mt-8 flex items-center gap-2 text-gray-500">
-                <CheckCircle className="h-5 w-5 text-green-400" />
-                <span>No payment card required</span>
-              </div>
-            </div>
-            <div className="md:w-1/2 mt-12 md:mt-0">
-              <div className="relative">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur opacity-30"></div>
-                <div className="bg-white p-6 rounded-lg shadow-xl relative">
-                  <img 
-                    src="/images/top_image.png" 
-                    alt="Conversation Demo" 
-                    className="rounded-md w-full"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section id="features" className="py-20 px-4 md:px-8 bg-white">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Powerful AI Feedback Features</h2>
-            <p className="mt-4 text-xl text-gray-600 max-w-3xl mx-auto">
-              Provide personalized formative feedback to all your participants, every time.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-10">
-            <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm">
-              <div className="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center mb-6">
-                <Zap className="h-6 w-6 text-green-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900">Bespoke feedack</h3>
-              <p className="mt-4 text-gray-600">
-                Each of your particpants gets bespoke feedback based on their responses and your assessment criteria.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm">
-              <div className="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center mb-6">
-                <Award className="h-6 w-6 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900">Leaderboards</h3>
-              <p className="mt-4 text-gray-600">
-                Participants can see how they compare to others in the live session.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm">
-              <div className="h-12 w-12 rounded-lg bg-purple-100 flex items-center justify-center mb-6">
-                <Brain className="h-6 w-6 text-purple-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900">Trainer view</h3>
-              <p className="mt-4 text-gray-600">
-                Get insights that help you adapt your session on the fly.
-              </p>
-            </div>
-
-
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section id="how-it-works" className="py-20 px-4 md:px-8 bg-gray-50">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">How It Works</h2>
-            <p className="mt-4 text-xl text-gray-600 max-w-3xl mx-auto">
-              Create and share activities with a magic wand (and a few clicks).
-            </p>
-          </div>
-
-          <div className="relative">
-            <div className="hidden md:block absolute left-1/2 top-0 h-full w-0.5 bg-gray-200 -translate-x-1/2"></div>
-
-            <div className="space-y-16 relative">
-              <div className="flex flex-col md:flex-row gap-8 items-center">
-                <div className="md:w-1/2 order-2 md:order-1">
-                  <div className="relative">
-                    <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur opacity-20"></div>
-                    <div className="bg-white p-4 rounded-lg shadow-md relative">
-                      <img 
-                        src="/images/1.2 screenshot.png" 
-                        alt="Create Activity" 
-                        className="rounded-md w-full"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="md:w-1/2 order-1 md:order-2 relative">
-                  
-                  <div className="md:pl-8">
-                    
-                    <h3 className="text-2xl font-bold text-gray-900 md:text-left text-center">1. Create Your Activity and Feedback Criteria</h3>
-                    <p className="mt-4 text-gray-600 md:text-left text-center">
-                      Activity types include quizzes, screenshot uploads and practice conversations. Create clear and specific feedback criteria.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col md:flex-row gap-8 items-center">
-                <div className="md:w-1/2 order-2">
-                  <div className="relative">
-                   
-                    <div className="bg-white p-4 rounded-lg shadow-md relative">
-                      <img 
-                        src="/images/screenshot 2.2.png" 
-                        alt="Share Quiz" 
-                        className="rounded-md w-full"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="md:w-1/2 order-1 relative">
-                  {/* Removed the original number on the left */}
-                  <div className="md:pl-8">
-                    <div className="flex items-start mb-4">
-                      <h3 className="text-2xl font-bold text-gray-900 md:text-left">2. Share with your Participants</h3>
-                    </div>
-                    <p className="mt-4 text-gray-600 md:text-left text-center">
-                      Generate a unique link to share in the chat for each session your run. Participants can get hints and feedback.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col md:flex-row gap-8 items-center">
-                <div className="md:w-1/2 order-2 md:order-1">
-                  <div className="relative">
-                    <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-600 rounded-lg blur opacity-20"></div>
-                    <div className="bg-white p-4 rounded-lg shadow-md relative">
-                      <img 
-                        src="/images/3.1 screenshot.png" 
-                        alt="Conversation Analysis" 
-                        className="rounded-md w-full"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="md:w-1/2 order-1 md:order-2 relative">
-                  
-                  <div className="md:pl-8">
-                    
-                    <h3 className="text-2xl font-bold text-gray-900 md:text-left text-center">3. Your particpants get feedback</h3>
-                    <p className="mt-4 text-gray-600 md:text-left text-center">
-                      Review key feedback themes to inform your session.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col md:flex-row gap-8 items-center">
-                <div className="md:w-1/2 order-2">
-                  <div className="relative">
-                    
-                    <div className="bg-white p-4 rounded-lg shadow-md relative">
-                      <img 
-                        src="/images/3 screenshot.png" 
-                        alt="Womble class analysis dashboard showing key feedback themes for educators" 
-                        className="rounded-md w-full"
-                        loading="lazy"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="md:w-1/2 order-1 relative">
-                  <div className="md:pl-8">
-                    <div className="flex items-start mb-4">
-                        <h3 className="text-2xl font-bold text-gray-900 md:text-left">4. You get a class analysis</h3>
-                    </div>
-                    <p className="mt-4 text-gray-600 md:text-left text-center">
-                      Review key feedback themes to inform your session.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-
-        
-      </section>
-
-      {/* Types of Activities Section */}
-      <section id="activity-types" className="py-20 px-4 md:px-8 bg-white">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Interactive Learning Activities</h2>
-            <p className="mt-4 text-xl text-gray-600 max-w-3xl mx-auto">
-              Choose from different activity formats to engage your participants with personalized feedback
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-10">
-            <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow">
-              <div className="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center mb-6">
-                <BarChart className="h-6 w-6 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900">Quiz</h3>
-              <p className="mt-4 text-gray-600">
-                Create interactive quizzes with free-text answers. Set clear assessment criteria to guide the AI in creating helpful feedback. 
-              </p>
-            </div>
-
-            <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow">
-              <div className="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center mb-6">
-                <Users className="h-6 w-6 text-green-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900">Conversation</h3>
-              <p className="mt-4 text-gray-600">
-                Practice conversations with an AI and get feedback. Perfect for role-playing scenarios and communication skills development.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-lg border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow">
-              <div className="h-12 w-12 rounded-lg bg-purple-100 flex items-center justify-center mb-6">
-                <CameraIcon className="h-6 w-6 text-purple-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900">Screenshot</h3>
-              <p className="mt-4 text-gray-600">
-                Upload screenshots for analysis and feedback based on your criteria. Great for reviewing documents or notes from participants.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Section */}
-      <section id="pricing" className="py-20 px-4 md:px-8 bg-white">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Simple, Transparent Pricing</h2>
-            <p className="mt-4 text-xl text-gray-600 max-w-3xl mx-auto">
-              Choose the Womble plan that's right for you
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {/* Free Plan */}
-            <div className="border border-gray-200 rounded-xl p-8 bg-white relative">
-              <h3 className="text-xl font-bold text-gray-900">Free</h3>
-              <p className="text-gray-600 mt-2">For occasional use</p>
-              <div className="mt-6 mb-8">
-                <span className="text-4xl font-bold text-gray-900">£0</span>
-                <span className="text-gray-600 ml-2">/month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-600">Up to 2 activities</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-600">Unlimited responses</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-600">Teacher analytics</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-600">Access to templates</span>
-                </li>
-              </ul>
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => {
-                  track(EventName.PRICING_BUTTON_CLICK, { plan: 'free', location: 'pricing_section' });
-                  window.location.href = "/auth?mode=register";
-                }}
-              >
-                Sign Up Free
-              </Button>
-            </div>
-
-            {/* Pro Plan */}
-            <div className="border-2 border-primary rounded-xl p-8 bg-white relative shadow-lg">
-              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-primary text-white px-4 py-1 rounded-full text-sm font-medium">
-                Most Popular
-              </div>
-              <h3 className="text-xl font-bold text-gray-900">Pro</h3>
-              <p className="text-gray-600 mt-2">For AI evangelists</p>
-              <div className="mt-6 mb-8">
-                <span className="text-4xl font-bold text-gray-900">£8</span>
-                <span className="text-gray-600 ml-2">/month</span>
-                <div className="text-sm text-red-500 font-medium mt-1">
-                  <span className="line-through">£15</span> Limited time offer!
-                </div>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-600">Unlimited quizzes</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-600">Advanced analytics</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-600">Priority AI assistance</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-600">Team collaboration</span>
-                </li>
-              </ul>
-              <Button 
-                className="w-full bg-primary hover:bg-primary/90"
-                onClick={() => {
-                  track(EventName.PRICING_BUTTON_CLICK, { plan: 'pro', location: 'pricing_section' });
-                  window.location.href = "/auth?mode=register";
-                }}
-              >
-                Get Started
-              </Button>
-            </div>
-
-            {/* Enterprise Plan */}
-            <div className="border border-gray-200 rounded-xl p-8 bg-white relative">
-              <h3 className="text-xl font-bold text-gray-900">Enterprise</h3>
-              <p className="text-gray-600 mt-2">For organisations</p>
-              <div className="mt-6 mb-8">
-                <span className="text-4xl font-bold text-gray-900">£99</span>
-                <span className="text-gray-600 ml-2">/month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-600">Everything in Pro</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-600">Template sharing with the team</span>
-                </li>
-
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-600">Dedicated support</span>
-                </li>
-
-              </ul>
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => {
-                  track(EventName.PRICING_BUTTON_CLICK, { plan: 'enterprise', location: 'pricing_section' });
-                  window.location.href = "/auth?mode=register";
-                }}
-              >
-                Contact Sales
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
-      
-
-      {/* CTA Section */}
-      <section className="py-20 px-4 md:px-8 bg-white">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Ready to Transform Learning?</h2>
-          <p className="mt-6 text-xl text-gray-600">
-            Join the community of educators who are turbocharging their learning experiences with bespoke feedback.
+      {/* ── Hero ────────────────────────────────────────────── */}
+      <section className="lp-hero">
+        <div className="container">
+          <span className="eyebrow"><span className="dot" /> AI-powered experiences for your learners</span>
+          <h1>
+            Every participant gets<br />
+            <span className="accent">bespoke feedback.</span><br />
+            Instantly.
+          </h1>
+          <p className="lead">
+            Create AI-powered practice activities in minutes. Share a link. Your participants get bespoke feedback and you get insights to adapt your session on the fly.
           </p>
-          <div className="mt-10">
-            <motion.div
-              initial={{ opacity: 0, y: 25 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ 
-                type: "spring", 
-                stiffness: 400, 
-                damping: 8, 
-                delay: 0.2 
-              }}
-              whileHover={{ 
-                scale: 1.05, 
-                transition: { duration: 0.2 } 
-              }}
-            >
-              <Button 
-                size="lg" 
-                className="bg-primary hover:bg-primary/90"
-                onClick={() => {
-                  track(EventName.LANDING_GET_STARTED_CLICK, { location: 'cta_section' });
-                  window.location.href = "/auth?mode=register";
-                }}
-              >
-                Get Started for Free
-              </Button>
-            </motion.div>
+          <div className="ctas">
+            <button className="btn btn-primary lg" onClick={() => goRegister("hero")}>
+              Start for free <ArrowRight size={18} />
+            </button>
+            <a className="btn btn-outline lg" href="#how">See how it works</a>
+          </div>
+          <div className="trust">
+            <span><CheckCircle2 size={16} className="icon" /> No credit card required</span>
+            <span><CheckCircle2 size={16} className="icon" /> Free to start</span>
+            <span>No login for participants</span>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12 px-4 md:px-8 mt-auto">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
-            <div>
-              <div className="flex items-center">
-                <span className="text-2xl font-bold text-primary flex items-center">
-                  <img src="/womble-icon.svg" alt="Womble" className="h-9 w-9 mr-2" />
-                  <span className="text-green-700">Womble</span>
+      {/* ── Activity Types ───────────────────────────────────── */}
+      <section id="activities">
+        <div className="container">
+          <div className="section-head">
+            <span className="eyebrow"><Layers size={14} style={{ display: "inline" }} /> The core product</span>
+            <h2>Four ways to run AI-powered practice</h2>
+            <p className="sub">Pick the shape that fits the moment. Every activity gives every participant their own bespoke feedback.</p>
+          </div>
 
+          <div className="activity-grid">
+            {/* Chat with AI */}
+            <div className="activity-card tone-chat">
+              <div className="preview">
+                <span className="meta-tag">Roleplay · typed or voice</span>
+                <span className="speaker">AI · sceptical procurement manager</span>
+                <span className="bubble">"What's your best price on a 12-month deal?"</span>
+                <span className="bubble right">"Before we get to numbers, can I understand what's driving the timing?"</span>
+                <span className="bubble">"Mm. I've heard that one before."</span>
+              </div>
+              <div className="info">
+                <div className="head">
+                  <div className="icon-chip"><MessageCircle size={18} /></div>
+                  <h3>Chat with AI</h3>
+                </div>
+                <p>Participants have a typed or voice conversation with an AI playing a custom role you define. Sales practice, customer service, difficult conversations.</p>
+              </div>
+            </div>
+
+            {/* Two-way conversation */}
+            <div className="activity-card tone-conversation">
+              <div className="preview">
+                <span className="meta-tag">Pair work · recorded</span>
+                <div className="row">
+                  <span className="who">Sam:</span>
+                  <span className="bubble">"How would you handle a missed deadline with this client?"</span>
+                </div>
+                <div className="row" style={{ justifyContent: "flex-end" }}>
+                  <span className="bubble right">"I'd own it first — say what happened, what I'd change next time."</span>
+                  <span className="who" style={{ textAlign: "right" }}>Alex:</span>
+                </div>
+                <div className="row">
+                  <span className="who">Sam:</span>
+                  <span className="bubble">"What would you say first, exactly?"</span>
+                </div>
+                <span className="rec">
+                  <span className="rec-dot" /> Recording · Womble listening
                 </span>
               </div>
+              <div className="info">
+                <div className="head">
+                  <div className="icon-chip"><Users size={18} /></div>
+                  <h3>Two-way conversation</h3>
+                </div>
+                <p>Two participants have a real conversation while Womble records it. AI analyses both sides and gives each person feedback.</p>
+              </div>
             </div>
 
-            <div>
-              <h3 className="text-lg font-semibold mb-4"></h3>
-              <ul className="space-y-2">
+            {/* Teach an AI */}
+            <div className="activity-card tone-teach">
+              <div className="preview">
+                <span className="meta-tag">Learn-by-teaching</span>
+                <span className="speaker">AI · curious beginner</span>
+                <span className="bubble">"So RICE stands for Reach, Impact, Confidence and Effort."</span>
+                <span className="bubble right">"Great and how would you suggest using it?"</span>
+                <span className="bubble">"Well let's think through a particular context..."</span>
+              </div>
+              <div className="info">
+                <div className="head">
+                  <div className="icon-chip"><GraduationCap size={18} /></div>
+                  <h3>Teach an AI</h3>
+                </div>
+                <p>Participants explain a topic to an AI set at a specific knowledge level. The AI asks questions rather than giving answers. Your participants have to do the teaching.</p>
+              </div>
+            </div>
 
+            {/* Thought Partner */}
+            <div className="activity-card tone-thought">
+              <div className="preview">
+                <span className="meta-tag">Apply · open-ended</span>
+                <span className="speaker">AI · thought partner</span>
+                <span className="bubble">"How would I apply active listening with my remote team?"</span>
+                <span className="bubble right">"Well let's talk it through. Give me a summary of the regular weekly meetings you have. We'll step through each one."</span>
+                <span className="bubble">"OK well we have a team meeting every Wednesday and I sometimes find it's a little one-way..."</span>
+              </div>
+              <div className="info">
+                <div className="head">
+                  <div className="icon-chip">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M6 4 Q 4 4 4 6 L 4 14 Q 4 16 6 16 L 9 16 L 11 19 L 13 16 L 18 16 Q 20 16 20 14 L 20 6 Q 20 4 18 4 Z" />
+                      <circle cx="9" cy="10" r="0.6" fill="currentColor" />
+                      <circle cx="12" cy="10" r="0.6" fill="currentColor" />
+                      <circle cx="15" cy="10" r="0.6" fill="currentColor" />
+                    </svg>
+                  </div>
+                  <h3>Thought Partner</h3>
+                </div>
+                <p>An AI that helps participants think through how to apply a concept in their own context. It asks probing questions, surfaces blind spots — they find their own answer.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── How It Works ────────────────────────────────────── */}
+      <section id="how" className="how-bg">
+        <div className="container">
+          <div className="section-head">
+            <span className="eyebrow"><Wand2 size={14} style={{ display: "inline" }} /> Set up in 90 seconds</span>
+            <h2>From idea to feedback in four steps</h2>
+            <p className="sub">Describe it. Share a link. Run it live. Everyone walks out with feedback.</p>
+          </div>
+
+          <div className="how-grid">
+            {/* Step 1 */}
+            <div className="how-card">
+              <span className="step-num">1</span>
+              <h3>Describe your activity</h3>
+              <p>Type what you want in plain English. AI builds it in seconds. Tweak the role, tone, knowledge level, feedback criteria. Full control.</p>
+              <div className="visual visual-prompt">
+                <div className="input">a negotiation roleplay where the AI plays a sceptical procurement manager pushing on price</div>
+                <div className="build-btn"><Sparkles style={{ width: 11, height: 11 }} /> Build activity</div>
+              </div>
+            </div>
+
+            {/* Step 2 */}
+            <div className="how-card">
+              <span className="step-num">2</span>
+              <h3>Share a link</h3>
+              <p>One link in the chat. No logins or app downloads needed for participants. Works typed or as a live voice conversation.</p>
+              <div className="visual visual-link">
+                <div className="link-pill">womble.co/p/neg-prc-9k2x</div>
+                <span className="copy"><Copy style={{ width: 11, height: 11 }} /> Copy</span>
+              </div>
+            </div>
+
+            {/* Step 3 */}
+            <div className="how-card">
+              <span className="step-num">3</span>
+              <h3>Participants do the activity</h3>
+              <p>Everyone joins in — typed or spoken. A live leaderboard keeps the room engaged and shows you who's flying and who's stuck.</p>
+              <div className="visual visual-leaderboard">
+                <div className="lb-h"><Trophy style={{ width: 11, height: 11 }} /> Live leaderboard</div>
+                {[
+                  { pos: "1", initial: "M", name: "Maya", color: "#16A34A", dots: [1,1,1,1,1] },
+                  { pos: "2", initial: "S", name: "Sam",  color: "#2563EB", dots: [1,1,1,1,0] },
+                  { pos: "3", initial: "A", name: "Alex", color: "#9333EA", dots: [1,1,1,0,0] },
+                  { pos: "4", initial: "J", name: "Jo",   color: "#F97316", dots: [1,1,0,0,0], faint: true },
+                ].map(({ pos, initial, name, color, dots, faint }) => (
+                  <div className="lb-row" key={name} style={faint ? { opacity: 0.55 } : undefined}>
+                    <span className="pos">{pos}</span>
+                    <span className="av" style={{ background: color }}>{initial}</span>
+                    <span className="name">{name}</span>
+                    <span className="score">{dots.map((on, i) => <i key={i} className={on ? "on" : undefined} />)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Step 4 */}
+            <div className="how-card">
+              <span className="step-num">4</span>
+              <h3>Everyone gets feedback</h3>
+              <p>Participants see personalised AI feedback instantly. You get a class-level summary so you know what to revisit before moving on.</p>
+              <div className="visual visual-dash">
+                <div className="dash-label"><BarChart3 style={{ width: 11, height: 11 }} /> Class summary</div>
+                {[
+                  { label: "Interests", pct: 75,  count: "9/12", orange: false },
+                  { label: "BATNA",     pct: 33,  count: "4/12", orange: true  },
+                  { label: "Criteria",  pct: 58,  count: "7/12", orange: false },
+                  { label: "Options",   pct: 42,  count: "5/12", orange: false },
+                ].map(({ label, pct, count, orange }) => (
+                  <div className="dash-row" key={label}>
+                    <span style={{ width: 60, fontSize: 11 }}>{label}</span>
+                    <span className="bar"><i style={{ width: `${pct}%`, background: orange ? "#F97316" : undefined }} /></span>
+                    <span className="dash-count">{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Pricing ─────────────────────────────────────────── */}
+      <section id="pricing" className="pricing-bg">
+        <div className="container-narrow">
+          <div className="section-head">
+            <span className="eyebrow"><Tag size={14} style={{ display: "inline" }} /> Simple, fair pricing</span>
+            <h2>Pricing for small budgets</h2>
+            <p className="sub">Made by teachers — priced like it.</p>
+          </div>
+
+          <div className="pricing-grid">
+            {/* Free */}
+            <div className="price-card no-offer">
+              <h3>Free</h3>
+              <div className="sub-tier">For occasional use</div>
+              <div className="price-row">
+                <span className="price">£0</span>
+                <span className="per">forever</span>
+              </div>
+              <ul>
+                {["Up to 2 activities", "Unlimited responses", "Personalised feedback for participants", "Basic class summary"].map(f => (
+                  <li key={f}><Check size={18} className="li-check" /><span>{f}</span></li>
+                ))}
+              </ul>
+              <button className="btn btn-outline" onClick={() => { track(EventName.PRICING_BUTTON_CLICK, { plan: "free", location: "pricing_section" }); window.location.href = "/auth?mode=register"; }}>
+                Get started
+              </button>
+            </div>
+
+            {/* Pro */}
+            <div className="price-card featured">
+              <span className="pop-badge">★ Most popular</span>
+              <h3>Pro</h3>
+              <div className="sub-tier">For active trainers</div>
+              <div className="price-row">
+                <span className="price">£8</span>
+                <span className="per">/ month</span>
+                <span className="strike">£15</span>
+              </div>
+              <div className="offer-line"><span className="badge">Limited time</span> save 47%</div>
+              <ul>
+                {["Unlimited activities", "Full class analytics", "Custom feedback criteria", "Voice + typed modes", "Priority support"].map(f => (
+                  <li key={f}><Check size={18} className="li-check" /><span>{f}</span></li>
+                ))}
+              </ul>
+              <button className="btn btn-primary" onClick={() => { track(EventName.PRICING_BUTTON_CLICK, { plan: "pro", location: "pricing_section" }); window.location.href = "/auth?mode=register"; }}>
+                Start free trial
+              </button>
+            </div>
+
+            {/* Enterprise */}
+            <div className="price-card no-offer">
+              <h3>Enterprise</h3>
+              <div className="sub-tier">For organisations</div>
+              <div className="price-row">
+                <span className="price">Custom</span>
+              </div>
+              <ul>
+                {["Everything in Pro", "Team-shared activities", "Dedicated support", "SSO & compliance", "Custom onboarding"].map(f => (
+                  <li key={f}><Check size={18} className="li-check" /><span>{f}</span></li>
+                ))}
+              </ul>
+              <button className="btn btn-outline" onClick={() => { track(EventName.PRICING_BUTTON_CLICK, { plan: "enterprise", location: "pricing_section" }); window.location.href = "mailto:womblefeedback@gmail.com"; }}>
+                Contact sales
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FAQ ─────────────────────────────────────────────── */}
+      <section className="faq-bg">
+        <div className="container">
+          <div className="faq-wrap">
+            <div className="faq-side">
+              <span className="eyebrow"><MessageCircleQuestion size={14} style={{ display: "inline" }} /> Questions, answered</span>
+              <h2 style={{ marginTop: 16 }}>Things trainers ask before they sign up</h2>
+              <p>Built by teachers who've stood at the front of the room. If your question isn't here, ask us — we answer every email personally.</p>
+              <a className="contact" href="mailto:womblefeedback@gmail.com">
+                <Mail size={14} /> womblefeedback@gmail.com
+              </a>
+            </div>
+
+            <div className="faq-list">
+              {[
+                {
+                  q: "Do my participants need to sign up or download anything?",
+                  a: "No. You share a link, they click it, they're in. Works on any phone or laptop, in the browser. No accounts, no installs, no friction. They can pick a name and go.",
+                  open: true,
+                },
+                {
+                  q: "How long does it take to build an activity?",
+                  a: "Most trainers have a first activity running in under 90 seconds. Type a sentence describing what you want and the AI drafts the role, the brief and the feedback criteria. You tweak whatever doesn't sound like you, then share the link.",
+                },
+                {
+                  q: "Is the feedback actually any good?",
+                  a: "It's grounded in the criteria you set. You can paste in your own marking rubric or edit what the AI suggests. Womble grades against that, not against a generic notion of 'good'. Most trainers iterate on the criteria once or twice in the first week and then trust it.",
+                },
+                {
+                  q: "What happens to my participants' data?",
+                  a: "Conversations are stored in your account so you can review them later. Participants see their own; you see your class. We don't train on your data, and we don't share it apart from data through the Open AI API but nothing identifiable apart from the name they choose to share. Full deletion on request.",
+                },
+                {
+                  q: "How well does voice mode actually work?",
+                  a: "Low-latency, natural. Honestly, the new Open AI Realtime API is excellent. Give it a go — it's free!",
+                },
+                {
+                  q: "Can I share activities with my team?",
+                  a: "Yes on Pro (one-way shareable links to your activity templates) and on Enterprise (a proper shared library with permissions and a brand layer). On Free you can run as many sessions as you like — just two activity templates at a time.",
+                },
+              ].map(({ q, a, open }) => (
+                <details key={q} className="faq-item" open={open}>
+                  <summary>
+                    {q}
+                    <span className="plus"><Plus size={16} /></span>
+                  </summary>
+                  <div className="answer">{a}</div>
+                </details>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA Banner ──────────────────────────────────────── */}
+      <section className="cta-banner">
+        <div className="container">
+          <h2>Ready to give every participant the feedback they deserve?</h2>
+          <p>Set up your first activity in under a minute. No credit card. No app for participants.</p>
+          <div className="ctas">
+            <button className="btn btn-on-green lg" onClick={() => goRegister("cta_banner")}>
+              Start for free <ArrowRight size={18} />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Footer ──────────────────────────────────────────── */}
+      <footer className="lp-footer">
+        <div className="container">
+          <div className="grid">
+            <div>
+              <div className="footer-logo">
+                <img src="/womble-icon.svg" alt="Womble" />
+                <span className="footer-wordmark">Womble</span>
+              </div>
+              <p className="tag">Timely, bespoke feedback. Built by teachers, for teachers.</p>
+            </div>
+            <div>
+              <h4>Product</h4>
+              <ul>
+                <li><a href="#activities">Features</a></li>
+                <li><a href="#how">How it works</a></li>
+                <li><a href="#pricing">Pricing</a></li>
               </ul>
             </div>
-
             <div>
-              <h3 className="text-lg font-semibold mb-4"></h3>
-              <ul className="space-y-2">
-
+              <h4>Activity types</h4>
+              <ul>
+                <li><a href="#activities">Chat with AI</a></li>
+                <li><a href="#activities">Two-way conversation</a></li>
+                <li><a href="#activities">Teach an AI</a></li>
+                <li><a href="#activities">Thought Partner</a></li>
               </ul>
             </div>
-
             <div>
-              <h3 className="text-lg font-semibold mb-4">Company</h3>
-              <ul className="space-y-2">
-                <li><a href="mailto:womblefeedback@gmail.com" className="text-gray-400 hover:text-white">Contact Us</a></li>
-
+              <h4>Company</h4>
+              <ul>
+                <li><a href="mailto:womblefeedback@gmail.com">Contact us</a></li>
               </ul>
             </div>
           </div>
-
-          <div className="mt-12 pt-8 border-t border-gray-800 text-center text-gray-400">
-            <p>Made with ❤️ by Uncle Bulgaria.</p>
-          </div>
+          <div className="bottom">Made with ❤️ by Uncle Bulgaria.</div>
         </div>
       </footer>
     </div>

@@ -89,6 +89,15 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
 
   const isTeachAi = config.type === 'teach-ai';
   const isThoughtPartner = config.type === 'thought-partner';
+  const showHarshness = config.type === 'chat' || config.type === 'two-way-conversation' || config.type === 'teach-ai';
+
+  const HARSHNESS_LEVELS = [
+    { value: 'encouraging', label: 'Encouraging' },
+    { value: 'developmental', label: 'Developmental' },
+    { value: 'standard', label: 'Standard' },
+    { value: 'high-performance', label: 'High Performance' },
+    { value: 'elite', label: 'Elite' },
+  ] as const;
   const knowledgeLevel = config.knowledgeLevel ?? 2;
   const attitude = config.attitude ?? 2;
   const coachingStyle = config.coachingStyle ?? 2;
@@ -173,7 +182,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
       </div>
 
       {/* Create with AI */}
-      <div className="space-y-2">
+      {!isEditMode && <div className="space-y-2">
         {!showAiPrompt ? (
           <Button
             type="button"
@@ -214,7 +223,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       <div className="space-y-4">
         <div className="space-y-2">
@@ -401,6 +410,35 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               : 'Add helpful instructions or context that will be shown to users.'}
           </p>
         </div>
+
+        {showHarshness && (
+          <div className="space-y-2">
+            <Label>Feedback Standard</Label>
+            <div className="flex gap-1 flex-wrap">
+              {HARSHNESS_LEVELS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => onConfigChange({ ...config, feedbackHarshness: value })}
+                  className={`px-3 py-1.5 text-xs rounded-full border font-medium transition-colors ${
+                    (config.feedbackHarshness ?? 'standard') === value
+                      ? 'bg-green-600 text-white border-green-600'
+                      : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {(config.feedbackHarshness ?? 'standard') === 'encouraging' && 'Generous scoring — 7–8 for solid effort, 9–10 for excellent work.'}
+              {(config.feedbackHarshness ?? 'standard') === 'developmental' && 'Supportive but honest — 6–7 for good effort, 8–9 for strong work.'}
+              {(config.feedbackHarshness ?? 'standard') === 'standard' && 'Balanced — 5–6 is average, 7–8 is good, 9–10 is excellent.'}
+              {(config.feedbackHarshness ?? 'standard') === 'high-performance' && 'High bar — 5–6 is competent, 7–8 is strong, 9–10 for exceptional work.'}
+              {(config.feedbackHarshness ?? 'standard') === 'elite' && 'Rigorous — a 5 is decent, 8–9 is excellent. Only truly outstanding responses score 9–10.'}
+            </p>
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="feedback-criteria">

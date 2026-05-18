@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, primaryKey, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 
@@ -16,13 +16,16 @@ export const sessions = pgTable("sessions", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
   shareToken: text("share_token").unique().notNull(),
+  title: text("title").notNull().default("New Session"),
+  isLibrary: boolean("is_library").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const chatConfigs = pgTable("chat_configs", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
-  type: text("type", { enum: ['chat', 'upload', 'quiz', 'two-way-conversation', 'teach-ai', 'thought-partner'] }).default('chat').notNull(),
+  type: text("type", { enum: ['chat', 'upload', 'quiz', 'two-way-conversation', 'teach-ai', 'thought-partner', 'quick-fire-quiz'] }).default('chat').notNull(),
   title: text("title").notNull(),
   systemPrompt: text("system_prompt").notNull(),
   userInstructions: text("user_instructions"),
@@ -40,6 +43,7 @@ export const chatConfigs = pgTable("chat_configs", {
   referenceContent: text("reference_content"),
   referenceImages: jsonb("reference_images").$type<string[]>(),
   interactionMode: text("interaction_mode", { enum: ['typed', 'spoken', 'both'] }).default('both'),
+  feedbackHarshness: text("feedback_harshness", { enum: ['encouraging', 'developmental', 'standard', 'high-performance', 'elite'] }).default('standard'),
   sessionId: integer("session_id").references(() => sessions.id),
   sessionOrder: integer("session_order"),
   isLive: boolean("is_live").default(false),
@@ -159,6 +163,9 @@ export const chatConfigsRelations = relations(chatConfigs, ({ one, many }) => ({
   quizQuestions: many(quizQuestions),
   quizResponses: many(quizResponses),
   dualConversations: many(dualConversations),
+  quickFireQuizQuestions: many(quickFireQuizQuestions),
+  quickFireQuizState: one(quickFireQuizState, { fields: [chatConfigs.id], references: [quickFireQuizState.configId] }),
+  quickFireQuizResponses: many(quickFireQuizResponses),
 }));
 
 export const quizQuestionsRelations = relations(quizQuestions, ({ one }) => ({
@@ -209,6 +216,54 @@ export const dualConversationsRelations = relations(dualConversations, ({ one })
   }),
 }));
 
+// ─── Quick Fire Quiz ──────────────────────────────────────────────────────────
+
+export const quickFireQuizQuestions = pgTable("quick_fire_quiz_questions", {
+  id: serial("id").primaryKey(),
+  configId: integer("config_id").notNull().references(() => chatConfigs.id),
+  question: text("question").notNull(),
+  options: jsonb("options").$type<string[]>().notNull(),
+  correctIndex: integer("correct_index").notNull(),
+  orderIndex: integer("order_index").notNull(),
+  timeLimit: integer("time_limit").notNull().default(30),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const quickFireQuizState = pgTable("quick_fire_quiz_state", {
+  configId: integer("config_id").primaryKey().references(() => chatConfigs.id),
+  phase: text("phase").notNull().default("waiting"),
+  currentQuestionIndex: integer("current_question_index").notNull().default(-1),
+  questionStartedAt: timestamp("question_started_at"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const quickFireQuizResponses = pgTable("quick_fire_quiz_responses", {
+  id: serial("id").primaryKey(),
+  configId: integer("config_id").notNull().references(() => chatConfigs.id),
+  questionId: integer("question_id").notNull().references(() => quickFireQuizQuestions.id),
+  participantId: text("participant_id").notNull(),
+  userName: text("user_name"),
+  selectedIndex: integer("selected_index").notNull(),
+  responseTimeMs: integer("response_time_ms").notNull(),
+  points: integer("points").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  uniq: unique().on(table.configId, table.questionId, table.participantId),
+}));
+
+export const quickFireQuizQuestionsRelations = relations(quickFireQuizQuestions, ({ one }) => ({
+  config: one(chatConfigs, { fields: [quickFireQuizQuestions.configId], references: [chatConfigs.id] }),
+}));
+
+export const quickFireQuizStateRelations = relations(quickFireQuizState, ({ one }) => ({
+  config: one(chatConfigs, { fields: [quickFireQuizState.configId], references: [chatConfigs.id] }),
+}));
+
+export const quickFireQuizResponsesRelations = relations(quickFireQuizResponses, ({ one }) => ({
+  config: one(chatConfigs, { fields: [quickFireQuizResponses.configId], references: [chatConfigs.id] }),
+  question: one(quickFireQuizQuestions, { fields: [quickFireQuizResponses.questionId], references: [quickFireQuizQuestions.id] }),
+}));
+
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
 export const insertChatConfigSchema = createInsertSchema(chatConfigs);
@@ -238,3 +293,9 @@ export type InsertUpload = typeof uploads.$inferInsert;
 export type SelectUpload = typeof uploads.$inferSelect;
 export type InsertQuizResponse = typeof quizResponses.$inferInsert;
 export type SelectQuizResponse = typeof quizResponses.$inferSelect;
+export type InsertQuickFireQuizQuestion = typeof quickFireQuizQuestions.$inferInsert;
+export type SelectQuickFireQuizQuestion = typeof quickFireQuizQuestions.$inferSelect;
+export type InsertQuickFireQuizState = typeof quickFireQuizState.$inferInsert;
+export type SelectQuickFireQuizState = typeof quickFireQuizState.$inferSelect;
+export type InsertQuickFireQuizResponse = typeof quickFireQuizResponses.$inferInsert;
+export type SelectQuickFireQuizResponse = typeof quickFireQuizResponses.$inferSelect;

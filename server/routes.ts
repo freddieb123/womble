@@ -2,15 +2,57 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db, pool } from "@db";
-import { chatConfigs, conversations, uploads, quizQuestions, quizResponses, dualConversations, sessions, type Message, type ConversationFeedback, type UploadFeedback, type DualConversationFeedback } from "@db/schema";
-import { eq, and, or, desc, count } from "drizzle-orm";
+import { chatConfigs, conversations, uploads, quizQuestions, quizResponses, dualConversations, sessions, quickFireQuizQuestions, quickFireQuizState, quickFireQuizResponses, type Message, type ConversationFeedback, type UploadFeedback, type DualConversationFeedback } from "@db/schema";
+import { eq, and, or, desc, count, isNull } from "drizzle-orm";
 import { saveAudio, handleSaveAudio, transcribeAudio, generateFeedback } from "./routes/dual-conversation";
 import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam } from 'openai/dist/resources/chat/completions';
 
-// Keep existing schema definitions...
+function harshnessGuidance(level: string | null | undefined): string {
+  switch (level) {
+    case 'encouraging':
+      return 'Use an encouraging, supportive tone. A score of 7–8 reflects solid effort and covers the main points; 9–10 for genuinely excellent work. Be generous — reward engagement and good intent even if some depth is missing.';
+    case 'developmental':
+      return 'Use a constructive, developmental tone. A score of 6–7 reflects good effort; 8–9 for strong performance that covers most criteria well; 9–10 only for outstanding work.';
+    case 'high-performance':
+      return 'Apply high-performance standards. A score of 5–6 reflects competent work that covers the basics; 7–8 for strong, well-reasoned responses; 9–10 only for exceptional depth and quality that clearly exceeds expectations.';
+    case 'elite':
+      return 'Apply elite, rigorous standards. A score of 4–5 is decent — it shows understanding but lacks depth. A 6–7 is good. An 8–9 is excellent and should only be awarded when the response covers all criteria with real insight and specificity. Only a truly outstanding, comprehensive response warrants a 9–10. Do not be generous — superficial coverage of points should score no higher than 5.';
+    default: // 'standard'
+      return 'Use a standard 1–10 scale. A score of 5–6 is average and meets most criteria adequately; 7–8 is good and covers criteria well; 9–10 is excellent and should be reserved for thorough, high-quality responses.';
+  }
+}
+
+// ── In-memory activity timers ─────────────────────────────────────────────────
+interface TimerState {
+  totalSeconds: number;
+  remainingAtLastAction: number;
+  startedAt: number | null; // Date.now() ms
+  status: 'idle' | 'running' | 'paused' | 'finished';
+}
+const activityTimers = new Map<number, TimerState>();
+
+function getTimerRemaining(t: TimerState): number {
+  if (t.status === 'running' && t.startedAt !== null) {
+    return Math.max(0, t.remainingAtLastAction - (Date.now() - t.startedAt) / 1000);
+  }
+  return t.remainingAtLastAction;
+}
+
+// In-memory participant tracking for quick-fire quiz waiting room
+const quizParticipants = new Map<number, Map<string, number>>(); // configId -> participantId -> lastSeen ms
+
+function getActiveParticipants(configId: number): number {
+  const now = Date.now();
+  const map = quizParticipants.get(configId);
+  if (!map) return 0;
+  for (const [pid, ts] of map) {
+    if (now - ts > 30_000) map.delete(pid);
+  }
+  return map.size;
+}
 
 const uploadFeedbackSchema = z.object({
   configId: z.number(),
@@ -28,11 +70,19 @@ const quizQuestionSchema = z.object({
 
 const chatConfigSchema = z.object({
   title: z.string().min(1, "Title is required"),
-  type: z.enum(['chat', 'upload', 'quiz', 'two-way-conversation', 'teach-ai', 'thought-partner']).default('chat'),
+  type: z.enum(['chat', 'upload', 'quiz', 'two-way-conversation', 'teach-ai', 'thought-partner', 'quick-fire-quiz']).default('chat'),
   systemPrompt: z.string().optional().default(''),
   userInstructions: z.string().nullable(),
   feedbackCriteria: z.string().nullable(),
+  feedbackHarshness: z.enum(['encouraging', 'developmental', 'standard', 'high-performance', 'elite']).optional().default('standard'),
   questions: z.array(quizQuestionSchema).optional(),
+  quickFireQuestions: z.array(z.object({
+    question: z.string().min(1),
+    options: z.array(z.string()).length(4),
+    correctIndex: z.number().int().min(0).max(3),
+    timeLimit: z.number().int().min(5).max(120).default(30),
+    orderIndex: z.number().int(),
+  })).optional(),
   participant1Role: z.string().nullable().optional(),
   participant2Role: z.string().nullable().optional(),
   knowledgeLevel: z.number().int().min(0).max(4).nullable().optional(),
@@ -147,6 +197,82 @@ export function registerRoutes(app: Express): Server {
   pool.query(`ALTER TABLE chat_configs ADD COLUMN IF NOT EXISTS session_id INTEGER REFERENCES sessions(id)`).catch(() => {});
   pool.query(`ALTER TABLE chat_configs ADD COLUMN IF NOT EXISTS session_order INTEGER`).catch(() => {});
   pool.query(`ALTER TABLE chat_configs ADD COLUMN IF NOT EXISTS is_live BOOLEAN DEFAULT false`).catch(() => {});
+  pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS title TEXT NOT NULL DEFAULT 'New Session'`).catch(() => {});
+  pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW()`).catch(() => {});
+  pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS is_library BOOLEAN NOT NULL DEFAULT false`).catch(() => {});
+
+  pool.query(`CREATE TABLE IF NOT EXISTS quick_fire_quiz_questions (
+    id SERIAL PRIMARY KEY,
+    config_id INTEGER NOT NULL REFERENCES chat_configs(id),
+    question TEXT NOT NULL,
+    options JSONB NOT NULL,
+    correct_index INTEGER NOT NULL,
+    order_index INTEGER NOT NULL,
+    time_limit INTEGER NOT NULL DEFAULT 30,
+    created_at TIMESTAMP DEFAULT NOW()
+  )`).catch(() => {});
+
+  pool.query(`CREATE TABLE IF NOT EXISTS quick_fire_quiz_state (
+    config_id INTEGER PRIMARY KEY REFERENCES chat_configs(id),
+    phase TEXT NOT NULL DEFAULT 'waiting',
+    current_question_index INTEGER NOT NULL DEFAULT -1,
+    question_started_at TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT NOW()
+  )`).catch(() => {});
+
+  pool.query(`CREATE TABLE IF NOT EXISTS quick_fire_quiz_responses (
+    id SERIAL PRIMARY KEY,
+    config_id INTEGER NOT NULL REFERENCES chat_configs(id),
+    question_id INTEGER NOT NULL REFERENCES quick_fire_quiz_questions(id),
+    participant_id TEXT NOT NULL,
+    user_name TEXT,
+    selected_index INTEGER NOT NULL,
+    response_time_ms INTEGER NOT NULL,
+    points INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE (config_id, question_id, participant_id)
+  )`).catch(() => {});
+
+  // Backfill: mark any existing "My Agents" sessions as library (runs after DDL has settled)
+  setTimeout(() => {
+    pool.query(`UPDATE sessions SET is_library = true WHERE title = 'My Agents' AND is_library = false`).catch(() => {});
+  }, 1000);
+
+  // Migrate orphaned agents (no sessionId) into a per-user "My Agents" session
+  setTimeout(async () => {
+    try {
+
+      const orphaned = await db.query.chatConfigs.findMany({
+        where: and(isNull(chatConfigs.sessionId), eq(chatConfigs.deleted, false)),
+      });
+      if (orphaned.length === 0) return;
+
+      const byUser: Record<number, typeof orphaned> = {};
+      for (const cfg of orphaned) {
+        if (!byUser[cfg.userId]) byUser[cfg.userId] = [];
+        byUser[cfg.userId].push(cfg);
+      }
+
+      for (const [userIdStr, cfgs] of Object.entries(byUser)) {
+        const userId = parseInt(userIdStr);
+        const [session] = await db.insert(sessions).values({
+          userId,
+          shareToken: crypto.randomUUID(),
+          title: 'My Agents',
+          isLibrary: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }).returning();
+        for (let i = 0; i < cfgs.length; i++) {
+          await db.update(chatConfigs)
+            .set({ sessionId: session.id, sessionOrder: i, isLive: i === 0 })
+            .where(eq(chatConfigs.id, cfgs[i].id));
+        }
+      }
+    } catch (e) {
+      console.error('Orphan migration error:', e);
+    }
+  }, 2000);;
 
   // Set up authentication routes and middleware
   setupAuth(app);
@@ -251,7 +377,10 @@ export function registerRoutes(app: Express): Server {
           quizQuestions: {
             where: eq(quizQuestions.deleted, false),
             orderBy: [quizQuestions.orderIndex],
-          }
+          },
+          quickFireQuizQuestions: {
+            orderBy: [quickFireQuizQuestions.orderIndex],
+          },
         }
       });
 
@@ -266,7 +395,9 @@ export function registerRoutes(app: Express): Server {
           question: q.question,
           expectedAnswer: q.expectedAnswer
         })) : [],
-        quizQuestions: undefined
+        quickFireQuestions: config.type === 'quick-fire-quiz' ? config.quickFireQuizQuestions : undefined,
+        quizQuestions: undefined,
+        quickFireQuizQuestions: undefined,
       };
 
       res.json(responseConfig);
@@ -278,7 +409,8 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/chat-configs", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { title, type, systemPrompt, userInstructions, feedbackCriteria, questions, participant1Role, participant2Role, knowledgeLevel, attitude, coachingStyle, referenceContent, referenceImages, interactionMode } = chatConfigSchema.parse(req.body);
+      const { title, type, systemPrompt, userInstructions, feedbackCriteria, feedbackHarshness, questions, quickFireQuestions, participant1Role, participant2Role, knowledgeLevel, attitude, coachingStyle, referenceContent, referenceImages, interactionMode } = chatConfigSchema.parse(req.body);
+      const sessionId: number | null = req.body.sessionId ?? null;
 
       // Get the user ID from the authenticated request
       const userId = req.user?.id;
@@ -291,7 +423,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Quiz type requires at least one question" });
       }
 
-      const autoGeneratedTypes = ['teach-ai', 'thought-partner'];
+      const autoGeneratedTypes = ['teach-ai', 'thought-partner', 'quick-fire-quiz'];
       if (!autoGeneratedTypes.includes(type) && !systemPrompt?.trim()) {
         return res.status(400).json({ error: "System prompt is required" });
       }
@@ -302,24 +434,17 @@ export function registerRoutes(app: Express): Server {
         ? buildThoughtPartnerSystemPrompt(userInstructions, referenceContent ?? null, coachingStyle ?? 2)
         : systemPrompt!;
 
-      // Auto-create session for this user if one doesn't exist
-      let userSession = await db.query.sessions.findFirst({
-        where: eq(sessions.userId, userId as number),
-        orderBy: [desc(sessions.createdAt)],
-      });
-      if (!userSession) {
-        const [newSession] = await db.insert(sessions).values({
-          userId: userId as number,
-          shareToken: crypto.randomUUID(),
-          createdAt: new Date(),
-        }).returning();
-        userSession = newSession;
+      // Assign to session if provided
+      let assignedSessionOrder: number | null = null;
+      let assignedIsLive = false;
+      if (sessionId) {
+        const existing = await db.query.chatConfigs.findMany({
+          where: and(eq(chatConfigs.sessionId, sessionId), eq(chatConfigs.deleted, false)),
+        });
+        assignedSessionOrder = existing.length;
+        assignedIsLive = existing.length === 0;
+        await db.update(sessions).set({ updatedAt: new Date() }).where(eq(sessions.id, sessionId));
       }
-      const existingSessionConfigs = await db.query.chatConfigs.findMany({
-        where: and(eq(chatConfigs.sessionId, userSession.id), eq(chatConfigs.deleted, false)),
-      });
-      const sessionConfigCount = existingSessionConfigs.length;
-      const isFirstInSession = sessionConfigCount === 0;
 
       const newConfig = await db.insert(chatConfigs).values({
         title,
@@ -335,12 +460,13 @@ export function registerRoutes(app: Express): Server {
         referenceContent: referenceContent ?? null,
         referenceImages: referenceImages ?? null,
         interactionMode: interactionMode ?? 'both',
+        feedbackHarshness: feedbackHarshness ?? 'standard',
         userId,
         deleted: false,
         createdAt: new Date(),
-        sessionId: userSession.id,
-        sessionOrder: sessionConfigCount,
-        isLive: isFirstInSession,
+        sessionId: sessionId ?? null,
+        sessionOrder: assignedSessionOrder,
+        isLive: assignedIsLive,
       }).returning();
 
       // If this is a quiz type and questions were provided, save them
@@ -355,6 +481,20 @@ export function registerRoutes(app: Express): Server {
         }));
 
         await db.insert(quizQuestions).values(questionsToInsert);
+      }
+
+      if (type === 'quick-fire-quiz' && quickFireQuestions && quickFireQuestions.length > 0) {
+        await db.insert(quickFireQuizQuestions).values(
+          quickFireQuestions.map((q, i) => ({
+            configId: newConfig[0].id,
+            question: q.question,
+            options: q.options,
+            correctIndex: q.correctIndex,
+            orderIndex: i,
+            timeLimit: q.timeLimit ?? 30,
+          }))
+        );
+        await db.insert(quickFireQuizState).values({ configId: newConfig[0].id }).onConflictDoNothing();
       }
 
       res.json(newConfig[0]);
@@ -389,9 +529,9 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ error: "You don't have permission to modify this configuration" });
       }
 
-      const { title, type, systemPrompt, userInstructions, feedbackCriteria, questions, participant1Role, participant2Role, knowledgeLevel, attitude, coachingStyle, referenceContent, referenceImages, interactionMode } = chatConfigSchema.parse(req.body);
+      const { title, type, systemPrompt, userInstructions, feedbackCriteria, feedbackHarshness, questions, quickFireQuestions, participant1Role, participant2Role, knowledgeLevel, attitude, coachingStyle, referenceContent, referenceImages, interactionMode } = chatConfigSchema.parse(req.body);
 
-      const autoGeneratedTypes = ['teach-ai', 'thought-partner'];
+      const autoGeneratedTypes = ['teach-ai', 'thought-partner', 'quick-fire-quiz'];
       if (!autoGeneratedTypes.includes(type) && !systemPrompt?.trim()) {
         return res.status(400).json({ error: "System prompt is required" });
       }
@@ -417,6 +557,7 @@ export function registerRoutes(app: Express): Server {
           referenceContent: referenceContent ?? null,
           referenceImages: referenceImages ?? null,
           interactionMode: interactionMode ?? 'both',
+          feedbackHarshness: feedbackHarshness ?? 'standard',
         })
         .where(and(
           eq(chatConfigs.id, configId),
@@ -425,23 +566,33 @@ export function registerRoutes(app: Express): Server {
         .returning();
 
       if (type === 'quiz') {
-        // Delete existing quiz questions for this config
         await db.delete(quizQuestions).where(eq(quizQuestions.configId, configId));
-
-        // Insert the updated list of quiz questions
         if (questions && questions.length > 0) {
-          const questionsToInsert = questions.map((q, index) => ({
+          await db.insert(quizQuestions).values(questions.map((q, index) => ({
             configId,
             question: q.question,
             expectedAnswer: q.expectedAnswer,
             orderIndex: index,
             createdAt: new Date(),
             deleted: false
-          }));
-          await db.insert(quizQuestions).values(questionsToInsert);
+          })));
         }
       }
 
+      if (type === 'quick-fire-quiz') {
+        await db.delete(quickFireQuizQuestions).where(eq(quickFireQuizQuestions.configId, configId));
+        if (quickFireQuestions && quickFireQuestions.length > 0) {
+          await db.insert(quickFireQuizQuestions).values(quickFireQuestions.map((q, i) => ({
+            configId,
+            question: q.question,
+            options: q.options,
+            correctIndex: q.correctIndex,
+            orderIndex: i,
+            timeLimit: q.timeLimit ?? 30,
+          })));
+        }
+        await db.insert(quickFireQuizState).values({ configId }).onConflictDoNothing();
+      }
 
       if (!updatedConfig.length) {
         return res.status(404).json({ error: "Configuration not found" });
@@ -467,8 +618,18 @@ export function registerRoutes(app: Express): Server {
       };
       const typeLabel = typeDescriptions[type] || 'a conversation with an AI assistant';
 
+      const systemPromptInstruction = (type === 'teach-ai' || type === 'thought-partner')
+        ? `"systemPrompt": Leave this as an empty string ("") — it is auto-generated for this activity type.`
+        : `"systemPrompt": A detailed, well-structured AI system prompt. Format it clearly using:
+- A clear opening statement of the AI's role and persona
+- Numbered or bulleted sections for key behaviours and rules
+- Line breaks between sections
+- Plain English, no jargon
+${type === 'two-way-conversation' ? 'This prompt guides a feedback AI that analyses the conversation after it happens — write it accordingly.' : 'Write this as instructions directly to the AI, starting with "You are..."'}
+IMPORTANT: This field must not be empty for this activity type.`;
+
       const completion = await openai.chat.completions.create({
-        model: "gpt-5.4-mini",
+        model: "gpt-4o",
         messages: [
           {
             role: "system",
@@ -478,14 +639,7 @@ Return a JSON object with exactly these four fields:
 
 "title": A short, punchy title (4–7 words max).
 
-"systemPrompt": A detailed, well-structured AI system prompt. Format it clearly using:
-- A clear opening statement of the AI's role
-- Numbered or bulleted sections for key behaviours and rules
-- Line breaks between sections
-- Plain English, no jargon
-For two-way-conversation type, this prompt guides a feedback AI that analyses the conversation after it happens — write it accordingly.
-For teach-ai type, leave this blank ("") — it is auto-generated.
-For thought-partner type, leave this blank ("") — it is auto-generated.
+${systemPromptInstruction}
 
 "userInstructions": Instructions shown to the learner before they start. Format using:
 - A short intro sentence
@@ -507,14 +661,15 @@ Return only valid JSON — no markdown fences, no extra keys.`
       if (!content) throw new Error("Empty response from OpenAI");
       const raw = JSON.parse(content);
       console.log("generate-with-ai raw response:", JSON.stringify(raw, null, 2));
-      const toString = (v: any): string | null =>
-        v == null ? null : typeof v === 'object' ? JSON.stringify(v) : String(v);
-      // Normalise field names (model sometimes returns snake_case) and flatten any nested objects
+      const toString = (v: any): string =>
+        v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+      // Normalise field names — model may return camelCase, snake_case, or PascalCase variants
+      const pick = (...keys: string[]) => keys.reduce((acc, k) => acc ?? raw[k], undefined as any);
       res.json({
-        title: toString(raw.title),
-        systemPrompt: toString(raw.systemPrompt ?? raw.system_prompt),
-        userInstructions: toString(raw.userInstructions ?? raw.user_instructions),
-        feedbackCriteria: toString(raw.feedbackCriteria ?? raw.feedback_criteria),
+        title: toString(pick('title', 'Title')),
+        systemPrompt: toString(pick('systemPrompt', 'system_prompt', 'SystemPrompt', 'system_Prompt')),
+        userInstructions: toString(pick('userInstructions', 'user_instructions', 'UserInstructions')),
+        feedbackCriteria: toString(pick('feedbackCriteria', 'feedback_criteria', 'FeedbackCriteria')),
       });
     } catch (error: any) {
       console.error("Error generating config with AI:", error);
@@ -1214,6 +1369,329 @@ Return only the JSON object, no other text.`;
     }
   });
 
+  // ─── Quick Fire Quiz Endpoints ────────────────────────────────────────────
+
+  app.post("/api/quick-fire-quiz/:configId/join", async (req: Request, res: Response) => {
+    const configId = parseInt(req.params.configId);
+    if (isNaN(configId)) return res.status(400).json({ error: "Invalid configId" });
+    const { participantId } = req.body;
+    if (!participantId) return res.status(400).json({ error: "Missing participantId" });
+    if (!quizParticipants.has(configId)) quizParticipants.set(configId, new Map());
+    quizParticipants.get(configId)!.set(participantId, Date.now());
+    res.json({ ok: true });
+  });
+
+  app.get("/api/quick-fire-quiz/:configId/state", async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.configId);
+      if (isNaN(configId)) return res.status(400).json({ error: "Invalid configId" });
+
+      let stateRows = await db.query.quickFireQuizState.findFirst({
+        where: eq(quickFireQuizState.configId, configId),
+      });
+
+      if (!stateRows) {
+        const inserted = await db.insert(quickFireQuizState)
+          .values({ configId, phase: 'waiting', currentQuestionIndex: -1 })
+          .returning();
+        stateRows = inserted[0];
+      }
+
+      let state = stateRows;
+
+      // Fetch all questions for totalQuestions count
+      const allQuestions = await db.query.quickFireQuizQuestions.findMany({
+        where: eq(quickFireQuizQuestions.configId, configId),
+        orderBy: [quickFireQuizQuestions.orderIndex],
+      });
+
+      // Auto-transition question → results when timer expires
+      if (state.phase === 'question' && state.questionStartedAt && state.currentQuestionIndex >= 0) {
+        const currentQ = allQuestions[state.currentQuestionIndex];
+        if (currentQ) {
+          const elapsed = Date.now() - new Date(state.questionStartedAt).getTime();
+          if (elapsed >= currentQ.timeLimit * 1000) {
+            await db.update(quickFireQuizState)
+              .set({ phase: 'results', updatedAt: new Date() })
+              .where(eq(quickFireQuizState.configId, configId));
+            state = { ...state, phase: 'results' };
+          }
+        }
+      }
+
+      let currentQuestion = null;
+      let answeredCount = 0;
+      if (state.currentQuestionIndex >= 0) {
+        const q = allQuestions[state.currentQuestionIndex];
+        if (q) {
+          currentQuestion = {
+            id: q.id,
+            question: q.question,
+            options: q.options,
+            timeLimit: q.timeLimit,
+            orderIndex: q.orderIndex,
+            ...(state.phase !== 'question' ? { correctIndex: q.correctIndex } : {}),
+          };
+          const countResult = await db.select({ value: count() })
+            .from(quickFireQuizResponses)
+            .where(and(
+              eq(quickFireQuizResponses.configId, configId),
+              eq(quickFireQuizResponses.questionId, q.id),
+            ));
+          answeredCount = countResult[0]?.value ?? 0;
+        }
+      }
+
+      res.json({
+        phase: state.phase,
+        currentQuestionIndex: state.currentQuestionIndex,
+        questionStartedAt: state.questionStartedAt,
+        totalQuestions: allQuestions.length,
+        participantCount: getActiveParticipants(configId),
+        answeredCount,
+        currentQuestion,
+        ...(state.phase === 'finished' ? {
+          allQuestions: allQuestions.map(q => ({
+            id: q.id,
+            question: q.question,
+            options: q.options,
+            correctIndex: q.correctIndex,
+            orderIndex: q.orderIndex,
+          })),
+        } : {}),
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/quick-fire-quiz/:configId/answer", async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.configId);
+      const { questionId, participantId, userName, selectedIndex, responseTimeMs } = req.body;
+
+      if (!questionId || !participantId || selectedIndex === undefined || responseTimeMs === undefined) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const question = await db.query.quickFireQuizQuestions.findFirst({
+        where: eq(quickFireQuizQuestions.id, questionId),
+      });
+      if (!question) return res.status(404).json({ error: "Question not found" });
+
+      const isCorrect = selectedIndex === question.correctIndex;
+      const timeLimitMs = question.timeLimit * 1000;
+      const points = isCorrect
+        ? Math.max(50, Math.round(1000 * (1 - Math.min(responseTimeMs, timeLimitMs) / timeLimitMs)))
+        : 0;
+
+      await db.insert(quickFireQuizResponses).values({
+        configId,
+        questionId,
+        participantId,
+        userName: userName || null,
+        selectedIndex,
+        responseTimeMs,
+        points,
+      }).onConflictDoNothing();
+
+      res.json({ points, correct: isCorrect });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/quick-fire-quiz/:configId/leaderboard", async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.configId);
+      const participantId = req.query.participantId as string | undefined;
+
+      if (isNaN(configId)) return res.status(400).json({ error: "Invalid configId" });
+
+      const result = await pool.query<{ participant_id: string; user_name: string | null; total_points: string }>(
+        `SELECT participant_id, user_name, SUM(points) AS total_points
+         FROM quick_fire_quiz_responses
+         WHERE config_id = $1
+         GROUP BY participant_id, user_name
+         ORDER BY total_points DESC`,
+        [configId]
+      );
+
+      const entries = result.rows.map((row, index) => ({
+        participantId: row.participant_id,
+        userName: row.user_name || 'Anonymous',
+        totalPoints: parseInt(row.total_points),
+        rank: index + 1,
+        isCurrentUser: !!(participantId && row.participant_id === participantId),
+      }));
+
+      const currentUserRank = participantId
+        ? entries.find(e => e.isCurrentUser)?.rank
+        : undefined;
+
+      res.json({ entries, currentUserRank });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/quick-fire-quiz/:configId/start", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.configId);
+      if (isNaN(configId)) return res.status(400).json({ error: "Invalid configId" });
+
+      await db.insert(quickFireQuizState)
+        .values({ configId, phase: 'question', currentQuestionIndex: 0, questionStartedAt: new Date(), updatedAt: new Date() })
+        .onConflictDoUpdate({
+          target: [quickFireQuizState.configId],
+          set: { phase: 'question', currentQuestionIndex: 0, questionStartedAt: new Date(), updatedAt: new Date() },
+        });
+
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/quick-fire-quiz/:configId/next", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.configId);
+      if (isNaN(configId)) return res.status(400).json({ error: "Invalid configId" });
+
+      const state = await db.query.quickFireQuizState.findFirst({
+        where: eq(quickFireQuizState.configId, configId),
+      });
+      if (!state) return res.status(404).json({ error: "State not found" });
+
+      if (state.phase === 'question') {
+        await db.update(quickFireQuizState)
+          .set({ phase: 'results', updatedAt: new Date() })
+          .where(eq(quickFireQuizState.configId, configId));
+        return res.json({ phase: 'results', currentQuestionIndex: state.currentQuestionIndex });
+      }
+
+      if (state.phase === 'results') {
+        const totalQuestions = await db.query.quickFireQuizQuestions.findMany({
+          where: eq(quickFireQuizQuestions.configId, configId),
+        });
+        const nextIndex = state.currentQuestionIndex + 1;
+        if (nextIndex >= totalQuestions.length) {
+          await db.update(quickFireQuizState)
+            .set({ phase: 'finished', updatedAt: new Date() })
+            .where(eq(quickFireQuizState.configId, configId));
+          return res.json({ phase: 'finished' });
+        }
+        await db.update(quickFireQuizState)
+          .set({ phase: 'question', currentQuestionIndex: nextIndex, questionStartedAt: new Date(), updatedAt: new Date() })
+          .where(eq(quickFireQuizState.configId, configId));
+        return res.json({ phase: 'question', currentQuestionIndex: nextIndex });
+      }
+
+      res.json({ phase: state.phase });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/quick-fire-quiz/:configId/reset", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.configId);
+      if (isNaN(configId)) return res.status(400).json({ error: "Invalid configId" });
+
+      await db.update(quickFireQuizState)
+        .set({ phase: 'waiting', currentQuestionIndex: -1, questionStartedAt: null, updatedAt: new Date() })
+        .where(eq(quickFireQuizState.configId, configId));
+      await db.delete(quickFireQuizResponses).where(eq(quickFireQuizResponses.configId, configId));
+      quizParticipants.delete(configId);
+
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ── Activity timers ───────────────────────────────────────────────────────
+
+  app.get("/api/timer/:configId", async (req: Request, res: Response) => {
+    const configId = parseInt(req.params.configId);
+    if (isNaN(configId)) return res.status(400).json({ error: "Invalid configId" });
+    const t = activityTimers.get(configId);
+    if (!t) return res.json({ status: 'idle', totalSeconds: 0, remainingSeconds: 0 });
+    const remaining = getTimerRemaining(t);
+    // Auto-finish if running and reached 0
+    if (t.status === 'running' && remaining <= 0) {
+      activityTimers.set(configId, { ...t, status: 'finished', remainingAtLastAction: 0, startedAt: null });
+    }
+    res.json({ status: remaining <= 0 && t.status === 'running' ? 'finished' : t.status, totalSeconds: t.totalSeconds, remainingSeconds: Math.round(remaining * 10) / 10 });
+  });
+
+  app.post("/api/timer/:configId", requireAuth, async (req: Request, res: Response) => {
+    const configId = parseInt(req.params.configId);
+    if (isNaN(configId)) return res.status(400).json({ error: "Invalid configId" });
+    const { action, seconds } = req.body as { action: string; seconds?: number };
+    let t = activityTimers.get(configId) ?? { totalSeconds: 0, remainingAtLastAction: 0, startedAt: null, status: 'idle' as const };
+
+    if (action === 'set') {
+      const secs = Math.max(0, seconds ?? 0);
+      t = { totalSeconds: secs, remainingAtLastAction: secs, startedAt: null, status: 'idle' };
+    } else if (action === 'add') {
+      const add = seconds ?? 60;
+      const current = getTimerRemaining(t);
+      const newRemaining = current + add;
+      const newTotal = t.totalSeconds + add;
+      t = { ...t, totalSeconds: newTotal, remainingAtLastAction: newRemaining, startedAt: t.status === 'running' ? Date.now() : t.startedAt };
+      if (t.status === 'running') t = { ...t, remainingAtLastAction: newRemaining, startedAt: Date.now() };
+    } else if (action === 'start') {
+      t = { ...t, startedAt: Date.now(), status: 'running' };
+    } else if (action === 'pause') {
+      const remaining = getTimerRemaining(t);
+      t = { ...t, remainingAtLastAction: remaining, startedAt: null, status: 'paused' };
+    } else if (action === 'resume') {
+      t = { ...t, startedAt: Date.now(), status: 'running' };
+    } else if (action === 'stop') {
+      t = { totalSeconds: t.totalSeconds, remainingAtLastAction: t.totalSeconds, startedAt: null, status: 'idle' };
+    } else if (action === 'reset') {
+      activityTimers.delete(configId);
+      return res.json({ status: 'idle', totalSeconds: 0, remainingSeconds: 0 });
+    }
+
+    activityTimers.set(configId, t);
+    const remaining = getTimerRemaining(t);
+    res.json({ status: t.status, totalSeconds: t.totalSeconds, remainingSeconds: Math.round(remaining * 10) / 10 });
+  });
+
+  app.post("/api/configs/generate-quick-fire-options", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { question } = req.body;
+      if (!question?.trim()) return res.status(400).json({ error: "Question required" });
+
+      const openai = new OpenAI();
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You generate multiple choice options for quiz questions. Return a JSON object with:
+- "correct": the single correct answer (concise, 2-8 words)
+- "distractors": an array of exactly 3 plausible but wrong answers (same style and length as the correct answer)
+
+Rules: all four options must be similar in length and style. Distractors should be genuinely plausible on first read. Return only valid JSON, no markdown.`
+          },
+          { role: "user", content: `Question: ${question}` }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.8,
+      });
+
+      const raw = JSON.parse(completion.choices[0].message.content!);
+      res.json({ correct: raw.correct, distractors: raw.distractors });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   app.post("/api/chat-feedback", async (req: Request, res: Response) => {
     try {
       const { configId, sessionId, messages, userName, chatMode } = req.body;
@@ -1254,9 +1732,11 @@ Format your response EXACTLY like this (one bullet per key point):
 • [Key Point Name]: 🟡 Partially covered — You touched on X but missed Y
 • [Key Point Name]: 🟢 Well covered — You clearly explained Z with a strong example
 
+Scoring standard: ${harshnessGuidance(config.feedbackHarshness)}
+
 Score: [1-10 based on overall coverage and quality of explanation]
 [One-line overall summary using 'you']`
-        : `Context:\n${config.systemPrompt}\n\nAnalyze the conversation based on these criteria:\n${config.feedbackCriteria}\n\nIMPORTANT: Your analysis must focus solely on the user's contributions—DO NOT reference or evaluate any of the GPT responses (you can identify the user as the first person to contribute to the conversation, and the gpt as the second - and then they alternate of course). When giving feedback, you MUST address the person being evaluated directly as 'you' in ALL feedback points. NEVER use phrases like 'the user' or 'they' – always speak directly (e.g. "You demonstrated strong understanding" instead of "The user demonstrated strong understanding"). You should also refer to yourself as 'me' or 'I' as the GPT. For example you might say 'You did an excellent job probing for specific details about my experiences with meal planning, particularly by asking follow-up questions that encouraged me to share more about my routines and preferences.'\n\nPlease provide your analysis in exactly this format, evaluating ONLY the user's side of the conversation:\n\n• [3 bullet points focusing on how well your contributions meet the criteria. Each bullet must use 'you' and be 1 sentence]\n\nScore: [1-10]\n[Brief one-line summary of overall quality using 'you']`;
+        : `Context:\n${config.systemPrompt}\n\nAnalyze the conversation based on these criteria:\n${config.feedbackCriteria}\n\nIMPORTANT: Your analysis must focus solely on the user's contributions—DO NOT reference or evaluate any of the GPT responses (you can identify the user as the first person to contribute to the conversation, and the gpt as the second - and then they alternate of course). When giving feedback, you MUST address the person being evaluated directly as 'you' in ALL feedback points. NEVER use phrases like 'the user' or 'they' – always speak directly (e.g. "You demonstrated strong understanding" instead of "The user demonstrated strong understanding"). You should also refer to yourself as 'me' or 'I' as the GPT. For example you might say 'You did an excellent job probing for specific details about my experiences with meal planning, particularly by asking follow-up questions that encouraged me to share more about my routines and preferences.'\n\nScoring standard: ${harshnessGuidance(config.feedbackHarshness)}\n\nPlease provide your analysis in exactly this format, evaluating ONLY the user's side of the conversation:\n\n• [3 bullet points focusing on how well your contributions meet the criteria. Each bullet must use 'you' and be 1 sentence]\n\nScore: [1-10]\n[Brief one-line summary of overall quality using 'you']`;
 
 
       const conversation = messages.map((m: Message) =>
@@ -1826,7 +2306,7 @@ Score: [1-10 based on overall coverage and quality of explanation]
         c => c.messages && c.messages.length >= 2 && (!c.feedback || c.feedback.score === null)
       );
 
-      const prompt = `Context:\n${config.systemPrompt}\n\nAnalyze the conversation based on these criteria:\n${config.feedbackCriteria}\n\nIMPORTANT: Focus only on the user's contributions. Address them directly as 'you'. Never say 'the user' or 'they'.\n\nFormat:\n• [3 bullet points]\n\nScore: [1-10]\n[One-line summary]`;
+      const prompt = `Context:\n${config.systemPrompt}\n\nAnalyze the conversation based on these criteria:\n${config.feedbackCriteria}\n\nIMPORTANT: Focus only on the user's contributions. Address them directly as 'you'. Never say 'the user' or 'they'.\n\nScoring standard: ${harshnessGuidance(config.feedbackHarshness)}\n\nFormat:\n• [3 bullet points]\n\nScore: [1-10]\n[One-line summary]`;
 
       await Promise.all(ungraded.map(async (conv) => {
         try {
@@ -1884,18 +2364,17 @@ Score: [1-10 based on overall coverage and quality of explanation]
 
   // ── Session endpoints ────────────────────────────────────────────────────
 
-  // GET current session with ordered configs
-  app.get("/api/sessions/current", requireAuth, async (req: Request, res: Response) => {
+  // GET session by id with ordered configs
+  app.get("/api/sessions/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.user?.id;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const sessionId = parseInt(req.params.id);
+      if (!userId || isNaN(sessionId)) return res.status(400).json({ error: "Bad request" });
 
       const session = await db.query.sessions.findFirst({
-        where: eq(sessions.userId, userId as number),
-        orderBy: [desc(sessions.createdAt)],
+        where: and(eq(sessions.id, sessionId), eq(sessions.userId, userId as number)),
       });
-
-      if (!session) return res.json(null);
+      if (!session) return res.status(404).json({ error: "Session not found" });
 
       const configs = await db.query.chatConfigs.findMany({
         where: and(eq(chatConfigs.sessionId, session.id), eq(chatConfigs.deleted, false)),
@@ -1908,24 +2387,186 @@ Score: [1-10 based on overall coverage and quality of explanation]
     }
   });
 
-  // PATCH reorder configs within session
-  app.patch("/api/sessions/current/order", requireAuth, async (req: Request, res: Response) => {
+  // PATCH rename session
+  app.patch("/api/sessions/:id/title", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.user?.id;
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const sessionId = parseInt(req.params.id);
+      const { title } = req.body as { title: string };
+      if (!userId || isNaN(sessionId) || !title?.trim()) return res.status(400).json({ error: "Bad request" });
+
+      await db.update(sessions)
+        .set({ title: title.trim(), updatedAt: new Date() })
+        .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId as number)));
+
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // DELETE session and remove configs from it
+  app.delete("/api/sessions/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const sessionId = parseInt(req.params.id);
+      if (!userId || isNaN(sessionId)) return res.status(400).json({ error: "Bad request" });
+
+      // Detach configs from this session
+      await db.update(chatConfigs)
+        .set({ sessionId: null, sessionOrder: null, isLive: false })
+        .where(and(eq(chatConfigs.sessionId, sessionId), eq(chatConfigs.userId, userId as number)));
+
+      await db.delete(sessions)
+        .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId as number)));
+
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST duplicate a session
+  app.post("/api/sessions/:id/duplicate", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const sessionId = parseInt(req.params.id);
+      if (!userId || isNaN(sessionId)) return res.status(400).json({ error: "Bad request" });
+
+      const original = await db.query.sessions.findFirst({
+        where: and(eq(sessions.id, sessionId), eq(sessions.userId, userId as number)),
+      });
+      if (!original) return res.status(404).json({ error: "Session not found" });
+
+      // Create duplicate session
+      const [newSession] = await db.insert(sessions).values({
+        userId: userId as number,
+        shareToken: crypto.randomUUID(),
+        title: `${original.title} copy`,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }).returning();
+
+      // Copy configs
+      const originalConfigs = await db.query.chatConfigs.findMany({
+        where: and(eq(chatConfigs.sessionId, sessionId), eq(chatConfigs.deleted, false)),
+        orderBy: [chatConfigs.sessionOrder],
+      });
+
+      for (const cfg of originalConfigs) {
+        const [newCfg] = await db.insert(chatConfigs).values({
+          userId: userId as number,
+          type: cfg.type,
+          title: cfg.title,
+          systemPrompt: cfg.systemPrompt,
+          userInstructions: cfg.userInstructions,
+          feedbackCriteria: cfg.feedbackCriteria,
+          participant1Role: cfg.participant1Role,
+          participant2Role: cfg.participant2Role,
+          knowledgeLevel: cfg.knowledgeLevel,
+          attitude: cfg.attitude,
+          coachingStyle: cfg.coachingStyle,
+          referenceContent: cfg.referenceContent,
+          referenceImages: cfg.referenceImages,
+          interactionMode: cfg.interactionMode,
+          sessionId: newSession.id,
+          sessionOrder: cfg.sessionOrder,
+          isLive: cfg.isLive,
+          deleted: false,
+          createdAt: new Date(),
+        }).returning();
+
+        // Copy quiz questions if applicable
+        if (cfg.type === 'quiz') {
+          const questions = await db.query.quizQuestions.findMany({
+            where: and(eq(quizQuestions.configId, cfg.id), eq(quizQuestions.deleted, false)),
+            orderBy: [quizQuestions.orderIndex],
+          });
+          if (questions.length > 0) {
+            await db.insert(quizQuestions).values(questions.map(q => ({
+              configId: newCfg.id,
+              question: q.question,
+              expectedAnswer: q.expectedAnswer,
+              orderIndex: q.orderIndex,
+              createdAt: new Date(),
+              deleted: false,
+            })));
+          }
+        }
+      }
+
+      res.json({ ...newSession, configCount: originalConfigs.length });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PATCH reorder configs within a session by id
+  app.patch("/api/sessions/:id/order", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const sessionId = parseInt(req.params.id);
+      if (!userId || isNaN(sessionId)) return res.status(400).json({ error: "Bad request" });
 
       const { configIds } = req.body as { configIds: number[] };
       if (!Array.isArray(configIds)) return res.status(400).json({ error: "configIds required" });
 
-      await Promise.all(
-        configIds.map((id, index) =>
-          db.update(chatConfigs)
-            .set({ sessionOrder: index })
-            .where(and(eq(chatConfigs.id, id), eq(chatConfigs.userId, userId)))
-        )
-      );
+      await Promise.all(configIds.map((id, index) =>
+        db.update(chatConfigs).set({ sessionOrder: index }).where(and(eq(chatConfigs.id, id), eq(chatConfigs.userId, userId as number)))
+      ));
+      await db.update(sessions).set({ updatedAt: new Date() }).where(eq(sessions.id, sessionId));
 
       res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET list all sessions for the logged-in user
+  app.get("/api/sessions", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const userSessions = await db.query.sessions.findMany({
+        where: eq(sessions.userId, userId as number),
+        orderBy: [desc(sessions.updatedAt)],
+      });
+
+      // Get config counts per session
+      const sessionIds = userSessions.map(s => s.id);
+      const counts: Record<number, number> = {};
+      if (sessionIds.length > 0) {
+        for (const sid of sessionIds) {
+          const configs = await db.query.chatConfigs.findMany({
+            where: and(eq(chatConfigs.sessionId, sid), eq(chatConfigs.deleted, false)),
+          });
+          counts[sid] = configs.length;
+        }
+      }
+
+      res.json(userSessions.map(s => ({ ...s, configCount: counts[s.id] ?? 0 })));
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST create a new session
+  app.post("/api/sessions", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const { title } = req.body as { title?: string };
+      const [session] = await db.insert(sessions).values({
+        userId: userId as number,
+        shareToken: crypto.randomUUID(),
+        title: title || "New Session",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }).returning();
+
+      res.json({ ...session, configCount: 0 });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -1954,33 +2595,34 @@ Score: [1-10 based on overall coverage and quality of explanation]
     try {
       const configId = parseInt(req.params.id);
       const userId = req.user?.id;
-      const { inSession } = req.body as { inSession: boolean };
+      const { sessionId } = req.body as { sessionId: number | null };
       if (!userId || isNaN(configId)) return res.status(400).json({ error: "Bad request" });
 
-      if (inSession) {
-        // Find or create the user's session
-        let session = await db.query.sessions.findFirst({
-          where: eq(sessions.userId, userId as number),
-          orderBy: [desc(sessions.createdAt)],
+      if (sessionId !== null && sessionId !== undefined) {
+        // Verify session belongs to user
+        const session = await db.query.sessions.findFirst({
+          where: and(eq(sessions.id, sessionId), eq(sessions.userId, userId as number)),
         });
-        if (!session) {
-          const [newSession] = await db.insert(sessions).values({
-            userId: userId as number,
-            shareToken: crypto.randomUUID(),
-            createdAt: new Date(),
-          }).returning();
-          session = newSession;
-        }
-        // Find current max order
+        if (!session) return res.status(404).json({ error: "Session not found" });
+
         const existing = await db.query.chatConfigs.findMany({
-          where: and(eq(chatConfigs.sessionId, session.id), eq(chatConfigs.deleted, false)),
+          where: and(eq(chatConfigs.sessionId, sessionId), eq(chatConfigs.deleted, false)),
         });
         const maxOrder = existing.length;
         const isFirst = maxOrder === 0;
         await db.update(chatConfigs)
-          .set({ sessionId: session.id, sessionOrder: maxOrder, isLive: isFirst })
+          .set({ sessionId, sessionOrder: maxOrder, isLive: isFirst })
           .where(and(eq(chatConfigs.id, configId), eq(chatConfigs.userId, userId)));
+        await db.update(sessions)
+          .set({ updatedAt: new Date() })
+          .where(eq(sessions.id, sessionId));
       } else {
+        const config = await db.query.chatConfigs.findFirst({ where: eq(chatConfigs.id, configId) });
+        if (config?.sessionId) {
+          await db.update(sessions)
+            .set({ updatedAt: new Date() })
+            .where(eq(sessions.id, config.sessionId));
+        }
         await db.update(chatConfigs)
           .set({ sessionId: null, sessionOrder: null, isLive: false })
           .where(and(eq(chatConfigs.id, configId), eq(chatConfigs.userId, userId)));

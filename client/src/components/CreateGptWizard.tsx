@@ -5,8 +5,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Users, GraduationCap, Brain, ArrowLeft, ArrowRight, Sparkles, Loader2, Upload, X, Mic, MicOff, Keyboard } from "lucide-react";
+import { MessageSquare, Users, GraduationCap, Brain, Zap, ArrowLeft, ArrowRight, Sparkles, Loader2, Upload, X, Mic, MicOff, Keyboard } from "lucide-react";
 import type { AdminConfig } from "@/lib/types";
+import QuickFireQuizEditor from "@/components/QuickFireQuizEditor";
 
 interface Props {
   onSave: (config: AdminConfig) => void;
@@ -14,7 +15,7 @@ interface Props {
   prefill?: AdminConfig;
 }
 
-type WizardType = 'chat' | 'two-way-conversation' | 'teach-ai' | 'thought-partner';
+type WizardType = 'chat' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz';
 
 const TYPE_CONFIG: Record<WizardType, {
   icon: React.ElementType;
@@ -51,6 +52,13 @@ const TYPE_CONFIG: Record<WizardType, {
     placeholder: "e.g. Help participants think through how to build an AI strategy for their organisation — what use cases to prioritise, how to get buy-in, and how to start...",
     badge: 'Thought Partner',
   },
+  'quick-fire-quiz': {
+    icon: Zap,
+    label: 'Quick Fire Quiz',
+    subtitle: 'Kahoot-style live quiz — everyone answers simultaneously, speed earns bonus points',
+    placeholder: '',
+    badge: 'Quick Fire Quiz',
+  },
 };
 
 const KNOWLEDGE_LABELS = ['Beginner', 'Novice', 'Intermediate', 'Advanced', 'Expert'];
@@ -78,6 +86,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
     systemPrompt: '',
     userInstructions: '',
     feedbackCriteria: '',
+    feedbackHarshness: 'standard',
     temperature: 0.7,
     maxTokens: 1000,
     knowledgeLevel: 2,
@@ -251,7 +260,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
           })}
         </div>
         <div className="flex justify-end pt-2">
-          <Button onClick={() => { setConfig(prev => ({ ...prev, type: selectedType! })); setStep(2); }} disabled={!selectedType}>
+          <Button onClick={() => { setConfig(prev => ({ ...prev, type: selectedType! })); selectedType === 'quick-fire-quiz' ? setStep(3) : setStep(2); }} disabled={!selectedType}>
             Continue <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
         </div>
@@ -330,6 +339,28 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
   const isTeachAi = config.type === 'teach-ai';
   const isTwoWay = config.type === 'two-way-conversation';
   const isThoughtPartner = config.type === 'thought-partner';
+  const isQuickFireQuiz = config.type === 'quick-fire-quiz';
+
+  if (isQuickFireQuiz) {
+    return (
+      <div className="space-y-5">
+        <StepIndicator current={3} />
+        <QuickFireQuizEditor config={config} onConfigChange={setConfig} />
+        <div className="flex justify-between pt-4 border-t">
+          <Button variant="ghost" onClick={() => setStep(1)}>
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back
+          </Button>
+          <Button
+            onClick={() => onSave(config)}
+            disabled={isSaving || !config.title.trim() || !(config.quickFireQuestions?.length)}
+          >
+            {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            Save Quiz
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -503,6 +534,41 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
           {isThoughtPartner ? 'Describe the concept or challenge this session helps learners think through.' : 'Shown to learners before they start.'}
         </p>
       </div>
+
+      {(config.type === 'chat' || config.type === 'two-way-conversation' || config.type === 'teach-ai') && (
+        <div className="space-y-2">
+          <Label>Feedback Standard</Label>
+          <div className="flex gap-1 flex-wrap">
+            {([
+              { value: 'encouraging', label: 'Encouraging' },
+              { value: 'developmental', label: 'Developmental' },
+              { value: 'standard', label: 'Standard' },
+              { value: 'high-performance', label: 'High Performance' },
+              { value: 'elite', label: 'Elite' },
+            ] as const).map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setConfig(prev => ({ ...prev, feedbackHarshness: value }))}
+                className={`px-3 py-1.5 text-xs rounded-full border font-medium transition-colors ${
+                  (config.feedbackHarshness ?? 'standard') === value
+                    ? 'bg-green-600 text-white border-green-600'
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {(config.feedbackHarshness ?? 'standard') === 'encouraging' && 'Generous scoring — 7–8 for solid effort, 9–10 for excellent work.'}
+            {(config.feedbackHarshness ?? 'standard') === 'developmental' && 'Supportive but honest — 6–7 for good effort, 8–9 for strong work.'}
+            {(config.feedbackHarshness ?? 'standard') === 'standard' && 'Balanced — 5–6 is average, 7–8 is good, 9–10 is excellent.'}
+            {(config.feedbackHarshness ?? 'standard') === 'high-performance' && 'High bar — 5–6 is competent, 7–8 is strong, 9–10 for exceptional work.'}
+            {(config.feedbackHarshness ?? 'standard') === 'elite' && 'Rigorous — a 5 is decent, 8–9 is excellent. Only truly outstanding responses score 9–10.'}
+          </p>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="wiz-feedback">

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, BarChart2 } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +47,7 @@ export default function SessionAnalysis() {
     },
     enabled: !!token,
     staleTime: 30_000,
+    refetchInterval: 45_000,
   });
 
   const activeConfigId = selectedConfigId ?? sessionData?.configs[0]?.id ?? null;
@@ -113,18 +114,24 @@ export default function SessionAnalysis() {
             <div className="text-center text-gray-400 text-sm py-16">Select an activity from the sidebar.</div>
           ) : (
             <>
-              <div className="flex items-center gap-3 mb-6">
+              <div className={`flex items-center gap-3 mb-6 ${selectedConfig.type === 'quick-fire-quiz' ? 'justify-center' : ''}`}>
                 <h1 className="text-xl font-bold text-gray-900">{selectedConfig.title}</h1>
                 <Badge variant="outline">{selectedConfig.type}</Badge>
-                {avgScore !== null && (
+                {selectedConfig.type !== 'quick-fire-quiz' && avgScore !== null && (
                   <span className="ml-auto text-sm font-medium text-gray-600">
                     Avg score: <span className="text-green-700">{avgScore.toFixed(1)}</span>
                   </span>
                 )}
-                <span className="text-sm text-gray-400">{(submissions ?? []).length} submission{(submissions ?? []).length !== 1 ? 's' : ''}</span>
+                {selectedConfig.type !== 'quick-fire-quiz' && (
+                  <span className="text-sm text-gray-400">{(submissions ?? []).length} submission{(submissions ?? []).length !== 1 ? 's' : ''}</span>
+                )}
               </div>
 
-              {loadingSubmissions ? (
+              {selectedConfig.type === 'quick-fire-quiz' ? (
+                <div className="max-w-lg mx-auto">
+                  <QuickFireQuizAnalysis configId={activeConfigId!} />
+                </div>
+              ) : loadingSubmissions ? (
                 <div className="text-gray-400 text-sm">Loading submissions...</div>
               ) : (submissions ?? []).length === 0 ? (
                 <div className="text-center py-16 text-gray-400 text-sm">No submissions yet for this activity.</div>
@@ -179,6 +186,102 @@ export default function SessionAnalysis() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function QuickFireQuizAnalysis({ configId }: { configId: number }) {
+  const [showReview, setShowReview] = useState(false);
+
+  const { data: leaderboard, refetch } = useQuery<{ entries: any[] }>({
+    queryKey: ["/api/quick-fire-quiz", configId, "leaderboard", "analysis"],
+    queryFn: async () => {
+      const res = await fetch(`/api/quick-fire-quiz/${configId}/leaderboard`);
+      if (!res.ok) return { entries: [] };
+      return res.json();
+    },
+    refetchInterval: 15_000,
+  });
+
+  const { data: config } = useQuery<any>({
+    queryKey: [`/api/chat-configs/${configId}`],
+    queryFn: async () => {
+      const res = await fetch(`/api/chat-configs/${configId}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+
+  const entries = leaderboard?.entries ?? [];
+  const questions: any[] = config?.quickFireQuestions ?? [];
+  const maxScore = questions.length * 1000;
+  const LABELS = ['A', 'B', 'C', 'D'];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-gray-500">{entries.length} participant{entries.length !== 1 ? 's' : ''}</span>
+        {questions.length > 0 && (
+          <button
+            onClick={() => setShowReview(v => !v)}
+            className={`text-sm px-3 py-1 rounded-full border transition-colors ${showReview ? 'bg-green-50 border-green-300 text-green-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+          >
+            {showReview ? 'Hide Review' : 'Question Review'}
+          </button>
+        )}
+      </div>
+
+      {entries.length === 0 ? (
+        <div className="text-center py-16 text-gray-400 text-sm">No quiz results yet.</div>
+      ) : (
+        <div className="space-y-2">
+          {entries.map((entry, i) => (
+            <div key={entry.participantId} className="flex items-center gap-3 px-4 py-3 bg-white border border-gray-100 rounded-lg">
+              <span className="w-7 text-center text-lg">
+                {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : <span className="text-sm text-gray-400">#{i + 1}</span>}
+              </span>
+              <span className="flex-1 font-medium text-gray-800">{entry.userName || 'Anonymous'}</span>
+              <span className="text-sm font-semibold text-gray-700">
+                {entry.totalPoints}{maxScore > 0 ? `/${maxScore}` : ''}
+              </span>
+            </div>
+          ))}
+          <button
+            onClick={() => refetch()}
+            className="w-full border border-gray-200 rounded-lg py-2 text-sm text-gray-400 hover:bg-gray-50 transition-colors"
+          >
+            ↻ Refresh
+          </button>
+        </div>
+      )}
+
+      {showReview && questions.length > 0 && (
+        <div className="mt-2 space-y-3">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-2">Question Review</p>
+          {questions.map((q: any, qi: number) => (
+            <div key={q.id} className="border border-gray-100 rounded-lg p-3 space-y-2 bg-white">
+              <p className="text-sm font-semibold text-gray-800">Q{qi + 1}. {q.question}</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {(q.options ?? []).map((opt: string, oi: number) => {
+                  const isCorrect = oi === q.correctIndex;
+                  return (
+                    <div
+                      key={oi}
+                      className={`flex items-center gap-2 rounded px-2.5 py-1.5 text-xs ${isCorrect ? 'bg-green-50 border border-green-300 text-green-800 font-medium' : 'bg-gray-50 text-gray-500'}`}
+                    >
+                      <span className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${isCorrect ? 'bg-green-600 text-white' : 'bg-gray-300 text-gray-600'}`}>
+                        {LABELS[oi]}
+                      </span>
+                      <span className="truncate">{opt}</span>
+                      {isCorrect && <span className="ml-auto text-green-600 flex-shrink-0">✓</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

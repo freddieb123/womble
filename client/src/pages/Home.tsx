@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
   DndContext,
   closestCenter,
@@ -16,14 +16,18 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, Pencil, Copy, MoreVertical, BarChart2, Trash2, ArrowUpCircle, Flag, Share2, EyeOff, Keyboard, Mic, MessageSquare, Users, GraduationCap, Brain, HelpCircle, Upload, LogOut, LayoutGrid, GripVertical, Radio, Layers } from "lucide-react";
+import {
+  Plus, Pencil, Copy, MoreVertical, BarChart2, Trash2,
+  Flag, Share2, EyeOff, Keyboard, Mic, LogOut, GripVertical, Radio,
+  Layers, FolderOpen, Library, Play,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { track, EventName } from "@/lib/mixpanel";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import AdminPanel from "@/components/AdminPanel";
 import CreateGptWizard from "@/components/CreateGptWizard";
@@ -34,6 +38,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -46,24 +53,40 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import TemplateGallery from "@/components/TemplateGallery";
+import AddAgentDialog from "@/components/AddAgentDialog";
 import QuizEditor from "@/components/QuizEditor";
+import QuickFireQuizEditor from "@/components/QuickFireQuizEditor";
+import QuickFireQuizAdminControl from "@/components/QuickFireQuizAdminControl";
+import AgentTimer from "@/components/AgentTimer";
 import type { Template } from "@/lib/types";
 
-const FILTER_TYPES = [
-  { type: 'all', label: 'All Agents', icon: LayoutGrid },
-  { type: 'chat', label: 'Conversation with AI', icon: MessageSquare },
-  { type: 'two-way-conversation', label: 'Two-way Conversation', icon: Users },
-  { type: 'teach-ai', label: 'Teach an AI', icon: GraduationCap },
-  { type: 'thought-partner', label: 'Thought Partner', icon: Brain },
+const LS_SESSION_KEY = 'womble_last_session_id';
+
+const AGENT_TYPE_FILTERS = [
+  { type: 'all', label: 'All' },
+  { type: 'chat', label: 'Conversation' },
+  { type: 'two-way-conversation', label: 'Two-way' },
+  { type: 'teach-ai', label: 'Teach an AI' },
+  { type: 'thought-partner', label: 'Thought Partner' },
+  { type: 'quiz', label: 'Quiz' },
+  { type: 'quick-fire-quiz', label: 'Quick Fire Quiz' },
+  { type: 'upload', label: 'Document Review' },
 ] as const;
 
-type FilterType = typeof FILTER_TYPES[number]['type'];
+type AgentTypeFilter = typeof AGENT_TYPE_FILTERS[number]['type'];
+
+function todayTitle() {
+  const now = new Date();
+  const d = String(now.getDate()).padStart(2, '0');
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const y = String(now.getFullYear()).slice(2);
+  return `Session - ${d}/${m}/${y}`;
+}
 
 type ChatConfig = {
   id: number;
   title: string;
-  type: 'chat' | 'upload' | 'quiz' | 'two-way-conversation' | 'teach-ai' | 'thought-partner';
+  type: 'chat' | 'upload' | 'quiz' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz';
   systemPrompt: string;
   userInstructions: string | null;
   feedbackCriteria: string | null;
@@ -73,88 +96,274 @@ type ChatConfig = {
   deletedAt?: string;
   isTemplate?: boolean;
   templateDescription?: string;
-  questions?: Array<{
-    question: string;
-    expectedAnswer: string;
-  }>;
-  quizQuestions?: Array<{
-    id: number;
-    question: string;
-    expectedAnswer: string;
-    orderIndex: number;
-  }>;
+  questions?: Array<{ question: string; expectedAnswer: string }>;
+  quizQuestions?: Array<{ id: number; question: string; expectedAnswer: string; orderIndex: number }>;
+  quickFireQuestions?: Array<{ id?: number; question: string; options: [string, string, string, string]; correctIndex: 0 | 1 | 2 | 3; timeLimit: number; orderIndex: number }>;
   temperature?: number;
   maxTokens?: number;
   userId?: number;
+  feedbackHarshness?: 'encouraging' | 'developmental' | 'standard' | 'high-performance' | 'elite';
   interactionMode?: 'typed' | 'spoken' | 'both';
   sessionId?: number | null;
   sessionOrder?: number | null;
   isLive?: boolean;
 };
 
-type SessionData = {
+type SessionSummary = {
   id: number;
+  title: string;
   shareToken: string;
-  configs: ChatConfig[];
+  isLibrary: boolean;
+  createdAt: string;
+  updatedAt: string;
+  configCount: number;
 };
 
-function SortableSessionCard({
+type SessionDetail = SessionSummary & { configs: ChatConfig[] };
+
+// ─── Editable main title ──────────────────────────────────────────────────────
+
+function EditableTitle({ title, onSave }: { title: string; onSave: (t: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(title);
+
+  useEffect(() => { setValue(title); }, [title]);
+
+  const commit = () => {
+    const trimmed = value.trim();
+    if (trimmed && trimmed !== title) onSave(trimmed);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); commit(); }
+          if (e.key === 'Escape') setEditing(false);
+        }}
+        autoFocus
+        className="text-xl font-bold text-gray-900 border-b-2 border-green-500 outline-none bg-transparent min-w-0 w-full max-w-sm"
+      />
+    );
+  }
+
+  return (
+    <div
+      className="group flex items-center gap-2 cursor-text"
+      onClick={() => setEditing(true)}
+      title="Click to rename"
+    >
+      <h1 className="text-xl font-bold text-gray-900">{title}</h1>
+      <Pencil className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+    </div>
+  );
+}
+
+// ─── Sidebar session item ─────────────────────────────────────────────────────
+
+function SessionSidebarItem({
+  session,
+  isSelected,
+  onSelect,
+  onDuplicate,
+  onDelete,
+  onRename,
+}: {
+  session: SessionSummary;
+  isSelected: boolean;
+  onSelect: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+  onRename: (title: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(session.title);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setValue(session.title); }, [session.title]);
+
+  const startEditing = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setValue(session.title);
+    setEditing(true);
+  };
+
+  const commit = () => {
+    const trimmed = value.trim();
+    if (trimmed && trimmed !== session.title) onRename(trimmed);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="px-2 py-1">
+        <input
+          ref={inputRef}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); commit(); }
+            if (e.key === 'Escape') setEditing(false);
+          }}
+          autoFocus
+          className="w-full text-sm px-2 py-1.5 rounded border border-green-400 outline-none bg-white"
+        />
+      </div>
+    );
+  }
+
+  const icon = session.isLibrary
+    ? <Library className={`h-3.5 w-3.5 flex-shrink-0 ${isSelected ? 'text-green-600' : 'text-gray-400'}`} />
+    : <FolderOpen className={`h-3.5 w-3.5 flex-shrink-0 ${isSelected ? 'text-green-600' : 'text-gray-400'}`} />;
+
+  return (
+    <div
+      onClick={onSelect}
+      onDoubleClick={startEditing}
+      className={`group flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
+        isSelected ? 'bg-green-50 text-green-800' : 'text-gray-700 hover:bg-gray-50'
+      }`}
+    >
+      {icon}
+      <span className="flex-1 text-sm truncate">{session.title}</span>
+      <span className="text-xs text-gray-400 tabular-nums flex-shrink-0">{session.configCount}</span>
+
+      {/* Pencil — visible on hover, only for non-library or library sessions */}
+      <button
+        onClick={startEditing}
+        title="Rename"
+        className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-gray-600 transition-opacity flex-shrink-0"
+      >
+        <Pencil className="h-3 w-3" />
+      </button>
+
+      {/* Three-dot — only if not library */}
+      {!session.isLibrary && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              onClick={(e) => e.stopPropagation()}
+              className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-gray-600 transition-opacity flex-shrink-0"
+            >
+              <MoreVertical className="h-3.5 w-3.5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuItem onClick={onDuplicate}>
+              <Copy className="h-4 w-4 mr-2" />Duplicate
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-red-600" onClick={onDelete}>
+              <Trash2 className="h-4 w-4 mr-2" />Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </div>
+  );
+}
+
+// ─── Sortable agent row ────────────────────────────────────────────────────────
+
+function SortableAgentCard({
   config,
+  isLibraryView,
+  sessions,
   onToggleLive,
-  onRemoveFromSession,
   onEdit,
   onDelete,
   onCopyLink,
   onViewFeedback,
+  onDuplicate,
+  onAddToSession,
+  onControlQuiz,
+  onSaveAsTemplate,
+  onRemoveFromTemplates,
 }: {
   config: ChatConfig;
+  isLibraryView: boolean;
+  sessions: SessionSummary[];
   onToggleLive: (isLive: boolean) => void;
-  onRemoveFromSession: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onCopyLink: () => void;
   onViewFeedback: () => void;
+  onDuplicate: () => void;
+  onAddToSession: (sessionId: number) => void;
+  onControlQuiz?: () => void;
+  onSaveAsTemplate: () => void;
+  onRemoveFromTemplates: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: config.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
+  const typeBadge = {
+    chat: { label: 'Conversation', classes: 'bg-green-50 text-green-700 border-green-200' },
+    'teach-ai': { label: 'Teach an AI', classes: 'bg-blue-50 text-blue-700 border-blue-200' },
+    'thought-partner': { label: 'Thought Partner', classes: 'bg-teal-50 text-teal-700 border-teal-200' },
+    'two-way-conversation': { label: 'Two-way', classes: 'bg-orange-50 text-orange-700 border-orange-200' },
+    quiz: { label: 'Quiz', classes: 'bg-gray-50 text-gray-600 border-gray-200' },
+    upload: { label: 'Document Review', classes: 'bg-purple-50 text-purple-700 border-purple-200' },
+    'quick-fire-quiz': { label: 'Quick Fire Quiz', classes: 'bg-amber-50 text-amber-700 border-amber-200' },
+  }[config.type] ?? { label: config.type, classes: 'bg-gray-50 text-gray-600 border-gray-200' };
+
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-3 py-2.5 shadow-sm">
+    <div ref={setNodeRef} style={style} className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-4 py-5 shadow-sm">
       <button {...attributes} {...listeners} className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing flex-shrink-0">
         <GripVertical className="h-4 w-4" />
       </button>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-gray-800 truncate">{config.title}</span>
-          <Badge
-            variant="outline"
-            className={`text-xs flex-shrink-0 ${
-              config.type === 'chat' ? 'bg-green-50 text-green-700 border-green-200' :
-              config.type === 'teach-ai' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-              config.type === 'thought-partner' ? 'bg-teal-50 text-teal-700 border-teal-200' :
-              config.type === 'two-way-conversation' ? 'bg-orange-50 text-orange-700 border-orange-200' :
-              'bg-gray-50 text-gray-600 border-gray-200'
-            }`}
-          >
-            {config.type === 'chat' ? 'Conversation' :
-             config.type === 'teach-ai' ? 'Teach an AI' :
-             config.type === 'thought-partner' ? 'Thought Partner' :
-             config.type === 'two-way-conversation' ? 'Two-way' :
-             config.type === 'quiz' ? 'Quiz' : 'Document Review'}
-          </Badge>
+          <Badge variant="outline" className={`text-xs flex-shrink-0 ${typeBadge.classes}`}>{typeBadge.label}</Badge>
+          {config.type !== 'quick-fire-quiz' && (() => {
+            const mode = config.interactionMode ?? 'both';
+            return (
+              <span className="inline-flex items-center gap-0.5 text-gray-400 flex-shrink-0">
+                {(mode === 'typed' || mode === 'both') && <Keyboard className="h-3.5 w-3.5" />}
+                {(mode === 'spoken' || mode === 'both') && <Mic className="h-3.5 w-3.5" />}
+              </span>
+            );
+          })()}
         </div>
+        <p className="text-xs text-gray-400 mt-0.5">
+          {config.conversationCount ?? 0} submission{(config.conversationCount ?? 0) !== 1 ? 's' : ''}
+        </p>
       </div>
-      <button
-        onClick={() => onToggleLive(!config.isLive)}
-        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors flex-shrink-0 ${
-          config.isLive
-            ? 'bg-green-100 text-green-700 hover:bg-green-200'
-            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-        }`}
-      >
-        <Radio className={`h-3 w-3 ${config.isLive ? 'text-green-600' : 'text-gray-400'}`} />
-        {config.isLive ? 'Live' : 'Not live'}
-      </button>
+
+      {/* Live toggle — hidden in library view */}
+      {!isLibraryView && (
+        <button
+          onClick={() => onToggleLive(!config.isLive)}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors flex-shrink-0 ${
+            config.isLive ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+          }`}
+        >
+          <Radio className={`h-3 w-3 ${config.isLive ? 'text-green-600' : 'text-gray-400'}`} />
+          {config.isLive ? 'Live' : 'Not live'}
+        </button>
+      )}
+
+      {/* Activity timer — for timed activity types */}
+      {!isLibraryView && (config.type === 'chat' || config.type === 'teach-ai' || config.type === 'two-way-conversation') && (
+        <AgentTimer configId={config.id} />
+      )}
+
+      {/* Control Quiz button — directly visible on quick-fire-quiz cards */}
+      {config.type === 'quick-fire-quiz' && onControlQuiz && !isLibraryView && (
+        <button
+          onClick={onControlQuiz}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors flex-shrink-0"
+        >
+          <Play className="h-3 w-3" />
+          Control
+        </button>
+      )}
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-400 hover:text-gray-600 flex-shrink-0">
@@ -163,9 +372,36 @@ function SortableSessionCard({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={onEdit}><Pencil className="h-4 w-4 mr-2" />Edit</DropdownMenuItem>
-          <DropdownMenuItem onClick={onCopyLink}><Share2 className="h-4 w-4 mr-2" />Share link</DropdownMenuItem>
-          <DropdownMenuItem onClick={onViewFeedback}><BarChart2 className="h-4 w-4 mr-2" />View Feedback</DropdownMenuItem>
-          <DropdownMenuItem onClick={onRemoveFromSession}><Layers className="h-4 w-4 mr-2" />Remove from Session</DropdownMenuItem>
+          {isLibraryView ? (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Layers className="h-4 w-4 mr-2" />Add to session
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {sessions.length === 0 ? (
+                  <DropdownMenuItem disabled>No sessions yet</DropdownMenuItem>
+                ) : (
+                  sessions.map(s => (
+                    <DropdownMenuItem key={s.id} onClick={() => onAddToSession(s.id)}>
+                      {s.title}
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          ) : (
+            <DropdownMenuItem onClick={onDuplicate}><Copy className="h-4 w-4 mr-2" />Duplicate</DropdownMenuItem>
+          )}
+          <DropdownMenuItem onClick={onCopyLink}><Share2 className="h-4 w-4 mr-2" />Share individual link</DropdownMenuItem>
+          {!isLibraryView && (
+            <DropdownMenuItem onClick={onViewFeedback}><BarChart2 className="h-4 w-4 mr-2" />View Feedback</DropdownMenuItem>
+          )}
+          {!config.isTemplate && (
+            <DropdownMenuItem onClick={onSaveAsTemplate}><Flag className="h-4 w-4 mr-2" />Save as Public Template</DropdownMenuItem>
+          )}
+          {config.isTemplate && (
+            <DropdownMenuItem onClick={onRemoveFromTemplates}><EyeOff className="h-4 w-4 mr-2" />Remove from Templates</DropdownMenuItem>
+          )}
           <DropdownMenuItem className="text-red-600" onClick={onDelete}><Trash2 className="h-4 w-4 mr-2" />Delete</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -173,83 +409,203 @@ function SortableSessionCard({
   );
 }
 
+// ─── Main component ────────────────────────────────────────────────────────────
+
 export default function Home() {
   const { logoutMutation, user } = useAuth();
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [wizardPrefill, setWizardPrefill] = useState<AdminConfig | undefined>(undefined);
-  const [isTemplateGalleryOpen, setIsTemplateGalleryOpen] = useState(false);
-  const [isPreviewingTemplate, setIsPreviewingTemplate] = useState(false);
-  const [editingConfig, setEditingConfig] = useState<ChatConfig | null>(null);
-  const [deletingConfig, setDeletingConfig] = useState<ChatConfig | null>(null);
-  const [showDeleted] = useState(false);
-  const [viewingFeedbackConfig, setViewingFeedbackConfig] = useState<ChatConfig | null>(null);
-  const [typeFilter, setTypeFilter] = useState<FilterType>('all');
-
-  const getInitials = (): string => {
-    if (!user) return 'U';
-    if (user.firstName) {
-      return `${user.firstName.charAt(0)}${(user.lastName || '').charAt(0)}`.toUpperCase();
-    }
-    return user.email?.charAt(0).toUpperCase() ?? 'U';
-  };
-  const [config, setConfig] = useState<AdminConfig>({
-    title: "",
-    type: "chat",
-    systemPrompt: "Act as a...",
-    userInstructions: "",
-    feedbackCriteria: "",
-    temperature: 0.7,
-    maxTokens: 1000,
-    questions: []
-  });
-  const [savingAsTemplate, setSavingAsTemplate] = useState<ChatConfig | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: configs, isLoading } = useQuery<ChatConfig[]>({
-    queryKey: ['/api/chat-configs', showDeleted, user?.id],
-    queryFn: async () => {
-      const response = await fetch(`/api/chat-configs?userId=${user?.id}${showDeleted ? '&showDeleted=true' : ''}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch Agents');
-      }
-      const data = await response.json();
-      console.log('Fetched configs:', data.map((c: ChatConfig) => ({
-        id: c.id,
-        title: c.title,
-        isTemplate: c.isTemplate,
-        userId: c.userId
-      })));
-      return data;
-    },
-    enabled: !!user?.id,
-    refetchInterval: 15_000,
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(() => {
+    const stored = localStorage.getItem(LS_SESSION_KEY);
+    return stored ? parseInt(stored) : null;
+  });
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [wizardPrefill, setWizardPrefill] = useState<AdminConfig | undefined>(undefined);
+  const [isAddAgentOpen, setIsAddAgentOpen] = useState(false);
+  const [isPreviewingTemplate, setIsPreviewingTemplate] = useState(false);
+  const [editingConfig, setEditingConfig] = useState<ChatConfig | null>(null);
+  const [deletingConfig, setDeletingConfig] = useState<ChatConfig | null>(null);
+  const [savingAsTemplate, setSavingAsTemplate] = useState<ChatConfig | null>(null);
+  const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null);
+  const [controllingQuizId, setControllingQuizId] = useState<number | null>(null);
+  const [agentOrderOverride, setAgentOrderOverride] = useState<ChatConfig[]>([]);
+  const [libraryTypeFilter, setLibraryTypeFilter] = useState<AgentTypeFilter>('all');
+  const [config, setConfig] = useState<AdminConfig>({
+    title: '', type: 'chat', systemPrompt: 'Act as a...', userInstructions: '',
+    feedbackCriteria: '', temperature: 0.7, maxTokens: 1000, questions: [],
   });
 
-  const { data: currentSession, refetch: refetchSession } = useQuery<SessionData | null>({
-    queryKey: ['/api/sessions/current'],
+  const selectSession = (id: number) => {
+    setSelectedSessionId(id);
+    setAgentOrderOverride([]);
+    setLibraryTypeFilter('all');
+    localStorage.setItem(LS_SESSION_KEY, String(id));
+  };
+
+  const getInitials = (): string => {
+    if (!user) return 'U';
+    if (user.firstName) return `${user.firstName.charAt(0)}${(user.lastName || '').charAt(0)}`.toUpperCase();
+    return user.email?.charAt(0).toUpperCase() ?? 'U';
+  };
+
+  // ── Queries ───────────────────────────────────────────────────────────────
+
+  const { data: sessionList = [], isLoading: loadingSessions } = useQuery<SessionSummary[]>({
+    queryKey: ['/api/sessions'],
     queryFn: async () => {
-      const res = await fetch('/api/sessions/current');
-      if (!res.ok) return null;
+      const res = await fetch('/api/sessions');
+      if (!res.ok) return [];
       return res.json();
     },
     enabled: !!user?.id,
-    refetchInterval: 10_000,
+    refetchInterval: 30_000,
   });
 
-  const [sessionConfigOrder, setSessionConfigOrder] = useState<ChatConfig[]>([]);
+  const regularSessions = sessionList.filter(s => !s.isLibrary);
+  const librarySessions = sessionList.filter(s => s.isLibrary);
 
-  // Keep local order in sync with server data
-  const sessionConfigs = sessionConfigOrder.length > 0 && currentSession
-    ? sessionConfigOrder
-    : (currentSession?.configs ?? []);
+  // Auto-select on first load or after deletion
+  useEffect(() => {
+    if (loadingSessions || sessionList.length === 0) return;
+    const ids = sessionList.map(s => s.id);
+    if (selectedSessionId && ids.includes(selectedSessionId)) return;
+    // Prefer first regular session, fall back to library
+    const first = regularSessions[0] ?? librarySessions[0];
+    if (first) selectSession(first.id);
+  }, [sessionList, loadingSessions]);
+
+  const { data: selectedSession, isLoading: loadingSession } = useQuery<SessionDetail | null>({
+    queryKey: ['/api/sessions', selectedSessionId],
+    queryFn: async () => {
+      const res = await fetch(`/api/sessions/${selectedSessionId}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!selectedSessionId,
+    refetchInterval: 10_000,
+    placeholderData: keepPreviousData,
+  });
+
+  // True during the brief gap between selecting a session and the query resolving
+  const sessionLoading = loadingSession || (!!selectedSessionId && selectedSession?.id !== selectedSessionId);
+
+  const isLibraryView = selectedSession?.isLibrary ?? false;
+
+  const allSessionAgents = agentOrderOverride.length > 0 && selectedSession
+    ? agentOrderOverride
+    : (selectedSession?.configs ?? []);
+
+  const sessionAgents = isLibraryView && libraryTypeFilter !== 'all'
+    ? allSessionAgents.filter(a => a.type === libraryTypeFilter)
+    : allSessionAgents;
+
+  // ── DnD ──────────────────────────────────────────────────────────────────
 
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+
+  const reorderAgents = useMutation({
+    mutationFn: async (configIds: number[]) => {
+      if (!selectedSessionId) return;
+      await fetch(`/api/sessions/${selectedSessionId}/order`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ configIds }),
+      });
+    },
+  });
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = allSessionAgents.findIndex(c => c.id === active.id);
+    const newIndex = allSessionAgents.findIndex(c => c.id === over.id);
+    const reordered = arrayMove(allSessionAgents, oldIndex, newIndex);
+    setAgentOrderOverride(reordered);
+    reorderAgents.mutate(reordered.map(c => c.id));
+  }, [allSessionAgents, reorderAgents]);
+
+  // ── Session mutations ─────────────────────────────────────────────────────
+
+  const createSession = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: todayTitle() }),
+      });
+      if (!res.ok) throw new Error('Failed to create session');
+      return res.json() as Promise<SessionSummary>;
+    },
+    onSuccess: (newSession) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+      selectSession(newSession.id);
+    },
+  });
+
+  const updateSessionTitle = useMutation({
+    mutationFn: async ({ id, title }: { id: number; title: string }) => {
+      await fetch(`/api/sessions/${id}/title`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/sessions'] }),
+  });
+
+  const duplicateSession = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/sessions/${id}/duplicate`, { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to duplicate session');
+      return res.json() as Promise<SessionSummary>;
+    },
+    onSuccess: (newSession) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+      selectSession(newSession.id);
+      toast({ description: 'Session duplicated.' });
+    },
+    onError: () => toast({ variant: 'destructive', description: 'Failed to duplicate session.' }),
+  });
+
+  const deleteSession = useMutation({
+    mutationFn: async (id: number) => {
+      await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+    },
+    onSuccess: (_, deletedId) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+      setDeletingSessionId(null);
+      setSelectedSessionId(prev => {
+        if (prev === deletedId) { localStorage.removeItem(LS_SESSION_KEY); return null; }
+        return prev;
+      });
+      toast({ description: 'Session deleted.' });
+    },
+  });
+
+  // ── Add agent to session ──────────────────────────────────────────────────
+
+  const addToSession = useMutation({
+    mutationFn: async ({ configId, sessionId }: { configId: number; sessionId: number }) => {
+      await fetch(`/api/chat-configs/${configId}/session`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      });
+    },
+    onSuccess: (_, { sessionId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] });
+      toast({ description: 'Agent added to session.' });
+    },
+    onError: () => toast({ variant: 'destructive', description: 'Failed to add agent to session.' }),
+  });
+
+  // ── Live toggle ───────────────────────────────────────────────────────────
 
   const toggleLive = useMutation({
     mutationFn: async ({ configId, isLive }: { configId: number; isLive: boolean }) => {
@@ -259,300 +615,156 @@ export default function Home() {
         body: JSON.stringify({ isLive }),
       });
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/sessions/current'] }); },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] }),
   });
 
-  const toggleSessionMembership = useMutation({
-    mutationFn: async ({ configId, inSession }: { configId: number; inSession: boolean }) => {
-      await fetch(`/api/chat-configs/${configId}/session`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inSession }),
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/sessions/current'] });
-      setSessionConfigOrder([]);
-    },
-  });
-
-  const reorderSession = useMutation({
-    mutationFn: async (configIds: number[]) => {
-      await fetch('/api/sessions/current/order', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ configIds }),
-      });
-    },
-  });
-
-  const handleSessionDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = sessionConfigs.findIndex(c => c.id === active.id);
-    const newIndex = sessionConfigs.findIndex(c => c.id === over.id);
-    const reordered = arrayMove(sessionConfigs, oldIndex, newIndex);
-    setSessionConfigOrder(reordered);
-    reorderSession.mutate(reordered.map(c => c.id));
-  }, [sessionConfigs, reorderSession]);
-
-  const handleCopySessionLink = async () => {
-    if (!currentSession) return;
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}/session?token=${currentSession.shareToken}`);
-      toast({ description: "Session link copied to clipboard!" });
-    } catch {
-      toast({ variant: "destructive", title: "Error", description: "Failed to copy session link" });
-    }
-  };
-
-  const handleViewSessionFeedback = () => {
-    if (!currentSession) return;
-    window.open(`${window.location.origin}/session-analysis?token=${currentSession.shareToken}`, '_blank');
-  };
+  // ── Agent CRUD ────────────────────────────────────────────────────────────
 
   const saveConfig = useMutation({
     mutationFn: async (configToSave?: AdminConfig) => {
       const c = configToSave || config;
-      const response = await fetch("/api/chat-configs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const response = await fetch('/api/chat-configs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: c.title,
           type: c.type,
-          systemPrompt: c.type === 'quiz' ? "Quiz Configuration" : c.systemPrompt,
-          userInstructions: c.type === 'quiz' ? "" : c.userInstructions || "",
-          feedbackCriteria: c.type === 'quiz' ? "" : c.feedbackCriteria || "",
+          systemPrompt: c.type === 'quiz' ? 'Quiz Configuration' : c.systemPrompt,
+          userInstructions: c.type === 'quiz' ? '' : c.userInstructions || '',
+          feedbackCriteria: c.type === 'quiz' ? '' : c.feedbackCriteria || '',
           questions: c.type === 'quiz' ? c.questions : undefined,
+          quickFireQuestions: c.type === 'quick-fire-quiz' ? c.quickFireQuestions : undefined,
           participant1Role: c.participant1Role ?? null,
           participant2Role: c.participant2Role ?? null,
           knowledgeLevel: c.knowledgeLevel ?? null,
           attitude: c.attitude ?? null,
           coachingStyle: c.coachingStyle ?? null,
+          feedbackHarshness: c.feedbackHarshness ?? 'standard',
           referenceContent: c.referenceContent ?? null,
           referenceImages: c.referenceImages ?? null,
           interactionMode: c.interactionMode ?? 'both',
+          sessionId: selectedSessionId,
         }),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to save Agent");
+        throw new Error(errorData.error || 'Failed to save Agent');
       }
-
       return response.json();
     },
-    onSuccess: (data) => {
-      // Track GPT creation event
-      track(EventName.GPT_CONFIRM_CREATION, { 
-        type: config.type, 
-        hasQuestions: config.type === 'quiz' && (config.questions?.length ?? 0) > 0
+    onSuccess: () => {
+      track(EventName.GPT_CONFIRM_CREATION, {
+        type: config.type,
+        hasQuestions: config.type === 'quiz' && (config.questions?.length ?? 0) > 0,
       });
-      
-      queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/sessions/current'] });
-      setSessionConfigOrder([]);
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] });
+      setAgentOrderOverride([]);
       setIsCreateOpen(false);
       setIsPreviewingTemplate(false);
-      setIsTemplateGalleryOpen(false);
-      setConfig({
-        title: "",
-        type: "chat",
-        systemPrompt: "Act as a...",
-        userInstructions: "",
-        feedbackCriteria: "",
-        temperature: 0.7,
-        maxTokens: 1000,
-        questions: []
-      });
-      toast({
-        description: "Agent saved successfully!",
-      });
+      setIsAddAgentOpen(false);
+      setConfig({ title: '', type: 'chat', systemPrompt: 'Act as a...', userInstructions: '', feedbackCriteria: '', temperature: 0.7, maxTokens: 1000, questions: [] });
+      toast({ description: 'Agent saved successfully!' });
     },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message,
-      });
-    },
+    onError: (error: Error) => toast({ variant: 'destructive', title: 'Error', description: error.message }),
   });
 
   const updateConfig = useMutation({
     mutationFn: async (configToUpdate: ChatConfig) => {
       const response = await fetch(`/api/chat-configs/${configToUpdate.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(configToUpdate),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update Agent");
+        throw new Error(errorData.error || 'Failed to update Agent');
       }
-
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] });
       setEditingConfig(null);
-      toast({
-        description: "Agent updated successfully!",
-      });
+      toast({ description: 'Agent updated successfully!' });
     },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message,
-      });
-    },
+    onError: (error: Error) => toast({ variant: 'destructive', title: 'Error', description: error.message }),
   });
 
   const deleteConfig = useMutation({
     mutationFn: async (configToDelete: ChatConfig) => {
-      const response = await fetch(`/api/chat-configs/${configToDelete.id}`, {
-        method: "DELETE",
-      });
-
+      const response = await fetch(`/api/chat-configs/${configToDelete.id}`, { method: 'DELETE' });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to delete Agent");
+        throw new Error(error.error || 'Failed to delete Agent');
       }
-
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] });
+      setAgentOrderOverride([]);
       setDeletingConfig(null);
-      toast({
-        description: "Agent deleted successfully!",
-      });
+      toast({ description: 'Agent deleted successfully!' });
     },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message,
-      });
-    },
-  });
-
-  const restoreConfig = useMutation({
-    mutationFn: async (configToRestore: ChatConfig) => {
-      const response = await fetch(`/api/chat-configs/${configToRestore.id}/restore`, {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to restore Agent");
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/chat-configs'] });
-      toast({
-        description: "Agent restored successfully!",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message,
-      });
-    },
+    onError: (error: Error) => toast({ variant: 'destructive', title: 'Error', description: error.message }),
   });
 
   const saveAsTemplate = useMutation({
     mutationFn: async ({ id, templateDescription }: { id: number; templateDescription: string }) => {
       const response = await fetch(`/api/chat-configs/${id}/template`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ templateDescription }),
       });
-      if (!response.ok) {
-        throw new Error('Failed to save as template');
-      }
+      if (!response.ok) throw new Error('Failed to save as template');
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['/api/chat-configs'],
-      });
-      toast({
-        title: 'Saved as template',
-        description: 'Your Agent is now available as a public template.',
-      });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] });
+      toast({ title: 'Saved as template', description: 'Your Agent is now available as a public template.' });
       setSavingAsTemplate(null);
     },
-    onError: (error) => {
-      toast({
-        title: 'Failed to save as template',
-        description: error.message,
-        variant: 'destructive',
-      });
-    }
+    onError: (error) => toast({ title: 'Failed to save as template', description: error.message, variant: 'destructive' }),
   });
 
   const removeFromTemplates = useMutation({
     mutationFn: async (id: number) => {
       const response = await fetch(`/api/chat-configs/${id}/template/remove`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
+        headers: { 'Content-Type': 'application/json' },
       });
-      if (!response.ok) {
-        throw new Error('Failed to remove from templates');
-      }
+      if (!response.ok) throw new Error('Failed to remove from templates');
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['/api/chat-configs'],
-      });
-      toast({
-        title: 'Removed from templates',
-        description: 'Your Agent is no longer available as a public template.',
-      });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] });
+      toast({ title: 'Removed from templates' });
     },
-    onError: (error) => {
-      toast({
-        title: 'Failed to remove from templates',
-        description: error.message,
-        variant: 'destructive',
-      });
-    }
+    onError: (error) => toast({ title: 'Failed to remove from templates', description: error.message, variant: 'destructive' }),
   });
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleCopyLink = async (configId: number) => {
     try {
-      const url = `${window.location.origin}/chat?configId=${configId}`;
-      await navigator.clipboard.writeText(url);
-
-      // Track GPT share link event
+      await navigator.clipboard.writeText(`${window.location.origin}/chat?configId=${configId}`);
       track(EventName.GPT_SHARE_LINK, { configId });
-
-      // Record share time so we can poll for new activity over the next 20 mins
       const stored = JSON.parse(localStorage.getItem('womble_shared_links') || '{}');
       stored[configId] = Date.now();
       localStorage.setItem('womble_shared_links', JSON.stringify(stored));
+      toast({ description: 'Link copied to clipboard!' });
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to copy link' });
+    }
+  };
 
-      toast({
-        description: "Link copied to clipboard!",
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to copy link",
-      });
+  const handleCopySessionLink = async () => {
+    if (!selectedSession) return;
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/session?token=${selectedSession.shareToken}`);
+      toast({ description: 'Session link copied to clipboard!' });
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to copy session link' });
     }
   };
 
@@ -564,35 +776,32 @@ export default function Home() {
     }
   };
 
-  const handleDuplicate = async (configToDuplicate: ChatConfig) => {
+  const handleViewSessionFeedback = () => {
+    if (!selectedSession) return;
+    window.open(`${window.location.origin}/session-analysis?token=${selectedSession.shareToken}`, '_blank');
+  };
+
+  const handleDuplicateAgent = async (configToDuplicate: ChatConfig) => {
     try {
       let fullConfig = configToDuplicate;
-      if (configToDuplicate.type === 'quiz') {
+      if (configToDuplicate.type === 'quiz' || configToDuplicate.type === 'quick-fire-quiz') {
         const response = await fetch(`/api/chat-configs/${configToDuplicate.id}`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch full config");
-        }
+        if (!response.ok) throw new Error('Failed to fetch full config');
         fullConfig = await response.json();
       }
-
       setWizardPrefill({
         title: `${fullConfig.title} (Copy)`,
         type: fullConfig.type,
         systemPrompt: fullConfig.systemPrompt,
-        userInstructions: fullConfig.userInstructions || "",
-        feedbackCriteria: fullConfig.feedbackCriteria || "",
+        userInstructions: fullConfig.userInstructions || '',
+        feedbackCriteria: fullConfig.feedbackCriteria || '',
         temperature: 0.7,
         maxTokens: 1000,
-        questions: fullConfig.questions || []
+        questions: fullConfig.questions || [],
       });
       setIsCreateOpen(true);
-    } catch (error) {
-      console.error(error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to duplicate Agent",
-      });
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to duplicate Agent' });
     }
   };
 
@@ -601,31 +810,48 @@ export default function Home() {
       let fullConfig = template;
       if (template.type === 'quiz') {
         const response = await fetch(`/api/chat-configs/${template.id}`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch full template config");
-        }
+        if (!response.ok) throw new Error('Failed to fetch full template config');
         fullConfig = await response.json();
       }
-
       setWizardPrefill({
         title: `${fullConfig.title} (Copy)`,
         type: fullConfig.type,
         systemPrompt: fullConfig.systemPrompt,
-        userInstructions: fullConfig.userInstructions || "",
-        feedbackCriteria: fullConfig.feedbackCriteria || "",
+        userInstructions: fullConfig.userInstructions || '',
+        feedbackCriteria: fullConfig.feedbackCriteria || '',
         temperature: 0.7,
         maxTokens: 1000,
-        questions: fullConfig.questions || []
+        questions: fullConfig.questions || [],
       });
       setIsPreviewingTemplate(true);
       setIsCreateOpen(true);
-    } catch (error) {
-      console.error(error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load template",
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load template' });
+    }
+  };
+
+  const handleDuplicateFromDialog = async (agent: { id: number; title: string; type: string; userInstructions: string | null; systemPrompt: string }) => {
+    try {
+      let fullConfig: any = agent;
+      if (agent.type === 'quiz' || agent.type === 'quick-fire-quiz') {
+        const response = await fetch(`/api/chat-configs/${agent.id}`);
+        if (!response.ok) throw new Error('Failed to fetch full config');
+        fullConfig = await response.json();
+      }
+      setWizardPrefill({
+        title: `${fullConfig.title} (Copy)`,
+        type: fullConfig.type,
+        systemPrompt: fullConfig.systemPrompt,
+        userInstructions: fullConfig.userInstructions || '',
+        feedbackCriteria: fullConfig.feedbackCriteria || '',
+        temperature: 0.7,
+        maxTokens: 1000,
+        questions: fullConfig.questions || [],
       });
+      setIsAddAgentOpen(false);
+      setIsCreateOpen(true);
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to duplicate Agent' });
     }
   };
 
@@ -635,51 +861,22 @@ export default function Home() {
       setWizardPrefill(undefined);
       if (isPreviewingTemplate) {
         setIsPreviewingTemplate(false);
-        setIsTemplateGalleryOpen(true);
+        setIsAddAgentOpen(true);
       }
     }
-  };
-
-  const handleStartFromScratch = () => {
-    setWizardPrefill(undefined);
-    setIsTemplateGalleryOpen(false);
-    setIsCreateOpen(true);
   };
 
   const handleEditConfig = async (configToEdit: ChatConfig) => {
     try {
       const response = await fetch(`/api/chat-configs/${configToEdit.id}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch full config");
-      }
-      const fullConfig: ChatConfig = await response.json();
-      setEditingConfig(fullConfig);
+      if (!response.ok) throw new Error('Failed to fetch full config');
+      setEditingConfig(await response.json());
     } catch (error) {
       console.error(error);
     }
   };
 
-  const navigateToLanding = () => {
-    window.location.href = "/";
-  };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-8">
-        <div className="max-w-4xl mx-auto">
-          <Card className="p-6">
-            <CardContent>Loading Agents...</CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  const filteredConfigs = (configs || []).filter(c => {
-    const matchesSearch = c.title.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = typeFilter === 'all' || c.type === typeFilter;
-    return matchesSearch && matchesType;
-  });
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
@@ -699,59 +896,74 @@ export default function Home() {
             <div className="space-y-2">
               <h4 className="font-bold">Womble</h4>
               <p className="text-sm">
-                <span className="italic text-muted-foreground">noun</span>
-                <br />
-                A fictional animal inhabiting Wimbledon Common in London, characterised as clearing up litter.
+                <span className="italic text-muted-foreground">noun</span><br />
+                A fictional animal inhabiting Wimbledon Common, characterised as clearing up litter.
               </p>
               <p className="text-sm">
-                <span className="italic text-muted-foreground">verb (informal)</span>
-                <br />
+                <span className="italic text-muted-foreground">verb (informal)</span><br />
                 Wander in a casual or relaxed way.
-                <br />
-                <span className="italic">"once we'd arrived back in Cambridge, we wombled quietly home"</span>
               </p>
             </div>
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* New Agent button */}
-        <div className="px-3 pt-4 pb-2">
+        {/* Action buttons */}
+        <div className="px-3 pt-4 pb-3">
           <button
-            onClick={() => {
-              track(EventName.GPT_CREATE_CLICK, { location: 'sidebar' });
-              setIsTemplateGalleryOpen(true);
-            }}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm font-medium text-gray-700 transition-colors"
+            onClick={() => createSession.mutate()}
+            disabled={createSession.isPending}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors"
           >
             <Plus className="h-4 w-4 flex-shrink-0" />
-            New Agent
+            New Session
           </button>
         </div>
 
-        {/* Type filters */}
-        <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-2 mb-2 mt-2">Filter by type</p>
-          {FILTER_TYPES.map(({ type, label, icon: Icon }) => {
-            const count = (configs || []).filter(c => type === 'all' ? true : c.type === type).length;
-            const isActive = typeFilter === type;
-            if (type !== 'all' && count === 0) return null;
-            return (
-              <button
-                key={type}
-                onClick={() => setTypeFilter(type)}
-                className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-sm transition-colors
-                  ${isActive
-                    ? 'bg-gray-100 text-gray-900 font-medium'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-              >
-                <Icon className="h-4 w-4 flex-shrink-0" />
-                <span className="flex-1 text-left truncate">{label}</span>
-                <span className={`text-xs tabular-nums ${isActive ? 'text-gray-500' : 'text-gray-400'}`}>{count}</span>
-              </button>
-            );
-          })}
-        </nav>
+        {/* Sessions section */}
+        <div className="flex-1 overflow-y-auto">
+          {regularSessions.length > 0 && (
+            <div className="px-3 pb-1 pt-1">
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-2 mb-1">Sessions</p>
+              <div className="space-y-0.5">
+                {regularSessions.map(session => (
+                  <SessionSidebarItem
+                    key={session.id}
+                    session={session}
+                    isSelected={session.id === selectedSessionId}
+                    onSelect={() => selectSession(session.id)}
+                    onDuplicate={() => duplicateSession.mutate(session.id)}
+                    onDelete={() => setDeletingSessionId(session.id)}
+                    onRename={(title) => updateSessionTitle.mutate({ id: session.id, title })}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* My Agents section */}
+          {librarySessions.length > 0 && (
+            <div className="px-3 pt-3 pb-2">
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-2 mb-1">Agents</p>
+              <div className="space-y-0.5">
+                {librarySessions.map(session => (
+                  <SessionSidebarItem
+                    key={session.id}
+                    session={session}
+                    isSelected={session.id === selectedSessionId}
+                    onSelect={() => selectSession(session.id)}
+                    onDuplicate={() => {}}
+                    onDelete={() => {}}
+                    onRename={(title) => updateSessionTitle.mutate({ id: session.id, title })}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {loadingSessions && (
+            <p className="text-xs text-gray-400 px-5 py-3">Loading...</p>
+          )}
+        </div>
 
         {/* User + logout */}
         <div className="border-t border-gray-200 p-3">
@@ -782,71 +994,128 @@ export default function Home() {
 
       {/* ── Main Content ──────────────────────────────────────── */}
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-8 py-8">
-
-          {/* Page header */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">
-              {typeFilter === 'all' ? 'All Agents' : FILTER_TYPES.find(f => f.type === typeFilter)?.label}
-            </h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {filteredConfigs.length} agent{filteredConfigs.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-
-          {/* Search */}
-          {configs && configs.length > 3 && (
-            <div className="mb-6">
-              <input
-                type="text"
-                placeholder="Search agents..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
+        {sessionLoading && selectedSessionId ? (
+          <div className="max-w-3xl mx-auto px-8 py-8">
+            <div className="h-8 w-48 bg-gray-100 rounded animate-pulse mb-6" />
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
+              ))}
             </div>
-          )}
+          </div>
+        ) : !selectedSession ? (
+          <div className="h-full flex flex-col items-center justify-center text-center p-8">
+            <Layers className="h-12 w-12 text-gray-200 mb-4" />
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">No session selected</h2>
+            <p className="text-sm text-gray-500 mb-6 max-w-xs">
+              Create a new session to organise your agents and share a single link with participants.
+            </p>
+            <Button onClick={() => createSession.mutate()} className="bg-green-600 hover:bg-green-700">
+              <Plus className="h-4 w-4 mr-2" />New Session
+            </Button>
+          </div>
+        ) : (
+          <div className="max-w-3xl mx-auto px-8 py-8">
 
-          {/* Current Session area */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Layers className="h-4 w-4 text-green-600" />
-                <h2 className="text-base font-semibold text-gray-800">Current Session</h2>
-                <span className="text-xs text-gray-400">({sessionConfigs.length} agent{sessionConfigs.length !== 1 ? 's' : ''})</span>
+            {/* Session header */}
+            <div className="flex items-center gap-3 mb-6 flex-wrap">
+              <EditableTitle
+                title={selectedSession.title}
+                onSave={(title) => updateSessionTitle.mutate({ id: selectedSession.id, title })}
+              />
+              {/* Share/Feedback/Add Agent — hidden for library view and when session is empty */}
+              {!isLibraryView && allSessionAgents.length > 0 && (
+                <div className="flex gap-2 ml-auto">
+                  <Button size="sm" variant="outline" onClick={handleCopySessionLink}>
+                    <Share2 className="h-3.5 w-3.5 mr-1.5" />Share Session
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={handleViewSessionFeedback}>
+                    <BarChart2 className="h-3.5 w-3.5 mr-1.5" />Feedback
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      track(EventName.GPT_CREATE_CLICK, { location: 'session_header' });
+                      setIsAddAgentOpen(true);
+                    }}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />Add Agent
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Type filter — library view only */}
+            {isLibraryView && (
+              <div className="flex flex-wrap gap-1.5 mb-5">
+                {AGENT_TYPE_FILTERS.map(({ type, label }) => {
+                  const count = type === 'all'
+                    ? allSessionAgents.length
+                    : allSessionAgents.filter(a => a.type === type).length;
+                  if (type !== 'all' && count === 0) return null;
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => setLibraryTypeFilter(type)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        libraryTypeFilter === type
+                          ? 'bg-green-600 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {label} <span className="opacity-70">{count}</span>
+                    </button>
+                  );
+                })}
               </div>
-              <div className="flex gap-2">
-                {currentSession && (
-                  <>
-                    <Button size="sm" variant="outline" onClick={handleCopySessionLink}>
-                      <Share2 className="h-3.5 w-3.5 mr-1.5" />Share Session
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={handleViewSessionFeedback}>
-                      <BarChart2 className="h-3.5 w-3.5 mr-1.5" />Feedback
-                    </Button>
-                  </>
+            )}
+
+            {/* Agents */}
+            {sessionLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ) : sessionAgents.length === 0 ? (
+              <div className="border-2 border-dashed border-gray-200 rounded-lg p-10 text-center">
+                <p className="text-sm text-gray-400 mb-4">
+                  {isLibraryView ? 'No agents match this filter.' : 'No agents in this session yet.'}
+                </p>
+                {!isLibraryView && (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      track(EventName.GPT_CREATE_CLICK, { location: 'empty_state' });
+                      setIsAddAgentOpen(true);
+                    }}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />Add Agent
+                  </Button>
                 )}
               </div>
-            </div>
-
-            {sessionConfigs.length === 0 ? (
-              <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-400">
-                No agents in this session yet. Create a new agent or add one from the list below.
-              </div>
             ) : (
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSessionDragEnd}>
-                <SortableContext items={sessionConfigs.map(c => c.id)} strategy={verticalListSortingStrategy}>
-                  <div className="space-y-2">
-                    {sessionConfigs.map((cfg) => (
-                      <SortableSessionCard
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={sessionAgents.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-3">
+                    {sessionAgents.map((cfg) => (
+                      <SortableAgentCard
                         key={cfg.id}
                         config={cfg}
+                        isLibraryView={isLibraryView}
+                        sessions={regularSessions}
                         onToggleLive={(isLive) => toggleLive.mutate({ configId: cfg.id, isLive })}
-                        onRemoveFromSession={() => toggleSessionMembership.mutate({ configId: cfg.id, inSession: false })}
                         onEdit={() => handleEditConfig(cfg)}
                         onDelete={() => setDeletingConfig(cfg)}
                         onCopyLink={() => handleCopyLink(cfg.id)}
                         onViewFeedback={() => handleViewFeedback(cfg)}
+                        onDuplicate={() => handleDuplicateAgent(cfg)}
+                        onAddToSession={(sessionId) => addToSession.mutate({ configId: cfg.id, sessionId })}
+                        onControlQuiz={cfg.type === 'quick-fire-quiz' ? () => setControllingQuizId(cfg.id) : undefined}
+                        onSaveAsTemplate={() => setSavingAsTemplate(cfg)}
+                        onRemoveFromTemplates={() => removeFromTemplates.mutate(cfg.id)}
                       />
                     ))}
                   </div>
@@ -854,202 +1123,30 @@ export default function Home() {
               </DndContext>
             )}
           </div>
-
-          <div className="border-b border-gray-200 mb-6" />
-
-          {/* Agent list */}
-          <div className="space-y-4">
-            {filteredConfigs.length === 0 ? (
-              configs?.length === 0 ? (
-                /* True empty state — no agents at all */
-                <div className="flex flex-col items-center justify-center py-24 text-center">
-                  <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-                    <Plus className="h-8 w-8 text-gray-400" />
-                  </div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">Create your first agent</h2>
-                  <p className="text-sm text-gray-500 max-w-sm mb-6">
-                    Build practice conversations, quizzes, or document review activities for your learners.
-                  </p>
-                  <Button
-                    onClick={() => {
-                      track(EventName.GPT_CREATE_CLICK, { location: 'empty_state' });
-                      setIsTemplateGalleryOpen(true);
-                    }}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Agent
-                  </Button>
-                </div>
-              ) : (
-                /* Filter/search returned nothing */
-                <div className="text-center py-16 text-gray-400 text-sm">
-                  No agents match this filter.
-                </div>
-              )
-            ) : (
-              filteredConfigs.map((config) => (
-                <Card
-                  key={config.id}
-                  className={`${config.deleted ? 'opacity-60' : ''}`}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start">
-                      <div className="min-w-0 flex-1 mr-4">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <CardTitle className="text-base">{config.title}</CardTitle>
-                          <Badge
-                            variant="outline"
-                            className={
-                              config.type === 'chat' ? 'bg-green-50 text-green-700 border-green-200' :
-                              config.type === 'upload' ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                              config.type === 'two-way-conversation' ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                              config.type === 'teach-ai' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                              config.type === 'thought-partner' ? 'bg-teal-50 text-teal-700 border-teal-200' :
-                              'bg-gray-50 text-gray-600 border-gray-200'
-                            }
-                          >
-                            {config.type === 'chat' ? 'Conversation with AI' :
-                             config.type === 'upload' ? 'Document Review' :
-                             config.type === 'two-way-conversation' ? 'Two-way Conversation' :
-                             config.type === 'teach-ai' ? 'Teach an AI' :
-                             config.type === 'thought-partner' ? 'Thought Partner' :
-                             'Quiz'}
-                          </Badge>
-                          {/* Interaction mode indicator */}
-                          {(() => {
-                            const mode = config.interactionMode ?? 'both';
-                            const label = mode === 'typed' ? 'Typed only' : mode === 'spoken' ? 'Voice only' : 'Voice or typed — user\'s choice';
-                            return (
-                              <span title={label} className="inline-flex items-center gap-0.5 text-gray-400">
-                                {(mode === 'typed' || mode === 'both') && <Keyboard className="h-3.5 w-3.5" />}
-                                {(mode === 'spoken' || mode === 'both') && <Mic className="h-3.5 w-3.5" />}
-                              </span>
-                            );
-                          })()}
-                          {config.isTemplate && (
-                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 flex items-center gap-1">
-                              <Flag className="h-3 w-3" />
-                              Public Template
-                            </Badge>
-                          )}
-                        </div>
-                        <CardDescription className="mt-1">
-                          Created {new Date(config.createdAt).toLocaleDateString()}
-                          {config.deleted && config.deletedAt && (
-                            <span className="text-red-500 ml-2">
-                              · Deleted {new Date(config.deletedAt).toLocaleDateString()}
-                            </span>
-                          )}
-                        </CardDescription>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-600">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {!config.deleted ? (
-                            <>
-                              <DropdownMenuItem onClick={() => handleEditConfig(config)}>
-                                <Pencil className="h-4 w-4 mr-2" />Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDuplicate(config)}>
-                                <Copy className="h-4 w-4 mr-2" />Duplicate
-                              </DropdownMenuItem>
-                              {!config.sessionId ? (
-                                <DropdownMenuItem onClick={() => toggleSessionMembership.mutate({ configId: config.id, inSession: true })}>
-                                  <Layers className="h-4 w-4 mr-2" />Add to Session
-                                </DropdownMenuItem>
-                              ) : null}
-                              {!config.isTemplate && (
-                                <DropdownMenuItem onClick={() => setSavingAsTemplate(config)}>
-                                  <Flag className="h-4 w-4 mr-2" />Save as Public Template
-                                </DropdownMenuItem>
-                              )}
-                              {config.isTemplate && (
-                                <DropdownMenuItem onClick={() => removeFromTemplates.mutate(config.id)}>
-                                  <EyeOff className="h-4 w-4 mr-2" />Remove from Templates
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem className="text-red-600" onClick={() => setDeletingConfig(config)}>
-                                <Trash2 className="h-4 w-4 mr-2" />Delete
-                              </DropdownMenuItem>
-                            </>
-                          ) : (
-                            <DropdownMenuItem onClick={() => restoreConfig.mutate(config)}>
-                              <ArrowUpCircle className="h-4 w-4 mr-2" />Restore
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    {config.userInstructions && (
-                      <p className="text-sm text-gray-500 mb-4 line-clamp-2">{config.userInstructions}</p>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={() => handleCopyLink(config.id)}>
-                          <Share2 className="h-3.5 w-3.5 mr-1.5" />
-                          Share
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleViewFeedback(config)}
-                          disabled={config.conversationCount === 0}
-                        >
-                          <BarChart2 className="h-3.5 w-3.5 mr-1.5" />
-                          {config.type === 'thought-partner' ? 'View Activity' : 'View Feedback'}
-                        </Button>
-                      </div>
-                      <span className="text-xs text-gray-400 tabular-nums">
-                        {config.conversationCount} submission{config.conversationCount !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
-        </div>
+        )}
       </main>
 
-      {/* Template Gallery Dialog */}
-      <Dialog 
-        open={isTemplateGalleryOpen} 
-        onOpenChange={(open) => {
-          setIsTemplateGalleryOpen(open);
-          if (!open) {
-            queryClient.invalidateQueries({ queryKey: ["/api/chat-configs"] });
-          }
-        }}
-      >
-        <DialogContent className="max-w-4xl">
-          <TemplateGallery
+      {/* ── Dialogs ───────────────────────────────────────────── */}
+
+      <Dialog open={isAddAgentOpen} onOpenChange={(open) => {
+        setIsAddAgentOpen(open);
+        if (!open) queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] });
+      }}>
+        <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
+          <AddAgentDialog
             onSelectTemplate={handleTemplateSelect}
-            onStartFromScratch={handleStartFromScratch}
+            onDuplicate={handleDuplicateFromDialog}
+            onStartFromScratch={() => { setWizardPrefill(undefined); setIsAddAgentOpen(false); setIsCreateOpen(true); }}
           />
         </DialogContent>
       </Dialog>
 
-      {/* Create GPT Dialog */}
-      <Dialog
-        open={isCreateOpen}
-        onOpenChange={(open) => {
-          handleCreateModalClose(open);
-          if (!open) {
-            queryClient.invalidateQueries({ queryKey: ["/api/chat-configs"] });
-          }
-        }}
-      >
+      <Dialog open={isCreateOpen} onOpenChange={(open) => {
+        handleCreateModalClose(open);
+        if (!open) queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] });
+      }}>
         <DialogContent className="max-w-2xl h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Create New Agent</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Create New Agent</DialogTitle></DialogHeader>
           <ScrollArea className="flex-1 -mx-6 px-6">
             <div className="py-4">
               <CreateGptWizard
@@ -1063,84 +1160,38 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Agent Dialog */}
       {editingConfig && (
-        <Dialog 
-          open={editingConfig !== null} 
-          onOpenChange={(open) => {
-            if (!open) {
-              setEditingConfig(null);
-              queryClient.invalidateQueries({ queryKey: ["/api/chat-configs"] });
-            }
-          }}
-        >
+        <Dialog open={editingConfig !== null} onOpenChange={(open) => {
+          if (!open) { setEditingConfig(null); queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] }); }
+        }}>
           <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Edit Agent</DialogTitle>
-              <DialogDescription>
-                Modify your Agent configuration below.
-              </DialogDescription>
+              <DialogDescription>Modify your Agent configuration below.</DialogDescription>
             </DialogHeader>
             <ScrollArea className="flex-1 -mx-6 px-6">
               <div className="py-4">
                 {editingConfig.type === 'quiz' ? (
                   <QuizEditor
-                    config={{
-                      title: editingConfig.title,
-                      type: editingConfig.type,
-                      systemPrompt: editingConfig.systemPrompt,
-                      userInstructions: editingConfig.userInstructions || "",
-                      feedbackCriteria: editingConfig.feedbackCriteria || "",
-                      temperature: 0.7,
-                      maxTokens: 1000,
-                      questions: editingConfig.questions || []
-                    }}
-                    onConfigChange={(updatedConfig) => {
-                      setEditingConfig(prev => {
-                        const updated = prev ? {
-                          ...prev,
-                          title: updatedConfig.title,
-                          questions: updatedConfig.questions
-                        } : null;
-                        return updated;
-                      });
-                    }}
+                    config={{ title: editingConfig.title, type: editingConfig.type, systemPrompt: editingConfig.systemPrompt, userInstructions: editingConfig.userInstructions || '', feedbackCriteria: editingConfig.feedbackCriteria || '', temperature: 0.7, maxTokens: 1000, questions: editingConfig.questions || [] }}
+                    onConfigChange={(u) => setEditingConfig(prev => prev ? { ...prev, title: u.title, questions: u.questions } : null)}
+                  />
+                ) : editingConfig.type === 'quick-fire-quiz' ? (
+                  <QuickFireQuizEditor
+                    config={{ ...editingConfig, temperature: 0.7, maxTokens: 1000, userInstructions: editingConfig.userInstructions || '', feedbackCriteria: editingConfig.feedbackCriteria || '', questions: [] }}
+                    onConfigChange={(u) => setEditingConfig(prev => prev ? { ...prev, title: u.title, quickFireQuestions: u.quickFireQuestions } : null)}
                   />
                 ) : (
                   <AdminPanel
-                    config={{
-                      title: editingConfig.title,
-                      type: editingConfig.type,
-                      systemPrompt: editingConfig.systemPrompt,
-                      userInstructions: editingConfig.userInstructions || "",
-                      feedbackCriteria: editingConfig.feedbackCriteria || "",
-                      temperature: 0.7,
-                      maxTokens: 1000,
-                      questions: editingConfig.questions || [],
-                      interactionMode: editingConfig.interactionMode ?? 'both',
-                    }}
-                    onConfigChange={(updatedConfig) => {
-                      setEditingConfig({
-                        ...editingConfig,
-                        title: updatedConfig.title,
-                        type: updatedConfig.type,
-                        systemPrompt: updatedConfig.systemPrompt,
-                        userInstructions: updatedConfig.userInstructions || null,
-                        feedbackCriteria: updatedConfig.feedbackCriteria || null,
-                        questions: updatedConfig.questions || [],
-                        interactionMode: updatedConfig.interactionMode ?? 'both',
-                      });
-                    }}
+                    config={{ title: editingConfig.title, type: editingConfig.type, systemPrompt: editingConfig.systemPrompt, userInstructions: editingConfig.userInstructions || '', feedbackCriteria: editingConfig.feedbackCriteria || '', feedbackHarshness: editingConfig.feedbackHarshness ?? 'standard', temperature: 0.7, maxTokens: 1000, questions: editingConfig.questions || [], interactionMode: editingConfig.interactionMode ?? 'both' }}
+                    onConfigChange={(u) => setEditingConfig({ ...editingConfig, title: u.title, type: u.type, systemPrompt: u.systemPrompt, userInstructions: u.userInstructions || null, feedbackCriteria: u.feedbackCriteria || null, feedbackHarshness: u.feedbackHarshness, questions: u.questions || [], interactionMode: u.interactionMode ?? 'both' })}
                     isEditMode={true}
                   />
                 )}
               </div>
             </ScrollArea>
             <div className="pt-4 border-t flex justify-end">
-              <Button
-                onClick={() => editingConfig && updateConfig.mutate(editingConfig)}
-                disabled={updateConfig.isPending}
-              >
+              <Button onClick={() => editingConfig && updateConfig.mutate(editingConfig)} disabled={updateConfig.isPending}>
                 Update Agent
               </Button>
             </div>
@@ -1148,79 +1199,62 @@ export default function Home() {
         </Dialog>
       )}
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog
-        open={deletingConfig !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDeletingConfig(null);
-          }
-        }}
-      >
+      <AlertDialog open={deletingConfig !== null} onOpenChange={(open) => { if (!open) setDeletingConfig(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the Agent
-              "{deletingConfig?.title}" and all associated conversations.
+              This will permanently delete "{deletingConfig?.title}" and all associated conversations.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deletingConfig && deleteConfig.mutate(deletingConfig)}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
-            </AlertDialogAction>
+            <AlertDialogAction onClick={() => deletingConfig && deleteConfig.mutate(deletingConfig)} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Save as Template Dialog */}
-      <Dialog
-        open={savingAsTemplate !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSavingAsTemplate(null);
-          }
-        }}
-      >
+      <AlertDialog open={deletingSessionId !== null} onOpenChange={(open) => { if (!open) setDeletingSessionId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete session?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The session will be deleted. Agents inside will not be deleted — their feedback remains accessible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deletingSessionId !== null && deleteSession.mutate(deletingSessionId)} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={savingAsTemplate !== null} onOpenChange={(open) => { if (!open) setSavingAsTemplate(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Save as Public Template</DialogTitle>
-            <DialogDescription>
-              Public templates are available to all users. Please provide a description for this template.
-            </DialogDescription>
+            <DialogDescription>Public templates are available to all users. Please provide a description.</DialogDescription>
           </DialogHeader>
           <div className="mt-4">
             <textarea
               className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               rows={3}
-              placeholder="Describe what this template is for and how it should be used... (25 words max)"
+              placeholder="Describe what this template is for... (25 words max)"
               value={savingAsTemplate?.templateDescription || ''}
               onChange={(e) => {
                 const words = e.target.value.trim().split(/\s+/);
                 if (words.length <= 25 || e.target.value.length < (savingAsTemplate?.templateDescription || '').length) {
-                  savingAsTemplate && setSavingAsTemplate({
-                    ...savingAsTemplate,
-                    templateDescription: e.target.value
-                  });
+                  savingAsTemplate && setSavingAsTemplate({ ...savingAsTemplate, templateDescription: e.target.value });
                 }
               }}
             />
             <div className="text-xs text-right mt-1 text-muted-foreground">
-              {savingAsTemplate?.templateDescription ? 
-                `${savingAsTemplate.templateDescription.trim().split(/\s+/).length}/25 words` : 
-                "0/25 words"}
+              {savingAsTemplate?.templateDescription ? `${savingAsTemplate.templateDescription.trim().split(/\s+/).length}/25 words` : '0/25 words'}
             </div>
           </div>
           <div className="flex justify-end mt-4">
-            <Button 
-              onClick={() => savingAsTemplate && saveAsTemplate.mutate({
-                id: savingAsTemplate.id as number,
-                templateDescription: savingAsTemplate.templateDescription || ''
-              })}
+            <Button
+              onClick={() => savingAsTemplate && saveAsTemplate.mutate({ id: savingAsTemplate.id as number, templateDescription: savingAsTemplate.templateDescription || '' })}
               disabled={!savingAsTemplate?.templateDescription || saveAsTemplate.isPending}
             >
               Save as Template
@@ -1228,6 +1262,14 @@ export default function Home() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {controllingQuizId !== null && (
+        <QuickFireQuizAdminControl
+          configId={controllingQuizId}
+          open={true}
+          onClose={() => setControllingQuizId(null)}
+        />
+      )}
     </div>
   );
 }

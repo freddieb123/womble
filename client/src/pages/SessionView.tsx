@@ -6,12 +6,11 @@ import WombleFooter from "@/components/WombleFooter";
 import ChatInterface from "@/components/ChatInterface";
 import VoiceChatInterface from "@/components/VoiceChatInterface";
 import QuizInterface from "@/components/QuizInterface";
+import QuickFireQuizInterface from "@/components/QuickFireQuizInterface";
 import UploadInterface from "@/components/UploadInterface";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Keyboard, Mic } from "lucide-react";
 import type { AdminConfig } from "@/lib/types";
 
@@ -47,8 +46,6 @@ export default function SessionView() {
   const token = searchParams.get('token');
 
   const [userName, setUserName] = useState<string | null>(() => localStorage.getItem(LS_NAME_KEY));
-  const [nameInput, setNameInput] = useState('');
-  const [showNameModal, setShowNameModal] = useState(false);
   const [selectedConfigId, setSelectedConfigId] = useState<number | null>(null);
   const [chatModes, setChatModes] = useState<Record<number, 'typed' | 'spoken'>>({});
   const [showModeModal, setShowModeModal] = useState(false);
@@ -72,6 +69,7 @@ export default function SessionView() {
     },
     enabled: !!token,
     staleTime: Infinity,
+    refetchInterval: 45_000,
   });
 
   const { data: liveStatus } = useQuery<LiveStatus>({
@@ -98,25 +96,11 @@ export default function SessionView() {
     if (firstLive) setSelectedConfigId(firstLive.id);
   }, [configs, selectedConfigId]);
 
-  // Show name modal if no name yet
-  useEffect(() => {
-    if (!userName && sessionData && !showNameModal) {
-      setShowNameModal(true);
-    }
-  }, [userName, sessionData, showNameModal]);
-
-  const handleNameSubmit = () => {
-    if (!nameInput.trim()) return;
-    const name = nameInput.trim();
-    localStorage.setItem(LS_NAME_KEY, name);
-    setUserName(name);
-    setShowNameModal(false);
-  };
-
   const handleSelectActivity = (config: SessionConfig) => {
     if (!config.isLive) return;
-    if (config.interactionMode === 'both' && !chatModes[config.id]) {
-      // Need to pick mode
+    // Only show mode picker when switching to a subsequent activity (name already known)
+    // For the first activity, the activity's own UserNameModal handles name + mode together
+    if (userName && config.interactionMode === 'both' && !chatModes[config.id]) {
       setPendingConfigId(config.id);
       setShowModeModal(true);
     } else {
@@ -218,7 +202,7 @@ export default function SessionView() {
               );
             })}
           </nav>
-          {userName && (
+          {userName && selectedConfig?.type !== 'quick-fire-quiz' && (
             <div className="px-3 py-3 border-t border-gray-100">
               <p className="text-xs text-gray-400 truncate">{userName}</p>
             </div>
@@ -226,7 +210,12 @@ export default function SessionView() {
         </div>
 
         {/* Main content */}
-        <div className="flex-1 overflow-hidden p-4 flex justify-center">
+        <div className="flex-1 overflow-hidden p-4 flex justify-center relative">
+          {selectedConfig && TIMER_TYPES.has(selectedConfig.type) && (
+            <div className="absolute top-4 right-4 z-10">
+              <ActivityTimerDisplay configId={selectedConfig.id} />
+            </div>
+          )}
           {!selectedConfig ? (
             <div className="h-full flex items-center justify-center text-gray-400 text-sm">
               Select an activity from the sidebar to get started.
@@ -239,6 +228,11 @@ export default function SessionView() {
                   sessionId={getSessionId(selectedConfig.id)}
                   userName={userName}
                   onUserNameSubmit={handleUserNameFromActivity}
+                />
+              ) : selectedConfig.type === 'quick-fire-quiz' ? (
+                <QuickFireQuizInterface
+                  configId={selectedConfig.id}
+                  userName={userName}
                 />
               ) : selectedConfig.type === 'quiz' ? (
                 <QuizInterface
@@ -271,27 +265,6 @@ export default function SessionView() {
 
       <WombleFooter />
 
-      {/* Name modal */}
-      <Dialog open={showNameModal} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle>Welcome! What's your name?</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <Input
-              placeholder="Your name"
-              value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleNameSubmit()}
-              autoFocus
-            />
-            <Button className="w-full bg-green-600 hover:bg-green-700" onClick={handleNameSubmit} disabled={!nameInput.trim()}>
-              Continue
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Mode modal (per-activity, shown when interactionMode === 'both') */}
       <Dialog open={showModeModal} onOpenChange={() => {}}>
         <DialogContent className="sm:max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
@@ -310,6 +283,74 @@ export default function SessionView() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+const TIMER_TYPES = new Set(['chat', 'teach-ai', 'two-way-conversation']);
+
+function ActivityTimerDisplay({ configId }: { configId: number }) {
+  const [tick, setTick] = useState(0);
+  const dingFiredRef = useRef(false);
+
+  const { data: timer } = useQuery<{ status: string; remainingSeconds: number; totalSeconds: number }>({
+    queryKey: ['/api/timer', configId, 'user'],
+    queryFn: async () => {
+      const res = await fetch(`/api/timer/${configId}`);
+      return res.json();
+    },
+    refetchInterval: 2000,
+  });
+
+  useEffect(() => {
+    if (timer?.status !== 'running') return;
+    const id = setInterval(() => setTick(t => t + 1), 500);
+    return () => clearInterval(id);
+  }, [timer?.status]);
+
+  useEffect(() => {
+    if (!timer) return;
+    if (timer.status === 'finished' && !dingFiredRef.current) {
+      dingFiredRef.current = true;
+      try {
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.4, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.2);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 1.2);
+      } catch {}
+    }
+    if (timer.status !== 'finished') dingFiredRef.current = false;
+  }, [timer?.status]);
+
+  if (!timer || timer.status === 'idle' || timer.totalSeconds === 0) return null;
+
+  const secs = Math.max(0, Math.ceil(timer.remainingSeconds));
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  const display = `${m}:${String(s).padStart(2, '0')}`;
+  const pct = timer.totalSeconds > 0 ? (timer.remainingSeconds / timer.totalSeconds) * 100 : 0;
+  const isLow = timer.remainingSeconds <= 60 && timer.status === 'running';
+  const isDone = timer.status === 'finished';
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm px-5 py-4 w-52">
+      <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Time remaining</p>
+      <p className={`text-4xl font-mono font-bold mb-3 ${isDone ? 'text-red-500' : isLow ? 'text-amber-500' : 'text-gray-900'}`}>
+        {isDone ? "0:00" : display}
+      </p>
+      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${isDone ? 'bg-red-400' : isLow ? 'bg-amber-400' : 'bg-green-500'}`}
+          style={{ width: `${Math.max(0, pct)}%` }}
+        />
+      </div>
+      {isDone && <p className="text-xs text-red-400 mt-2 text-center font-medium">Time's up!</p>}
     </div>
   );
 }

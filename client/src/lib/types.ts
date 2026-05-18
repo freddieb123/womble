@@ -23,14 +23,24 @@ export interface QuizQuestion {
   expectedAnswer: string;
 }
 
+export interface QuickFireQuestion {
+  id?: number;
+  question: string;
+  options: [string, string, string, string];
+  correctIndex: 0 | 1 | 2 | 3;
+  timeLimit: number;
+  orderIndex: number;
+}
+
 // Base configuration type
 export interface BaseConfig {
   id?: number;
   title: string;
-  type: 'chat' | 'upload' | 'quiz' | 'two-way-conversation' | 'teach-ai' | 'thought-partner';
+  type: 'chat' | 'upload' | 'quiz' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz';
   systemPrompt: string;
   userInstructions: string | null;
   feedbackCriteria: string | null;
+  feedbackHarshness?: 'encouraging' | 'developmental' | 'standard' | 'high-performance' | 'elite';
   temperature?: number;
   maxTokens?: number;
   interactionMode?: 'typed' | 'spoken' | 'both';
@@ -39,6 +49,7 @@ export interface BaseConfig {
 // Admin specific configuration
 export interface AdminConfig extends BaseConfig {
   questions?: QuizQuestion[];
+  quickFireQuestions?: QuickFireQuestion[];
   isTemplate?: boolean;
   templateDescription?: string;
   deleted?: boolean;
