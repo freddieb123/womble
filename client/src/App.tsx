@@ -10,6 +10,7 @@ import SessionAnalysis from "./pages/SessionAnalysis";
 import DualConversationPage from "./pages/DualConversationPage";
 import PresentationView from "./pages/PresentationView";
 import PresentationEditor from "./pages/PresentationEditor";
+import GroupBoardAdminPage from "./pages/GroupBoardAdminPage";
 import AuthPage from "./pages/auth-page";
 import ResetPasswordPage from "./pages/reset-password-page";
 import LandingPage from "./pages/LandingPage";
@@ -27,7 +28,8 @@ function App() {
         <Route path="/reset-password" component={ResetPasswordPage} />
         <ProtectedRoute path="/dashboard" component={Home} />
         <Route path="/chat" component={UserView} />
-<Route path="/dual-conversation/:id" component={DualConversationPage} />
+        <ProtectedRoute path="/group-board/:id" component={GroupBoardAdminPage} />
+        <Route path="/dual-conversation/:id" component={DualConversationPage} />
         <ProtectedRoute path="/analysis" component={ConversationAnalysis} />
         <ProtectedRoute path="/dual-analysis" component={DualConversationAnalysis} />
         <Route path="/session" component={SessionView} />
