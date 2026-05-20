@@ -22,10 +22,17 @@ export const sessions = pgTable("sessions", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export interface GroupBoardSettings {
+  numGroups: number;
+  groupLabels?: string[];
+  boardInstructions?: string;
+  showOtherGroups?: boolean;
+}
+
 export const chatConfigs = pgTable("chat_configs", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
-  type: text("type", { enum: ['chat', 'upload', 'quiz', 'two-way-conversation', 'teach-ai', 'thought-partner', 'quick-fire-quiz'] }).default('chat').notNull(),
+  type: text("type", { enum: ['chat', 'upload', 'quiz', 'two-way-conversation', 'teach-ai', 'thought-partner', 'quick-fire-quiz', 'group-board'] }).default('chat').notNull(),
   title: text("title").notNull(),
   systemPrompt: text("system_prompt").notNull(),
   userInstructions: text("user_instructions"),
@@ -42,6 +49,7 @@ export const chatConfigs = pgTable("chat_configs", {
   coachingStyle: integer("coaching_style"),
   referenceContent: text("reference_content"),
   referenceImages: jsonb("reference_images").$type<string[]>(),
+  groupBoardSettings: jsonb("group_board_settings").$type<GroupBoardSettings>(),
   interactionMode: text("interaction_mode", { enum: ['typed', 'spoken', 'both'] }).default('both'),
   feedbackHarshness: text("feedback_harshness", { enum: ['encouraging', 'developmental', 'standard', 'high-performance', 'elite'] }).default('standard'),
   sessionId: integer("session_id").references(() => sessions.id),
@@ -166,6 +174,8 @@ export const chatConfigsRelations = relations(chatConfigs, ({ one, many }) => ({
   quickFireQuizQuestions: many(quickFireQuizQuestions),
   quickFireQuizState: one(quickFireQuizState, { fields: [chatConfigs.id], references: [quickFireQuizState.configId] }),
   quickFireQuizResponses: many(quickFireQuizResponses),
+  groupBoardPostIts: many(groupBoardPostIts),
+  groupBoardComments: many(groupBoardComments),
 }));
 
 export const quizQuestionsRelations = relations(quizQuestions, ({ one }) => ({
@@ -263,6 +273,84 @@ export const quickFireQuizResponsesRelations = relations(quickFireQuizResponses,
   config: one(chatConfigs, { fields: [quickFireQuizResponses.configId], references: [chatConfigs.id] }),
   question: one(quickFireQuizQuestions, { fields: [quickFireQuizResponses.questionId], references: [quickFireQuizQuestions.id] }),
 }));
+
+// ─── Group Board ──────────────────────────────────────────────────────────────
+
+export const groupBoardPostIts = pgTable("group_board_post_its", {
+  id: serial("id").primaryKey(),
+  configId: integer("config_id").notNull().references(() => chatConfigs.id),
+  groupNumber: integer("group_number").notNull(),
+  authorName: text("author_name").notNull().default('Anonymous'),
+  text: text("text").notNull(),
+  color: text("color").notNull().default('#fbbf24'),
+  posX: integer("pos_x").notNull().default(10),
+  posY: integer("pos_y").notNull().default(10),
+  isTrainer: boolean("is_trainer").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const groupBoardComments = pgTable("group_board_comments", {
+  id: serial("id").primaryKey(),
+  configId: integer("config_id").notNull().references(() => chatConfigs.id),
+  groupNumber: integer("group_number").notNull(),
+  type: text("type", { enum: ['text', 'voice'] }).notNull().default('text'),
+  content: text("content"),
+  audioUrl: text("audio_url"),
+  authorName: text("author_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const groupBoardPostItsRelations = relations(groupBoardPostIts, ({ one }) => ({
+  config: one(chatConfigs, { fields: [groupBoardPostIts.configId], references: [chatConfigs.id] }),
+}));
+
+export const groupBoardCommentsRelations = relations(groupBoardComments, ({ one }) => ({
+  config: one(chatConfigs, { fields: [groupBoardComments.configId], references: [chatConfigs.id] }),
+}));
+
+// ─── Presentations ────────────────────────────────────────────────────────────
+
+export type PresentationFrame =
+  | { id: string; type: 'slide'; imageDataUrl: string; speakerNotes?: string }
+  | { id: string; type: 'activity'; configId: number; configTitle: string; configType: string };
+
+export const presentations = pgTable("presentations", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  title: text("title").notNull().default("New Presentation"),
+  shareToken: text("share_token").notNull().unique(),
+  frames: jsonb("frames").$type<PresentationFrame[]>().notNull().default([]),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const presentationState = pgTable("presentation_state", {
+  presentationId: integer("presentation_id").primaryKey().references(() => presentations.id),
+  phase: text("phase").notNull().default("waiting"),
+  currentFrame: integer("current_frame").notNull().default(0),
+  fullscreenMode: boolean("fullscreen_mode").notNull().default(false),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const presentationsRelations = relations(presentations, ({ one }) => ({
+  user: one(users, { fields: [presentations.userId], references: [users.id] }),
+  state: one(presentationState, { fields: [presentations.id], references: [presentationState.presentationId] }),
+}));
+
+export const presentationStateRelations = relations(presentationState, ({ one }) => ({
+  presentation: one(presentations, { fields: [presentationState.presentationId], references: [presentations.id] }),
+}));
+
+export type InsertPresentation = typeof presentations.$inferInsert;
+export type SelectPresentation = typeof presentations.$inferSelect;
+export type InsertPresentationState = typeof presentationState.$inferInsert;
+export type SelectPresentationState = typeof presentationState.$inferSelect;
+
+export type InsertGroupBoardPostIt = typeof groupBoardPostIts.$inferInsert;
+export type SelectGroupBoardPostIt = typeof groupBoardPostIts.$inferSelect;
+export type InsertGroupBoardComment = typeof groupBoardComments.$inferInsert;
+export type SelectGroupBoardComment = typeof groupBoardComments.$inferSelect;
 
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);

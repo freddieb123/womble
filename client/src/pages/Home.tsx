@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useLocation } from "wouter";
 import {
   DndContext,
   closestCenter,
@@ -23,7 +24,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Plus, Pencil, Copy, MoreVertical, BarChart2, Trash2,
   Flag, Share2, EyeOff, Keyboard, Mic, LogOut, GripVertical, Radio,
-  Layers, FolderOpen, Library, Play,
+  Layers, FolderOpen, Library, Play, Users, MonitorPlay,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { track, EventName } from "@/lib/mixpanel";
@@ -70,6 +71,7 @@ const AGENT_TYPE_FILTERS = [
   { type: 'thought-partner', label: 'Thought Partner' },
   { type: 'quiz', label: 'Quiz' },
   { type: 'quick-fire-quiz', label: 'Quick Fire Quiz' },
+  { type: 'group-board', label: 'Group Board' },
   { type: 'upload', label: 'Document Review' },
 ] as const;
 
@@ -86,7 +88,7 @@ function todayTitle() {
 type ChatConfig = {
   id: number;
   title: string;
-  type: 'chat' | 'upload' | 'quiz' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz';
+  type: 'chat' | 'upload' | 'quiz' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz' | 'group-board';
   systemPrompt: string;
   userInstructions: string | null;
   feedbackCriteria: string | null;
@@ -309,6 +311,7 @@ function SortableAgentCard({
     quiz: { label: 'Quiz', classes: 'bg-gray-50 text-gray-600 border-gray-200' },
     upload: { label: 'Document Review', classes: 'bg-purple-50 text-purple-700 border-purple-200' },
     'quick-fire-quiz': { label: 'Quick Fire Quiz', classes: 'bg-amber-50 text-amber-700 border-amber-200' },
+    'group-board': { label: 'Group Board', classes: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   }[config.type] ?? { label: config.type, classes: 'bg-gray-50 text-gray-600 border-gray-200' };
 
   return (
@@ -353,6 +356,20 @@ function SortableAgentCard({
         <AgentTimer configId={config.id} />
       )}
 
+      {/* View Board button — directly visible on group-board cards */}
+      {config.type === 'group-board' && !isLibraryView && (
+        <a
+          href={`/group-board/${config.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors flex-shrink-0"
+          onClick={e => e.stopPropagation()}
+        >
+          <Users className="h-3 w-3" />
+          View Board
+        </a>
+      )}
+
       {/* Control Quiz button — directly visible on quick-fire-quiz cards */}
       {config.type === 'quick-fire-quiz' && onControlQuiz && !isLibraryView && (
         <button
@@ -393,7 +410,7 @@ function SortableAgentCard({
             <DropdownMenuItem onClick={onDuplicate}><Copy className="h-4 w-4 mr-2" />Duplicate</DropdownMenuItem>
           )}
           <DropdownMenuItem onClick={onCopyLink}><Share2 className="h-4 w-4 mr-2" />Share individual link</DropdownMenuItem>
-          {!isLibraryView && (
+          {!isLibraryView && config.type !== 'group-board' && (
             <DropdownMenuItem onClick={onViewFeedback}><BarChart2 className="h-4 w-4 mr-2" />View Feedback</DropdownMenuItem>
           )}
           {!config.isTemplate && (
@@ -415,6 +432,7 @@ export default function Home() {
   const { logoutMutation, user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
 
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(() => {
     const stored = localStorage.getItem(LS_SESSION_KEY);
@@ -464,6 +482,42 @@ export default function Home() {
 
   const regularSessions = sessionList.filter(s => !s.isLibrary);
   const librarySessions = sessionList.filter(s => s.isLibrary);
+
+  // ── Presentations ─────────────────────────────────────────────────────────
+  type PresentationSummary = { id: number; title: string; shareToken: string; createdAt: string };
+  const { data: presentationList = [], refetch: refetchPresentations } = useQuery<PresentationSummary[]>({
+    queryKey: ['/api/presentations'],
+    queryFn: async () => {
+      const res = await fetch('/api/presentations');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!user?.id,
+  });
+
+  const createPresentation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/presentations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'New Presentation' }) });
+      return res.json() as Promise<PresentationSummary>;
+    },
+    onSuccess: (pres) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/presentations'] });
+      navigate(`/presentations/${pres.id}/edit`);
+    },
+  });
+
+  const deletePresentation = useMutation({
+    mutationFn: async (id: number) => {
+      await fetch(`/api/presentations/${id}`, { method: 'DELETE' });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/presentations'] }),
+  });
+
+  const copyPresentationLink = (pres: PresentationSummary) => {
+    const url = `${window.location.origin}/present?token=${pres.shareToken}`;
+    navigator.clipboard.writeText(url);
+    toast({ title: 'Link copied', description: url });
+  };
 
   // Auto-select on first load or after deletion
   useEffect(() => {
@@ -643,6 +697,7 @@ export default function Home() {
           referenceContent: c.referenceContent ?? null,
           referenceImages: c.referenceImages ?? null,
           interactionMode: c.interactionMode ?? 'both',
+          groupBoardSettings: c.groupBoardSettings ?? null,
           sessionId: selectedSessionId,
         }),
       });
@@ -908,7 +963,7 @@ export default function Home() {
         </DropdownMenu>
 
         {/* Action buttons */}
-        <div className="px-3 pt-4 pb-3">
+        <div className="px-3 pt-4 pb-3 flex flex-col gap-2">
           <button
             onClick={() => createSession.mutate()}
             disabled={createSession.isPending}
@@ -916,6 +971,14 @@ export default function Home() {
           >
             <Plus className="h-4 w-4 flex-shrink-0" />
             New Session
+          </button>
+          <button
+            onClick={() => createPresentation.mutate()}
+            disabled={createPresentation.isPending}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
+          >
+            <MonitorPlay className="h-4 w-4 flex-shrink-0" />
+            New Presentation
           </button>
         </div>
 
@@ -962,6 +1025,42 @@ export default function Home() {
 
           {loadingSessions && (
             <p className="text-xs text-gray-400 px-5 py-3">Loading...</p>
+          )}
+
+          {/* Presentations section */}
+          {presentationList.length > 0 && (
+            <div className="px-3 pt-3 pb-2">
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-2 mb-1">Presentations</p>
+              <div className="space-y-0.5">
+                {presentationList.map(pres => (
+                  <div key={pres.id} className="group flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-gray-100 cursor-pointer">
+                    <MonitorPlay className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                    <span
+                      className="flex-1 text-sm text-gray-700 truncate"
+                      onClick={() => navigate(`/presentations/${pres.id}/edit`)}
+                    >
+                      {pres.title}
+                    </span>
+                    <div className="hidden group-hover:flex gap-0.5">
+                      <button
+                        title="Share"
+                        onClick={(e) => { e.stopPropagation(); copyPresentationLink(pres); }}
+                        className="p-0.5 text-gray-400 hover:text-blue-600 rounded"
+                      >
+                        <Share2 className="h-3 w-3" />
+                      </button>
+                      <button
+                        title="Delete"
+                        onClick={(e) => { e.stopPropagation(); deletePresentation.mutate(pres.id); }}
+                        className="p-0.5 text-gray-400 hover:text-red-600 rounded"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 

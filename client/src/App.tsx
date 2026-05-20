@@ -8,6 +8,8 @@ import StaticTranscriptView from "./pages/StaticTranscriptView";
 import SessionView from "./pages/SessionView";
 import SessionAnalysis from "./pages/SessionAnalysis";
 import DualConversationPage from "./pages/DualConversationPage";
+import PresentationView from "./pages/PresentationView";
+import PresentationEditor from "./pages/PresentationEditor";
 import AuthPage from "./pages/auth-page";
 import ResetPasswordPage from "./pages/reset-password-page";
 import LandingPage from "./pages/LandingPage";
@@ -29,6 +31,8 @@ function App() {
         <ProtectedRoute path="/analysis" component={ConversationAnalysis} />
         <ProtectedRoute path="/dual-analysis" component={DualConversationAnalysis} />
         <Route path="/session" component={SessionView} />
+        <Route path="/present" component={PresentationView} />
+        <ProtectedRoute path="/presentations/:id/edit" component={PresentationEditor} />
         <ProtectedRoute path="/session-analysis" component={SessionAnalysis} />
         <Route path="/conversation" component={StaticConversationView} />
         <Route path="/transcript/:configId/:sessionId" component={StaticTranscriptView} />

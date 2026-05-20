@@ -2,9 +2,11 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db, pool } from "@db";
-import { chatConfigs, conversations, uploads, quizQuestions, quizResponses, dualConversations, sessions, quickFireQuizQuestions, quickFireQuizState, quickFireQuizResponses, type Message, type ConversationFeedback, type UploadFeedback, type DualConversationFeedback } from "@db/schema";
+import { chatConfigs, conversations, uploads, quizQuestions, quizResponses, dualConversations, sessions, quickFireQuizQuestions, quickFireQuizState, quickFireQuizResponses, groupBoardPostIts, groupBoardComments, type Message, type ConversationFeedback, type UploadFeedback, type DualConversationFeedback } from "@db/schema";
+import { broadcastBoardState } from "./routes/group-board-ws";
 import { eq, and, or, desc, count, isNull } from "drizzle-orm";
 import { saveAudio, handleSaveAudio, transcribeAudio, generateFeedback } from "./routes/dual-conversation";
+import { registerPresentationRoutes } from "./routes/presentations";
 import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
@@ -70,7 +72,13 @@ const quizQuestionSchema = z.object({
 
 const chatConfigSchema = z.object({
   title: z.string().min(1, "Title is required"),
-  type: z.enum(['chat', 'upload', 'quiz', 'two-way-conversation', 'teach-ai', 'thought-partner', 'quick-fire-quiz']).default('chat'),
+  type: z.enum(['chat', 'upload', 'quiz', 'two-way-conversation', 'teach-ai', 'thought-partner', 'quick-fire-quiz', 'group-board']).default('chat'),
+  groupBoardSettings: z.object({
+    numGroups: z.number().int().min(2).max(8),
+    groupLabels: z.array(z.string()).optional(),
+    boardInstructions: z.string().optional(),
+    showOtherGroups: z.boolean().optional(),
+  }).nullable().optional(),
   systemPrompt: z.string().optional().default(''),
   userInstructions: z.string().nullable(),
   feedbackCriteria: z.string().nullable(),
@@ -201,6 +209,31 @@ export function registerRoutes(app: Express): Server {
   pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW()`).catch(() => {});
   pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS is_library BOOLEAN NOT NULL DEFAULT false`).catch(() => {});
 
+  pool.query(`ALTER TABLE chat_configs ADD COLUMN IF NOT EXISTS group_board_settings JSONB`).catch(() => {});
+  pool.query(`CREATE TABLE IF NOT EXISTS group_board_post_its (
+    id SERIAL PRIMARY KEY,
+    config_id INTEGER NOT NULL REFERENCES chat_configs(id),
+    group_number INTEGER NOT NULL,
+    author_name TEXT NOT NULL DEFAULT 'Anonymous',
+    text TEXT NOT NULL,
+    color TEXT NOT NULL DEFAULT '#fbbf24',
+    pos_x INTEGER NOT NULL DEFAULT 10,
+    pos_y INTEGER NOT NULL DEFAULT 10,
+    is_trainer BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+  )`).catch(() => {});
+  pool.query(`CREATE TABLE IF NOT EXISTS group_board_comments (
+    id SERIAL PRIMARY KEY,
+    config_id INTEGER NOT NULL REFERENCES chat_configs(id),
+    group_number INTEGER NOT NULL,
+    type TEXT NOT NULL DEFAULT 'text',
+    content TEXT,
+    audio_url TEXT,
+    author_name TEXT,
+    created_at TIMESTAMP DEFAULT NOW() NOT NULL
+  )`).catch(() => {});
+
   pool.query(`CREATE TABLE IF NOT EXISTS quick_fire_quiz_questions (
     id SERIAL PRIMARY KEY,
     config_id INTEGER NOT NULL REFERENCES chat_configs(id),
@@ -231,6 +264,24 @@ export function registerRoutes(app: Express): Server {
     points INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT NOW(),
     UNIQUE (config_id, question_id, participant_id)
+  )`).catch(() => {});
+
+  // Presentations feature migrations
+  pool.query(`CREATE TABLE IF NOT EXISTS presentations (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    title TEXT NOT NULL DEFAULT 'New Presentation',
+    share_token TEXT NOT NULL UNIQUE,
+    frames JSONB NOT NULL DEFAULT '[]',
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+  )`).catch(() => {});
+  pool.query(`CREATE TABLE IF NOT EXISTS presentation_state (
+    presentation_id INTEGER PRIMARY KEY REFERENCES presentations(id),
+    phase TEXT NOT NULL DEFAULT 'waiting',
+    current_frame INTEGER NOT NULL DEFAULT 0,
+    fullscreen_mode BOOLEAN NOT NULL DEFAULT false,
+    updated_at TIMESTAMP DEFAULT NOW()
   )`).catch(() => {});
 
   // Backfill: mark any existing "My Agents" sessions as library (runs after DDL has settled)
@@ -409,7 +460,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/chat-configs", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { title, type, systemPrompt, userInstructions, feedbackCriteria, feedbackHarshness, questions, quickFireQuestions, participant1Role, participant2Role, knowledgeLevel, attitude, coachingStyle, referenceContent, referenceImages, interactionMode } = chatConfigSchema.parse(req.body);
+      const { title, type, systemPrompt, userInstructions, feedbackCriteria, feedbackHarshness, questions, quickFireQuestions, participant1Role, participant2Role, knowledgeLevel, attitude, coachingStyle, referenceContent, referenceImages, interactionMode, groupBoardSettings } = chatConfigSchema.parse(req.body);
       const sessionId: number | null = req.body.sessionId ?? null;
 
       // Get the user ID from the authenticated request
@@ -423,7 +474,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Quiz type requires at least one question" });
       }
 
-      const autoGeneratedTypes = ['teach-ai', 'thought-partner', 'quick-fire-quiz'];
+      const autoGeneratedTypes = ['teach-ai', 'thought-partner', 'quick-fire-quiz', 'group-board'];
       if (!autoGeneratedTypes.includes(type) && !systemPrompt?.trim()) {
         return res.status(400).json({ error: "System prompt is required" });
       }
@@ -432,6 +483,8 @@ export function registerRoutes(app: Express): Server {
         ? buildTeachAiSystemPrompt(userInstructions, knowledgeLevel ?? 2, attitude ?? 2)
         : type === 'thought-partner'
         ? buildThoughtPartnerSystemPrompt(userInstructions, referenceContent ?? null, coachingStyle ?? 2)
+        : type === 'group-board'
+        ? ''
         : systemPrompt!;
 
       // Assign to session if provided
@@ -461,6 +514,7 @@ export function registerRoutes(app: Express): Server {
         referenceImages: referenceImages ?? null,
         interactionMode: interactionMode ?? 'both',
         feedbackHarshness: feedbackHarshness ?? 'standard',
+        groupBoardSettings: groupBoardSettings ?? null,
         userId,
         deleted: false,
         createdAt: new Date(),
@@ -529,9 +583,9 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ error: "You don't have permission to modify this configuration" });
       }
 
-      const { title, type, systemPrompt, userInstructions, feedbackCriteria, feedbackHarshness, questions, quickFireQuestions, participant1Role, participant2Role, knowledgeLevel, attitude, coachingStyle, referenceContent, referenceImages, interactionMode } = chatConfigSchema.parse(req.body);
+      const { title, type, systemPrompt, userInstructions, feedbackCriteria, feedbackHarshness, questions, quickFireQuestions, participant1Role, participant2Role, knowledgeLevel, attitude, coachingStyle, referenceContent, referenceImages, interactionMode, groupBoardSettings } = chatConfigSchema.parse(req.body);
 
-      const autoGeneratedTypes = ['teach-ai', 'thought-partner', 'quick-fire-quiz'];
+      const autoGeneratedTypes = ['teach-ai', 'thought-partner', 'quick-fire-quiz', 'group-board'];
       if (!autoGeneratedTypes.includes(type) && !systemPrompt?.trim()) {
         return res.status(400).json({ error: "System prompt is required" });
       }
@@ -540,6 +594,8 @@ export function registerRoutes(app: Express): Server {
         ? buildTeachAiSystemPrompt(userInstructions, knowledgeLevel ?? 2, attitude ?? 2)
         : type === 'thought-partner'
         ? buildThoughtPartnerSystemPrompt(userInstructions, referenceContent ?? null, coachingStyle ?? 2)
+        : type === 'group-board'
+        ? ''
         : systemPrompt!;
 
       const updatedConfig = await db.update(chatConfigs)
@@ -558,6 +614,7 @@ export function registerRoutes(app: Express): Server {
           referenceImages: referenceImages ?? null,
           interactionMode: interactionMode ?? 'both',
           feedbackHarshness: feedbackHarshness ?? 'standard',
+          groupBoardSettings: groupBoardSettings ?? null,
         })
         .where(and(
           eq(chatConfigs.id, configId),
@@ -2665,6 +2722,7 @@ Score: [1-10 based on overall coverage and quality of explanation]
           referenceImages: c.referenceImages,
           referenceContent: c.referenceContent,
           sessionOrder: c.sessionOrder,
+          groupBoardSettings: c.groupBoardSettings,
         })),
       });
     } catch (error: any) {
@@ -2690,6 +2748,69 @@ Score: [1-10 based on overall coverage and quality of explanation]
       res.status(500).json({ error: error.message });
     }
   });
+
+  // ── Group Board REST ─────────────────────────────────────────────────────────
+
+  app.get("/api/group-board/:configId/state", async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.configId);
+      if (isNaN(configId)) return res.status(400).json({ error: "Invalid configId" });
+      const [postIts, comments] = await Promise.all([
+        db.select().from(groupBoardPostIts).where(eq(groupBoardPostIts.configId, configId)),
+        db.select().from(groupBoardComments).where(eq(groupBoardComments.configId, configId)),
+      ]);
+      res.json({ postIts, comments });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/group-board/:configId/postit/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const postitId = parseInt(req.params.id);
+      if (isNaN(postitId)) return res.status(400).json({ error: "Invalid id" });
+      await db.delete(groupBoardPostIts).where(eq(groupBoardPostIts.id, postitId));
+      await broadcastBoardState(parseInt(req.params.configId));
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/group-board/:configId/comment-voice", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.configId);
+      const { groupNumber, audioUrl, authorName } = req.body;
+      if (isNaN(configId) || !groupNumber || !audioUrl) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      await db.insert(groupBoardComments).values({
+        configId,
+        groupNumber: Number(groupNumber),
+        type: 'voice',
+        audioUrl: String(audioUrl),
+        authorName: authorName || 'Trainer',
+      });
+      await broadcastBoardState(configId);
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/group-board/:configId/comment/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const commentId = parseInt(req.params.id);
+      if (isNaN(commentId)) return res.status(400).json({ error: "Invalid id" });
+      await db.delete(groupBoardComments).where(eq(groupBoardComments.id, commentId));
+      await broadcastBoardState(parseInt(req.params.configId));
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  registerPresentationRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;
