@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Users, GraduationCap, Brain, Zap, ArrowLeft, ArrowRight, Sparkles, Loader2, Upload, X, Mic, MicOff, Keyboard } from "lucide-react";
+import { MessageSquare, Users, GraduationCap, Brain, Zap, ArrowLeft, ArrowRight, Sparkles, Loader2, Upload, X, Mic, MicOff, Keyboard, LayoutGrid } from "lucide-react";
 import type { AdminConfig } from "@/lib/types";
 import QuickFireQuizEditor from "@/components/QuickFireQuizEditor";
 
@@ -15,7 +15,7 @@ interface Props {
   prefill?: AdminConfig;
 }
 
-type WizardType = 'chat' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz';
+type WizardType = 'chat' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz' | 'group-board';
 
 const TYPE_CONFIG: Record<WizardType, {
   icon: React.ElementType;
@@ -58,6 +58,13 @@ const TYPE_CONFIG: Record<WizardType, {
     subtitle: 'Kahoot-style live quiz — everyone answers simultaneously, speed earns bonus points',
     placeholder: '',
     badge: 'Quick Fire Quiz',
+  },
+  'group-board': {
+    icon: LayoutGrid,
+    label: 'Group Board',
+    subtitle: 'Collaborative canvas — groups add post-its to their zone in real time',
+    placeholder: '',
+    badge: 'Group Board',
   },
 };
 
@@ -260,7 +267,15 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
           })}
         </div>
         <div className="flex justify-end pt-2">
-          <Button onClick={() => { setConfig(prev => ({ ...prev, type: selectedType! })); selectedType === 'quick-fire-quiz' ? setStep(3) : setStep(2); }} disabled={!selectedType}>
+          <Button onClick={() => {
+            const skipDescribe = selectedType === 'quick-fire-quiz' || selectedType === 'group-board';
+            setConfig(prev => ({
+              ...prev,
+              type: selectedType!,
+              ...(selectedType === 'group-board' ? { groupBoardSettings: { numGroups: 4, showOtherGroups: true } } : {}),
+            }));
+            skipDescribe ? setStep(3) : setStep(2);
+          }} disabled={!selectedType}>
             Continue <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
         </div>
@@ -340,6 +355,72 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
   const isTwoWay = config.type === 'two-way-conversation';
   const isThoughtPartner = config.type === 'thought-partner';
   const isQuickFireQuiz = config.type === 'quick-fire-quiz';
+  const isGroupBoard = config.type === 'group-board';
+
+  if (isGroupBoard) {
+    const settings = config.groupBoardSettings ?? { numGroups: 4, showOtherGroups: true };
+    return (
+      <div className="space-y-5">
+        <StepIndicator current={3} />
+        <div className="space-y-2">
+          <Label htmlFor="gb-title">Title</Label>
+          <input
+            id="gb-title"
+            type="text"
+            className="w-full px-3 py-2 border rounded-md text-sm"
+            value={config.title}
+            onChange={e => setConfig(prev => ({ ...prev, title: e.target.value }))}
+            placeholder="e.g. Identify the key risks"
+          />
+        </div>
+        <div className="space-y-3 border rounded-lg p-4">
+          <p className="text-sm font-medium flex items-center gap-2">
+            <LayoutGrid className="h-4 w-4 text-green-600" /> Board Setup
+          </p>
+          <div className="space-y-2">
+            <Label>Number of Groups</Label>
+            <div className="flex items-center gap-3">
+              <Slider
+                min={2} max={8} step={1}
+                value={[settings.numGroups ?? 4]}
+                onValueChange={([v]) => setConfig(prev => ({ ...prev, groupBoardSettings: { ...settings, numGroups: v } }))}
+                className="flex-1"
+              />
+              <span className="text-sm font-medium text-green-700 w-8 text-right">{settings.numGroups ?? 4}</span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="gb-instructions">Board Instructions</Label>
+            <Textarea
+              id="gb-instructions"
+              value={settings.boardInstructions ?? ''}
+              onChange={e => setConfig(prev => ({ ...prev, groupBoardSettings: { ...settings, boardInstructions: e.target.value } }))}
+              placeholder="e.g. In your group, identify the top 3 risks and add them as post-its in your zone."
+              className="resize-none"
+              rows={3}
+            />
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.showOtherGroups !== false}
+              onChange={e => setConfig(prev => ({ ...prev, groupBoardSettings: { ...settings, showOtherGroups: e.target.checked } }))}
+              className="rounded"
+            />
+            <span className="text-sm text-gray-700">Show other groups' boards to participants</span>
+          </label>
+        </div>
+        <div className="flex justify-between pt-2">
+          <Button variant="ghost" onClick={() => setStep(1)}>
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back
+          </Button>
+          <Button onClick={() => onSave(config)} disabled={isSaving || !config.title.trim()}>
+            {isSaving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : 'Save Board'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (isQuickFireQuiz) {
     return (

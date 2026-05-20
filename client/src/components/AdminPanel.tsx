@@ -3,7 +3,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import { Sparkles, X, Upload, Keyboard, Mic, Lock } from "lucide-react";
+import { Sparkles, X, Upload, Keyboard, Mic, Lock, Users } from "lucide-react";
 import type { AdminConfig } from "@/lib/types";
 import { useState, useRef } from "react";
 
@@ -30,11 +30,13 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
   const [isGenerating, setIsGenerating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleTypeChange = (newType: 'chat' | 'two-way-conversation' | 'teach-ai' | 'thought-partner') => {
+  const handleTypeChange = (newType: 'chat' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'group-board') => {
     const extra = newType === 'teach-ai'
       ? { knowledgeLevel: 2, attitude: 2, systemPrompt: config.systemPrompt || ' ' }
       : newType === 'thought-partner'
       ? { coachingStyle: 2, systemPrompt: config.systemPrompt || ' ' }
+      : newType === 'group-board'
+      ? { groupBoardSettings: { numGroups: 4, showOtherGroups: true } }
       : {};
     onConfigChange({ ...config, type: newType, ...extra });
   };
@@ -89,6 +91,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
 
   const isTeachAi = config.type === 'teach-ai';
   const isThoughtPartner = config.type === 'thought-partner';
+  const isGroupBoard = config.type === 'group-board';
   const showHarshness = config.type === 'chat' || config.type === 'two-way-conversation' || config.type === 'teach-ai';
 
   const HARSHNESS_LEVELS = [
@@ -114,6 +117,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               {config.type === 'chat' ? 'Conversation with AI' :
                config.type === 'two-way-conversation' ? 'Two-way Conversation' :
                config.type === 'teach-ai' ? 'Teach an AI' :
+               config.type === 'group-board' ? 'Group Board' :
                'Thought Partner'}
             </span>
             <span className="text-xs text-gray-400 ml-1">— cannot be changed</span>
@@ -150,12 +154,19 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
             >
               Thought Partner
             </button>
+            <button
+              type="button"
+              className={`px-4 py-2 text-sm font-medium focus:outline-none ${isGroupBoard ? "bg-green-200 text-green-900" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+              onClick={() => handleTypeChange('group-board')}
+            >
+              Group Board
+            </button>
           </div>
         </div>
       )}
 
-      {/* Interaction mode selector */}
-      <div className="space-y-1">
+      {/* Interaction mode selector — not applicable for group boards */}
+      {!isGroupBoard && <div className="space-y-1">
         <Label className="text-xs text-muted-foreground uppercase tracking-wide">Interaction Mode</Label>
         <div className="inline-flex items-center gap-1 rounded-md border p-1">
           {([
@@ -179,7 +190,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
             </button>
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* Create with AI */}
       {!isEditMode && <div className="space-y-2">
@@ -366,8 +377,63 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
           </div>
         )}
 
+        {/* Group Board settings */}
+        {isGroupBoard && (
+          <div className="space-y-4 border rounded-lg p-4">
+            <p className="text-sm font-medium flex items-center gap-2">
+              <Users className="h-4 w-4 text-green-600" /> Board Setup
+            </p>
+            <div className="space-y-2">
+              <Label>Number of Groups</Label>
+              <div className="flex items-center gap-3">
+                <Slider
+                  min={2} max={8} step={1}
+                  value={[config.groupBoardSettings?.numGroups ?? 4]}
+                  onValueChange={([v]) => onConfigChange({
+                    ...config,
+                    groupBoardSettings: { ...(config.groupBoardSettings ?? { showOtherGroups: true }), numGroups: v },
+                  })}
+                  className="flex-1"
+                />
+                <span className="text-sm font-medium text-green-700 w-8 text-right">
+                  {config.groupBoardSettings?.numGroups ?? 4}
+                </span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="board-instructions">Board Instructions</Label>
+              <Textarea
+                id="board-instructions"
+                value={config.groupBoardSettings?.boardInstructions ?? ''}
+                onChange={e => onConfigChange({
+                  ...config,
+                  groupBoardSettings: { ...(config.groupBoardSettings ?? { numGroups: 4 }), boardInstructions: e.target.value },
+                })}
+                placeholder="e.g. In your group, identify the top 3 risks and add them as post-its in your zone."
+                className="resize-none"
+                rows={3}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="show-other-groups"
+                checked={config.groupBoardSettings?.showOtherGroups !== false}
+                onChange={e => onConfigChange({
+                  ...config,
+                  groupBoardSettings: { ...(config.groupBoardSettings ?? { numGroups: 4 }), showOtherGroups: e.target.checked },
+                })}
+                className="rounded"
+              />
+              <Label htmlFor="show-other-groups" className="font-normal text-sm cursor-pointer">
+                Show other groups' boards to participants
+              </Label>
+            </div>
+          </div>
+        )}
+
         {/* System prompt — hidden for auto-generated types */}
-        {!isTeachAi && !isThoughtPartner && (
+        {!isTeachAi && !isThoughtPartner && !isGroupBoard && (
           <div className="space-y-2">
             <Label htmlFor="system-prompt">System Prompt</Label>
             <Textarea
@@ -384,32 +450,34 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
           </div>
         )}
 
-        <div className="space-y-2">
-          <Label htmlFor="user-instructions">
-            {isTeachAi ? 'Topic & Key Points' : isThoughtPartner ? 'Topic / Focus Area' : 'User Instructions'}
-          </Label>
-          <Textarea
-            id="user-instructions"
-            value={config.userInstructions || ''}
-            onChange={(e) => onConfigChange({ ...config, userInstructions: e.target.value })}
-            placeholder={
-              isTeachAi
-                ? "e.g. Topic: The water cycle\n\nKey points to cover:\n- Evaporation\n- Condensation\n- Precipitation\n- Collection"
+        {!isGroupBoard && (
+          <div className="space-y-2">
+            <Label htmlFor="user-instructions">
+              {isTeachAi ? 'Topic & Key Points' : isThoughtPartner ? 'Topic / Focus Area' : 'User Instructions'}
+            </Label>
+            <Textarea
+              id="user-instructions"
+              value={config.userInstructions || ''}
+              onChange={(e) => onConfigChange({ ...config, userInstructions: e.target.value })}
+              placeholder={
+                isTeachAi
+                  ? "e.g. Topic: The water cycle\n\nKey points to cover:\n- Evaporation\n- Condensation\n- Precipitation\n- Collection"
+                  : isThoughtPartner
+                  ? "e.g. AI strategy — how to identify the right use cases and build an implementation roadmap"
+                  : "Enter instructions for users..."
+              }
+              className="resize-none"
+              rows={4}
+            />
+            <p className="text-sm text-muted-foreground">
+              {isTeachAi
+                ? 'Describe the topic and list the key points the learner should cover.'
                 : isThoughtPartner
-                ? "e.g. AI strategy — how to identify the right use cases and build an implementation roadmap"
-                : "Enter instructions for users..."
-            }
-            className="resize-none"
-            rows={4}
-          />
-          <p className="text-sm text-muted-foreground">
-            {isTeachAi
-              ? 'Describe the topic and list the key points the learner should cover.'
-              : isThoughtPartner
-              ? 'Describe the concept or challenge this session helps learners think through. The AI will use this to open the conversation.'
-              : 'Add helpful instructions or context that will be shown to users.'}
-          </p>
-        </div>
+                ? 'Describe the concept or challenge this session helps learners think through. The AI will use this to open the conversation.'
+                : 'Add helpful instructions or context that will be shown to users.'}
+            </p>
+          </div>
+        )}
 
         {showHarshness && (
           <div className="space-y-2">
@@ -440,7 +508,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
           </div>
         )}
 
-        <div className="space-y-2">
+        {!isGroupBoard && <div className="space-y-2">
           <Label htmlFor="feedback-criteria">
             {isThoughtPartner ? 'Summary Focus (optional)' : 'Feedback Criteria'}
           </Label>
@@ -463,7 +531,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               Optionally guide what the AI highlights in the thinking map summary.
             </p>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   );

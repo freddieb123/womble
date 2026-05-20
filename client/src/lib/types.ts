@@ -32,11 +32,18 @@ export interface QuickFireQuestion {
   orderIndex: number;
 }
 
+export interface GroupBoardSettings {
+  numGroups: number;
+  groupLabels?: string[];
+  boardInstructions?: string;
+  showOtherGroups?: boolean;
+}
+
 // Base configuration type
 export interface BaseConfig {
   id?: number;
   title: string;
-  type: 'chat' | 'upload' | 'quiz' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz';
+  type: 'chat' | 'upload' | 'quiz' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz' | 'group-board';
   systemPrompt: string;
   userInstructions: string | null;
   feedbackCriteria: string | null;
@@ -62,6 +69,7 @@ export interface AdminConfig extends BaseConfig {
   coachingStyle?: number;
   referenceContent?: string;
   referenceImages?: string[];
+  groupBoardSettings?: GroupBoardSettings | null;
 }
 
 // Template specific configuration

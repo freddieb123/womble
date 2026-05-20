@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
+import { setupGroupBoardWS } from "./routes/group-board-ws";
 import { setupVite, log } from "./vite";
 import path from "path";
 import fs from "fs";
@@ -45,6 +46,7 @@ app.use((req, res, next) => {
 const startServer = async () => {
   try {
     const server = registerRoutes(app);
+    setupGroupBoardWS(server);
 
     // Global error handler with enhanced logging
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

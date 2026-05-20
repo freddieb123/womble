@@ -4,12 +4,17 @@ import { AlertCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import GroupBoardInterface from "@/components/GroupBoardInterface";
 
 type SessionConfig = {
   id: number;
   title: string;
   type: string;
   isLive: boolean;
+  groupBoardSettings?: any;
+  systemPrompt?: string;
+  userInstructions?: string | null;
+  feedbackCriteria?: string | null;
 };
 
 type SessionData = {
@@ -109,10 +114,27 @@ export default function SessionAnalysis() {
         </div>
 
         {/* Main content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-hidden flex flex-col">
           {!selectedConfig ? (
             <div className="text-center text-gray-400 text-sm py-16">Select an activity from the sidebar.</div>
+          ) : selectedConfig.type === 'group-board' ? (
+            <div className="flex-1 overflow-hidden">
+              <GroupBoardInterface
+                config={{
+                  id: selectedConfig.id,
+                  type: 'group-board',
+                  title: selectedConfig.title,
+                  systemPrompt: selectedConfig.systemPrompt || '',
+                  userInstructions: selectedConfig.userInstructions || '',
+                  feedbackCriteria: selectedConfig.feedbackCriteria || '',
+                  groupBoardSettings: selectedConfig.groupBoardSettings,
+                }}
+                userName="Trainer"
+                isAdmin={true}
+              />
+            </div>
           ) : (
+            <div className="flex-1 overflow-y-auto p-6">
             <>
               <div className={`flex items-center gap-3 mb-6 ${selectedConfig.type === 'quick-fire-quiz' ? 'justify-center' : ''}`}>
                 <h1 className="text-xl font-bold text-gray-900">{selectedConfig.title}</h1>
@@ -183,6 +205,7 @@ export default function SessionAnalysis() {
                 </div>
               )}
             </>
+            </div>
           )}
         </div>
       </div>

@@ -5,6 +5,7 @@ import ChatInterface from "@/components/ChatInterface";
 import VoiceChatInterface from "@/components/VoiceChatInterface";
 import UploadInterface from "@/components/UploadInterface";
 import QuizInterface from "@/components/QuizInterface";
+import GroupBoardInterface from "@/components/GroupBoardInterface";
 import WombleHeader from "@/components/WombleHeader";
 import WombleFooter from "@/components/WombleFooter";
 import { ParticipantCount, LiveLeaderboard } from "@/components/LiveActivityPanel";
@@ -106,6 +107,7 @@ export default function UserView() {
     referenceImages: (savedConfig as any).referenceImages ?? undefined,
     referenceContent: (savedConfig as any).referenceContent ?? undefined,
     interactionMode: ((savedConfig as any).interactionMode ?? 'both') as 'typed' | 'spoken' | 'both',
+    groupBoardSettings: (savedConfig as any).groupBoardSettings ?? undefined,
   };
 
   console.log('Transformed config:', config);
@@ -123,6 +125,26 @@ export default function UserView() {
             </div>
           </Card>
         </div>
+      </div>
+    );
+  }
+
+  if (config.type === 'group-board') {
+    return (
+      <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+        <WombleHeader />
+        <div className="flex-1 overflow-hidden px-4 py-3">
+          <div className="max-w-6xl mx-auto h-full">
+            <div className="h-full bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <GroupBoardInterface
+                config={config}
+                userName={userName}
+                onUserNameSubmit={updateUrlWithUserName}
+              />
+            </div>
+          </div>
+        </div>
+        <WombleFooter />
       </div>
     );
   }
