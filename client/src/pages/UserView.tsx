@@ -6,6 +6,7 @@ import VoiceChatInterface from "@/components/VoiceChatInterface";
 import UploadInterface from "@/components/UploadInterface";
 import QuizInterface from "@/components/QuizInterface";
 import GroupBoardInterface from "@/components/GroupBoardInterface";
+import UserTesterInterface from "@/components/UserTesterInterface";
 import WombleHeader from "@/components/WombleHeader";
 import WombleFooter from "@/components/WombleFooter";
 import { ParticipantCount, LiveLeaderboard } from "@/components/LiveActivityPanel";
@@ -125,6 +126,23 @@ export default function UserView() {
             </div>
           </Card>
         </div>
+      </div>
+    );
+  }
+
+  if (config.type === 'user-tester') {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        <WombleHeader />
+        <div className="flex-1 overflow-hidden">
+          <UserTesterInterface
+            config={config}
+            sessionId={sessionId}
+            userName={userName}
+            onUserNameSubmit={updateUrlWithUserName}
+          />
+        </div>
+        <WombleFooter />
       </div>
     );
   }

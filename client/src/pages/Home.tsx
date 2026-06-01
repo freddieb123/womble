@@ -73,6 +73,7 @@ const AGENT_TYPE_FILTERS = [
   { type: 'quick-fire-quiz', label: 'Quick Fire Quiz' },
   { type: 'group-board', label: 'Group Board' },
   { type: 'upload', label: 'Document Review' },
+  { type: 'user-tester', label: 'User Tester' },
 ] as const;
 
 type AgentTypeFilter = typeof AGENT_TYPE_FILTERS[number]['type'];
@@ -88,7 +89,7 @@ function todayTitle() {
 type ChatConfig = {
   id: number;
   title: string;
-  type: 'chat' | 'upload' | 'quiz' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz' | 'group-board';
+  type: 'chat' | 'upload' | 'quiz' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz' | 'group-board' | 'user-tester';
   systemPrompt: string;
   userInstructions: string | null;
   feedbackCriteria: string | null;
@@ -312,6 +313,7 @@ function SortableAgentCard({
     upload: { label: 'Document Review', classes: 'bg-purple-50 text-purple-700 border-purple-200' },
     'quick-fire-quiz': { label: 'Quick Fire Quiz', classes: 'bg-amber-50 text-amber-700 border-amber-200' },
     'group-board': { label: 'Group Board', classes: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    'user-tester': { label: 'User Tester', classes: 'bg-violet-50 text-violet-700 border-violet-200' },
   }[config.type] ?? { label: config.type, classes: 'bg-gray-50 text-gray-600 border-gray-200' };
 
   return (
@@ -323,7 +325,7 @@ function SortableAgentCard({
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-gray-800 truncate">{config.title}</span>
           <Badge variant="outline" className={`text-xs flex-shrink-0 ${typeBadge.classes}`}>{typeBadge.label}</Badge>
-          {config.type !== 'quick-fire-quiz' && (() => {
+          {config.type !== 'quick-fire-quiz' && config.type !== 'user-tester' && (() => {
             const mode = config.interactionMode ?? 'both';
             return (
               <span className="inline-flex items-center gap-0.5 text-gray-400 flex-shrink-0">
@@ -485,39 +487,20 @@ export default function Home() {
 
   // ── Presentations ─────────────────────────────────────────────────────────
   type PresentationSummary = { id: number; title: string; shareToken: string; createdAt: string };
-  const { data: presentationList = [], refetch: refetchPresentations } = useQuery<PresentationSummary[]>({
-    queryKey: ['/api/presentations'],
-    queryFn: async () => {
-      const res = await fetch('/api/presentations');
-      if (!res.ok) return [];
-      return res.json();
-    },
-    enabled: !!user?.id,
-  });
 
   const createPresentation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/presentations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'New Presentation' }) });
+    mutationFn: async (sessionId?: number) => {
+      const res = await fetch('/api/presentations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: selectedSession?.title ?? 'New Presentation', sessionId }),
+      });
       return res.json() as Promise<PresentationSummary>;
     },
     onSuccess: (pres) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/presentations'] });
       navigate(`/presentations/${pres.id}/edit`);
     },
   });
-
-  const deletePresentation = useMutation({
-    mutationFn: async (id: number) => {
-      await fetch(`/api/presentations/${id}`, { method: 'DELETE' });
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/presentations'] }),
-  });
-
-  const copyPresentationLink = (pres: PresentationSummary) => {
-    const url = `${window.location.origin}/present?token=${pres.shareToken}`;
-    navigator.clipboard.writeText(url);
-    toast({ title: 'Link copied', description: url });
-  };
 
   // Auto-select on first load or after deletion
   useEffect(() => {
@@ -972,14 +955,6 @@ export default function Home() {
             <Plus className="h-4 w-4 flex-shrink-0" />
             New Session
           </button>
-          <button
-            onClick={() => createPresentation.mutate()}
-            disabled={createPresentation.isPending}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
-          >
-            <MonitorPlay className="h-4 w-4 flex-shrink-0" />
-            New Presentation
-          </button>
         </div>
 
         {/* Sessions section */}
@@ -1027,41 +1002,6 @@ export default function Home() {
             <p className="text-xs text-gray-400 px-5 py-3">Loading...</p>
           )}
 
-          {/* Presentations section */}
-          {presentationList.length > 0 && (
-            <div className="px-3 pt-3 pb-2">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-2 mb-1">Presentations</p>
-              <div className="space-y-0.5">
-                {presentationList.map(pres => (
-                  <div key={pres.id} className="group flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-gray-100 cursor-pointer">
-                    <MonitorPlay className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
-                    <span
-                      className="flex-1 text-sm text-gray-700 truncate"
-                      onClick={() => navigate(`/presentations/${pres.id}/edit`)}
-                    >
-                      {pres.title}
-                    </span>
-                    <div className="hidden group-hover:flex gap-0.5">
-                      <button
-                        title="Share"
-                        onClick={(e) => { e.stopPropagation(); copyPresentationLink(pres); }}
-                        className="p-0.5 text-gray-400 hover:text-blue-600 rounded"
-                      >
-                        <Share2 className="h-3 w-3" />
-                      </button>
-                      <button
-                        title="Delete"
-                        onClick={(e) => { e.stopPropagation(); deletePresentation.mutate(pres.id); }}
-                        className="p-0.5 text-gray-400 hover:text-red-600 rounded"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* User + logout */}
@@ -1122,16 +1062,16 @@ export default function Home() {
                 title={selectedSession.title}
                 onSave={(title) => updateSessionTitle.mutate({ id: selectedSession.id, title })}
               />
-              {/* Share/Feedback/Add Agent — hidden for library view and when session is empty */}
+              {/* Session actions — hidden for library view and when session is empty */}
               {!isLibraryView && allSessionAgents.length > 0 && (
-                <div className="flex gap-2 ml-auto">
+                <div className="flex gap-2 ml-auto flex-wrap">
                   <Button size="sm" variant="outline" onClick={handleCopySessionLink}>
                     <Share2 className="h-3.5 w-3.5 mr-1.5" />Share Session
                   </Button>
                   <Button size="sm" variant="outline" onClick={handleViewSessionFeedback}>
                     <BarChart2 className="h-3.5 w-3.5 mr-1.5" />Feedback
                   </Button>
-                  <Button
+<Button
                     size="sm"
                     className="bg-green-600 hover:bg-green-700 text-white"
                     onClick={() => {

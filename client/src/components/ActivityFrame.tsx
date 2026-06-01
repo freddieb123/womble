@@ -4,6 +4,7 @@ import ChatInterface from "@/components/ChatInterface";
 import QuizInterface from "@/components/QuizInterface";
 import QuickFireQuizInterface from "@/components/QuickFireQuizInterface";
 import UploadInterface from "@/components/UploadInterface";
+import UserTesterInterface from "@/components/UserTesterInterface";
 import type { AdminConfig } from "@/lib/types";
 import type { SelectChatConfig } from "@db/schema";
 
@@ -90,6 +91,17 @@ export default function ActivityFrame({ configId, configType, userName, onUserNa
   if (config.type === 'upload') {
     return (
       <UploadInterface
+        config={config}
+        sessionId={sessionId}
+        userName={userName}
+        onUserNameSubmit={handleNameSubmit}
+      />
+    );
+  }
+
+  if (config.type === 'user-tester') {
+    return (
+      <UserTesterInterface
         config={config}
         sessionId={sessionId}
         userName={userName}

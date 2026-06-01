@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import SlideFrame from "@/components/SlideFrame";
 import ActivityFrame from "@/components/ActivityFrame";
 import FullscreenPrompt from "@/components/FullscreenPrompt";
 import type { PresentationFrame } from "@db/schema";
@@ -11,6 +10,7 @@ interface PresentationMeta {
   id: number;
   title: string;
   frameCount: number;
+  hasDeck: boolean;
 }
 
 interface PresentationState {
@@ -18,6 +18,8 @@ interface PresentationState {
   currentFrame: number;
   fullscreenMode: boolean;
   frameCount: number;
+  lastAction: string | null;
+  actionId: string | null;
 }
 
 export default function PresentationView() {
@@ -28,6 +30,8 @@ export default function PresentationView() {
   const [nameSubmitted, setNameSubmitted] = useState(() => !!localStorage.getItem(LS_NAME_KEY));
   const [fullscreenDismissed, setFullscreenDismissed] = useState(false);
   const participantId = useRef(crypto.randomUUID());
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const lastSeenActionId = useRef<string | null>(null);
 
   const { data: meta } = useQuery<PresentationMeta>({
     queryKey: ["/api/presentations/join", token],
@@ -47,7 +51,7 @@ export default function PresentationView() {
       return res.json();
     },
     enabled: !!token && nameSubmitted,
-    refetchInterval: 1500,
+    refetchInterval: 1000,
   });
 
   const { data: currentFrameData } = useQuery<PresentationFrame>({
@@ -59,6 +63,22 @@ export default function PresentationView() {
     enabled: !!token && !!state && state.phase === "live",
     staleTime: Infinity,
   });
+
+  // Fire postMessage to iframe when a new slide action arrives
+  useEffect(() => {
+    if (!state?.actionId || state.actionId === lastSeenActionId.current) return;
+    if (!state.lastAction) return;
+    lastSeenActionId.current = state.actionId;
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow) return;
+    // "goto:N" encodes an absolute slide jump; everything else is a named action
+    if (state.lastAction.startsWith('goto:')) {
+      const slideIndex = parseInt(state.lastAction.slice(5));
+      iframe.contentWindow.postMessage({ __womble: true, action: 'goto', slideIndex, actionId: state.actionId }, "*");
+    } else {
+      iframe.contentWindow.postMessage({ __womble: true, action: state.lastAction, actionId: state.actionId }, "*");
+    }
+  }, [state?.actionId, state?.lastAction]);
 
   // Heartbeat
   useEffect(() => {
@@ -73,7 +93,6 @@ export default function PresentationView() {
     return () => clearInterval(interval);
   }, [nameSubmitted, token]);
 
-  // Reset fullscreen prompt when fullscreenMode changes
   useEffect(() => {
     if (!state?.fullscreenMode) setFullscreenDismissed(false);
   }, [state?.fullscreenMode]);
@@ -142,8 +161,14 @@ export default function PresentationView() {
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col">
       <div className="flex-1 overflow-hidden relative">
-        {currentFrameData?.type === "slide" && (
-          <SlideFrame imageDataUrl={currentFrameData.imageDataUrl} />
+        {(currentFrameData?.type === "html-deck" || currentFrameData?.type === "html-slide") && token && (
+          <iframe
+            ref={iframeRef}
+            src={`/api/presentations/join/${token}/deck`}
+            sandbox="allow-scripts allow-same-origin allow-presentation"
+            className="w-full h-screen border-none"
+            title="Presentation"
+          />
         )}
         {currentFrameData?.type === "activity" && (
           <div className="h-screen bg-white flex flex-col">

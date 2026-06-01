@@ -32,7 +32,7 @@ export interface GroupBoardSettings {
 export const chatConfigs = pgTable("chat_configs", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
-  type: text("type", { enum: ['chat', 'upload', 'quiz', 'two-way-conversation', 'teach-ai', 'thought-partner', 'quick-fire-quiz', 'group-board'] }).default('chat').notNull(),
+  type: text("type", { enum: ['chat', 'upload', 'quiz', 'two-way-conversation', 'teach-ai', 'thought-partner', 'quick-fire-quiz', 'group-board', 'user-tester'] }).default('chat').notNull(),
   title: text("title").notNull(),
   systemPrompt: text("system_prompt").notNull(),
   userInstructions: text("user_instructions"),
@@ -312,15 +312,19 @@ export const groupBoardCommentsRelations = relations(groupBoardComments, ({ one 
 // ─── Presentations ────────────────────────────────────────────────────────────
 
 export type PresentationFrame =
-  | { id: string; type: 'slide'; imageDataUrl: string; speakerNotes?: string }
+  | { id: string; type: 'html-deck' }
+  | { id: string; type: 'html-slide'; slideIndex: number }
   | { id: string; type: 'activity'; configId: number; configTitle: string; configType: string };
 
 export const presentations = pgTable("presentations", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
+  sessionId: integer("session_id").references(() => sessions.id),
   title: text("title").notNull().default("New Presentation"),
   shareToken: text("share_token").notNull().unique(),
   frames: jsonb("frames").$type<PresentationFrame[]>().notNull().default([]),
+  htmlContent: text("html_content"),
+  originalFilename: text("original_filename"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -330,6 +334,8 @@ export const presentationState = pgTable("presentation_state", {
   phase: text("phase").notNull().default("waiting"),
   currentFrame: integer("current_frame").notNull().default(0),
   fullscreenMode: boolean("fullscreen_mode").notNull().default(false),
+  lastAction: text("last_action"),
+  actionId: text("action_id"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 

@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Users, GraduationCap, Brain, Zap, ArrowLeft, ArrowRight, Sparkles, Loader2, Upload, X, Mic, MicOff, Keyboard, LayoutGrid } from "lucide-react";
+import { MessageSquare, Users, GraduationCap, Brain, Zap, ArrowLeft, ArrowRight, Sparkles, Loader2, Upload, X, Mic, MicOff, Keyboard, LayoutGrid, Monitor } from "lucide-react";
 import type { AdminConfig } from "@/lib/types";
 import QuickFireQuizEditor from "@/components/QuickFireQuizEditor";
 
@@ -15,7 +15,7 @@ interface Props {
   prefill?: AdminConfig;
 }
 
-type WizardType = 'chat' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz' | 'group-board';
+type WizardType = 'chat' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz' | 'group-board' | 'user-tester';
 
 const TYPE_CONFIG: Record<WizardType, {
   icon: React.ElementType;
@@ -66,6 +66,13 @@ const TYPE_CONFIG: Record<WizardType, {
     placeholder: '',
     badge: 'Group Board',
   },
+  'user-tester': {
+    icon: Monitor,
+    label: 'User Tester',
+    subtitle: 'AI watches a prototype demo via screen share and gives spoken feedback against criteria',
+    placeholder: "e.g. A UX review where the AI evaluates a prototype demo of a mobile banking app — it should assess whether the onboarding flow is intuitive, whether the key actions are discoverable, and whether the visual design builds trust...",
+    badge: 'User Tester',
+  },
 };
 
 const KNOWLEDGE_LABELS = ['Beginner', 'Novice', 'Intermediate', 'Advanced', 'Expert'];
@@ -78,6 +85,17 @@ const COACHING_DESCRIPTIONS = [
   'Leans towards recommendations and frameworks',
   'Direct recommendations and guidance',
 ];
+
+function normaliseCriteria(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.map((s: any) => `- ${String(s).trim()}`).join('\n');
+    } catch {}
+  }
+  return raw;
+}
 
 export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(prefill ? 3 : 1);
@@ -356,6 +374,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
   const isThoughtPartner = config.type === 'thought-partner';
   const isQuickFireQuiz = config.type === 'quick-fire-quiz';
   const isGroupBoard = config.type === 'group-board';
+  const isUserTester = config.type === 'user-tester';
 
   if (isGroupBoard) {
     const settings = config.groupBoardSettings ?? { numGroups: 4, showOtherGroups: true };
@@ -437,6 +456,54 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
           >
             {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
             Save Quiz
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isUserTester) {
+    return (
+      <div className="space-y-5">
+        <StepIndicator current={3} />
+        <div className="space-y-2">
+          <Label htmlFor="ut-title">Title</Label>
+          <Input
+            id="ut-title"
+            value={config.title}
+            onChange={(e) => setConfig(prev => ({ ...prev, title: e.target.value }))}
+            placeholder="e.g. Prototype Demo Review"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="ut-criteria">Evaluation criteria</Label>
+          <Textarea
+            id="ut-criteria"
+            value={normaliseCriteria(config.feedbackCriteria || '')}
+            onChange={(e) => setConfig(prev => ({ ...prev, feedbackCriteria: e.target.value }))}
+            placeholder={"e.g.\n- Is the navigation intuitive?\n- Is the visual hierarchy clear?\n- Does it address the user need stated in the brief?\n- Is the call to action obvious?"}
+            rows={6}
+            className="resize-none"
+          />
+          <p className="text-xs text-muted-foreground">The AI will ask questions and give final feedback based on these criteria.</p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="ut-instructions">Additional context for the AI (optional)</Label>
+          <Textarea
+            id="ut-instructions"
+            value={config.userInstructions || ''}
+            onChange={(e) => setConfig(prev => ({ ...prev, userInstructions: e.target.value }))}
+            placeholder="e.g. The prototype is a mobile app for booking GP appointments. Apprentices should focus on the booking flow."
+            rows={3}
+            className="resize-none"
+          />
+        </div>
+        <div className="flex justify-between pt-2">
+          <Button variant="ghost" onClick={() => setStep(1)}>
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back
+          </Button>
+          <Button onClick={() => onSave(config)} disabled={isSaving || !config.title.trim()}>
+            {isSaving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : 'Save User Tester'}
           </Button>
         </div>
       </div>

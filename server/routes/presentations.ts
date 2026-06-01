@@ -5,14 +5,13 @@ import { eq, and, count } from "drizzle-orm";
 import multer from "multer";
 import crypto from "crypto";
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 function requireAuth(req: any, res: any, next: any) {
   if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
   next();
 }
 
-// In-memory participant heartbeat tracking (same pattern as quizParticipants)
 const presentationParticipants = new Map<number, Map<string, number>>();
 
 function getActivePresentationParticipants(presentationId: number): number {
@@ -25,7 +24,68 @@ function getActivePresentationParticipants(presentationId: number): number {
   return map.size;
 }
 
+const WOMBLE_SYNC_SCRIPT = `
+<script id="__womble_sync">
+(function() {
+  function dispatchKey(key, keyCode) {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: key, keyCode: keyCode, bubbles: true, cancelable: true }));
+  }
+  function gotoSlide(idx) {
+    if (window.Reveal) {
+      window.Reveal.slide(idx);
+    } else {
+      dispatchKey('Home', 36);
+      for (var i = 0; i < idx; i++) {
+        setTimeout(function(i) { return function() { dispatchKey('ArrowRight', 39); }; }(i), 80 * (i + 1));
+      }
+    }
+  }
+  // Hash-based auto-navigation: #slide-N jumps to that slide after framework init
+  function applyHashNav() {
+    var m = window.location.hash.match(/#slide-(\d+)/);
+    if (!m) return;
+    var target = parseInt(m[1]);
+    if (target === 0) return;
+    gotoSlide(target);
+  }
+  window.addEventListener('message', function(e) {
+    if (!e.data || e.data.__womble !== true) return;
+    var action = e.data.action;
+    if (action === 'next') {
+      dispatchKey('ArrowRight', 39);
+      if (window.Reveal) window.Reveal.next();
+    } else if (action === 'prev') {
+      dispatchKey('ArrowLeft', 37);
+      if (window.Reveal) window.Reveal.prev();
+    } else if (action === 'start') {
+      dispatchKey('Home', 36);
+      if (window.Reveal) window.Reveal.slide(0);
+    } else if (action === 'goto') {
+      gotoSlide(e.data.slideIndex || 0);
+    }
+    window.parent.postMessage({ __womble: true, type: 'ack', action: action, actionId: e.data.actionId }, '*');
+  });
+  // Apply hash nav after framework initialises (try at 1.5s and 4s for slower bundles)
+  setTimeout(applyHashNav, 1500);
+  setTimeout(applyHashNav, 4000);
+  // Report slide count
+  function reportSlideCount() {
+    var count = 0;
+    if (window.Reveal) count = window.Reveal.getTotalSlides ? window.Reveal.getTotalSlides() : 0;
+    if (count > 0) { window.parent.postMessage({ __womble: true, type: 'slideCount', count: count }, '*'); return; }
+    var els = document.querySelectorAll('.reveal .slides > section');
+    if (els.length > 0) { window.parent.postMessage({ __womble: true, type: 'slideCount', count: els.length }, '*'); return; }
+    els = document.querySelectorAll('.step');
+    if (els.length > 0) { window.parent.postMessage({ __womble: true, type: 'slideCount', count: els.length }, '*'); }
+  }
+  setTimeout(reportSlideCount, 1500);
+  setTimeout(reportSlideCount, 4000);
+})();
+</script>
+`;
+
 export function registerPresentationRoutes(app: Express) {
+
   // ── Admin CRUD ──────────────────────────────────────────────────────────────
 
   app.get("/api/presentations", requireAuth, async (req: Request, res: Response) => {
@@ -44,9 +104,10 @@ export function registerPresentationRoutes(app: Express) {
   app.post("/api/presentations", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = (req as any).user?.id;
-      const { title } = req.body as { title?: string };
+      const { title, sessionId } = req.body as { title?: string; sessionId?: number };
       const [pres] = await db.insert(presentations).values({
         userId,
+        sessionId: sessionId ?? null,
         title: title || "New Presentation",
         shareToken: crypto.randomUUID(),
         frames: [],
@@ -102,6 +163,143 @@ export function registerPresentationRoutes(app: Express) {
       res.json({ ok: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ── Set slide count: generates html-slide frames from a count ───────────────
+
+  app.post("/api/presentations/:id/set-slides", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user?.id;
+      const id = parseInt(req.params.id);
+      const { slideCount } = req.body as { slideCount: number };
+      if (!slideCount || slideCount < 1) return res.status(400).json({ error: "slideCount must be >= 1" });
+      const pres = await db.query.presentations.findFirst({
+        where: and(eq(presentations.id, id), eq(presentations.userId, userId)),
+      });
+      if (!pres) return res.status(404).json({ error: "Not found" });
+      // Keep all activity frames, replace all html-slide/html-deck frames
+      const activities = (pres.frames ?? []).filter(f => f.type === 'activity');
+      const slideFrames: PresentationFrame[] = Array.from({ length: slideCount }, (_, i) => ({
+        id: crypto.randomUUID(),
+        type: 'html-slide' as const,
+        slideIndex: i,
+      }));
+      // Interleave: put all slides first, then activities that were already placed
+      const updatedFrames = [...slideFrames, ...activities];
+      const [updated] = await db.update(presentations)
+        .set({ frames: updatedFrames, updatedAt: new Date() })
+        .where(eq(presentations.id, id))
+        .returning();
+      res.json({ success: true, frames: updated.frames });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ── Activities for this presentation (scoped to its session) ─────────────────
+
+  app.get("/api/presentations/:id/activities", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user?.id;
+      const id = parseInt(req.params.id);
+      const pres = await db.query.presentations.findFirst({
+        where: and(eq(presentations.id, id), eq(presentations.userId, userId)),
+      });
+      if (!pres) return res.status(404).json({ error: "Not found" });
+      let configs;
+      if (pres.sessionId) {
+        configs = await db.query.chatConfigs.findMany({
+          where: and(
+            eq(chatConfigs.userId, userId),
+            eq(chatConfigs.sessionId, pres.sessionId),
+            eq(chatConfigs.deleted, false)
+          ),
+          orderBy: (t, { asc }) => [asc(t.sessionOrder)],
+        });
+      } else {
+        configs = await db.query.chatConfigs.findMany({
+          where: and(eq(chatConfigs.userId, userId), eq(chatConfigs.deleted, false)),
+          orderBy: (t, { desc }) => [desc(t.createdAt)],
+        });
+      }
+      res.json(configs.map(c => ({ id: c.id, title: c.title, type: c.type })));
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ── HTML deck upload ─────────────────────────────────────────────────────────
+
+  function detectSlideCount(html: string): number {
+    // Reveal.js: <section elements (works for both plain HTML and __bundler template
+    // because JSON does not escape '<', so sections appear verbatim in the template string)
+    const revealSections = (html.match(/<section[\s>]/gi) ?? []).length;
+    if (revealSections > 0) return revealSections;
+    // Impress.js: <div class="step ...">
+    const impressSteps = (html.match(/class="[^"]*\bstep\b[^"]*"/gi) ?? []).length;
+    if (impressSteps > 0) return impressSteps;
+    return 0;
+  }
+
+  app.post("/api/presentations/:id/upload-deck", requireAuth, upload.single("file"), async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user?.id;
+      const id = parseInt(req.params.id);
+      const pres = await db.query.presentations.findFirst({
+        where: and(eq(presentations.id, id), eq(presentations.userId, userId)),
+      });
+      if (!pres) return res.status(404).json({ error: "Not found" });
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      if (!req.file.originalname.toLowerCase().endsWith(".html")) {
+        return res.status(400).json({ error: "Only .html files are supported" });
+      }
+
+      const htmlContent = req.file.buffer.toString("utf-8");
+      const originalFilename = req.file.originalname;
+      const slideCount = detectSlideCount(htmlContent);
+
+      // Preserve any activity frames already in the presentation
+      const existingActivities = (pres.frames ?? []).filter(f => f.type === 'activity');
+
+      let updatedFrames: PresentationFrame[];
+      if (slideCount > 0) {
+        const slideFrames: PresentationFrame[] = Array.from({ length: slideCount }, (_, i) => ({
+          id: crypto.randomUUID(),
+          type: 'html-slide' as const,
+          slideIndex: i,
+        }));
+        updatedFrames = [...slideFrames, ...existingActivities];
+      } else {
+        // Unknown format — single html-deck frame as fallback
+        updatedFrames = [{ id: crypto.randomUUID(), type: 'html-deck' as const }, ...existingActivities];
+      }
+
+      const [updated] = await db.update(presentations)
+        .set({ htmlContent, originalFilename, frames: updatedFrames, updatedAt: new Date() })
+        .where(eq(presentations.id, id))
+        .returning();
+
+      res.json({ success: true, filename: originalFilename, slideCount, frames: updated.frames });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ── Serve HTML deck with injected sync script ────────────────────────────────
+
+  app.get("/api/presentations/join/:token/deck", async (req: Request, res: Response) => {
+    try {
+      const pres = await db.query.presentations.findFirst({
+        where: eq(presentations.shareToken, req.params.token),
+      });
+      if (!pres || !pres.htmlContent) return res.status(404).send("Deck not found");
+      const html = pres.htmlContent.replace("</body>", `${WOMBLE_SYNC_SCRIPT}</body>`);
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("X-Frame-Options", "SAMEORIGIN");
+      res.send(html);
+    } catch (e: any) {
+      res.status(500).send("Error serving deck");
     }
   });
 
@@ -187,11 +385,15 @@ export function registerPresentationRoutes(app: Express) {
       });
       if (!pres) return res.status(404).json({ error: "Not found" });
       const current = pres.state?.currentFrame ?? 0;
-      const next = Math.min(current + 1, pres.frames.length - 1);
-      await db.update(presentationState)
-        .set({ currentFrame: next, updatedAt: new Date() })
-        .where(eq(presentationState.presentationId, id));
-      res.json({ ok: true, currentFrame: next });
+      const nextIdx = Math.min(current + 1, pres.frames.length - 1);
+      const nextFrame = pres.frames[nextIdx];
+      const stateUpdate: Record<string, any> = { currentFrame: nextIdx, updatedAt: new Date() };
+      if (nextFrame?.type === 'html-slide') {
+        stateUpdate.lastAction = `goto:${nextFrame.slideIndex}`;
+        stateUpdate.actionId = crypto.randomUUID();
+      }
+      await db.update(presentationState).set(stateUpdate).where(eq(presentationState.presentationId, id));
+      res.json({ ok: true, currentFrame: nextIdx });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -207,11 +409,52 @@ export function registerPresentationRoutes(app: Express) {
       });
       if (!pres) return res.status(404).json({ error: "Not found" });
       const current = pres.state?.currentFrame ?? 0;
-      const prev = Math.max(current - 1, 0);
+      const prevIdx = Math.max(current - 1, 0);
+      const prevFrame = pres.frames[prevIdx];
+      const stateUpdate: Record<string, any> = { currentFrame: prevIdx, updatedAt: new Date() };
+      if (prevFrame?.type === 'html-slide') {
+        stateUpdate.lastAction = `goto:${prevFrame.slideIndex}`;
+        stateUpdate.actionId = crypto.randomUUID();
+      }
+      await db.update(presentationState).set(stateUpdate).where(eq(presentationState.presentationId, id));
+      res.json({ ok: true, currentFrame: prevIdx });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Within-deck slide navigation (fires postMessage to all participant iframes)
+  app.post("/api/presentations/:id/slide-next", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user?.id;
+      const id = parseInt(req.params.id);
+      const pres = await db.query.presentations.findFirst({
+        where: and(eq(presentations.id, id), eq(presentations.userId, userId)),
+      });
+      if (!pres) return res.status(404).json({ error: "Not found" });
+      const actionId = crypto.randomUUID();
       await db.update(presentationState)
-        .set({ currentFrame: prev, updatedAt: new Date() })
+        .set({ lastAction: "next", actionId, updatedAt: new Date() })
         .where(eq(presentationState.presentationId, id));
-      res.json({ ok: true, currentFrame: prev });
+      res.json({ ok: true, actionId });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/presentations/:id/slide-prev", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user?.id;
+      const id = parseInt(req.params.id);
+      const pres = await db.query.presentations.findFirst({
+        where: and(eq(presentations.id, id), eq(presentations.userId, userId)),
+      });
+      if (!pres) return res.status(404).json({ error: "Not found" });
+      const actionId = crypto.randomUUID();
+      await db.update(presentationState)
+        .set({ lastAction: "prev", actionId, updatedAt: new Date() })
+        .where(eq(presentationState.presentationId, id));
+      res.json({ ok: true, actionId });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -252,128 +495,31 @@ export function registerPresentationRoutes(app: Express) {
       const state = pres.state;
       if (state && pres.frames.length > 0) {
         const frame = pres.frames[state.currentFrame];
-        if (frame?.type === 'activity') {
-          const configId = frame.configId;
-          const config = await db.query.chatConfigs.findFirst({ where: eq(chatConfigs.id, configId) });
+        if (frame?.type === "activity") {
+          const config = await db.query.chatConfigs.findFirst({ where: eq(chatConfigs.id, frame.configId) });
           if (config) {
-            if (config.type === 'quiz') {
-              const [row] = await db.select({ c: count() }).from(quizResponses).where(eq(quizResponses.configId, configId));
+            if (config.type === "quiz") {
+              const [row] = await db.select({ c: count() }).from(quizResponses).where(eq(quizResponses.configId, frame.configId));
               submissionCount = Number(row?.c ?? 0);
-            } else if (config.type === 'quick-fire-quiz') {
-              const [row] = await db.select({ c: count() }).from(quickFireQuizResponses).where(eq(quickFireQuizResponses.configId, configId));
+            } else if (config.type === "quick-fire-quiz") {
+              const [row] = await db.select({ c: count() }).from(quickFireQuizResponses).where(eq(quickFireQuizResponses.configId, frame.configId));
               submissionCount = Number(row?.c ?? 0);
             } else {
-              const [row] = await db.select({ c: count() }).from(conversations).where(eq(conversations.configId, configId));
+              const [row] = await db.select({ c: count() }).from(conversations).where(eq(conversations.configId, frame.configId));
               submissionCount = Number(row?.c ?? 0);
             }
           }
         }
       }
 
-      res.json({ participantCount, submissionCount, phase: state?.phase ?? 'waiting', currentFrame: state?.currentFrame ?? 0 });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  // ── CloudConvert PPTX upload ─────────────────────────────────────────────────
-
-  app.post("/api/presentations/:id/upload-deck", requireAuth, upload.single("file"), async (req: Request, res: Response) => {
-    try {
-      const userId = (req as any).user?.id;
-      const id = parseInt(req.params.id);
-      const pres = await db.query.presentations.findFirst({
-        where: and(eq(presentations.id, id), eq(presentations.userId, userId)),
+      res.json({
+        participantCount,
+        submissionCount,
+        phase: state?.phase ?? "waiting",
+        currentFrame: state?.currentFrame ?? 0,
+        lastAction: state?.lastAction ?? null,
+        actionId: state?.actionId ?? null,
       });
-      if (!pres) return res.status(404).json({ error: "Not found" });
-      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-
-      const apiKey = process.env.CLOUDCONVERT_API_KEY;
-      if (!apiKey) return res.status(500).json({ error: "CLOUDCONVERT_API_KEY not configured" });
-
-      // 1. Create job
-      const jobRes = await fetch("https://api.cloudconvert.com/v2/jobs", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tasks: {
-            "upload-my-file": { operation: "import/upload" },
-            "convert-my-file": {
-              operation: "convert",
-              input: "upload-my-file",
-              input_format: "pptx",
-              output_format: "png",
-              per_page: true,
-              dpi: 150,
-            },
-            "export-my-file": {
-              operation: "export/url",
-              input: "convert-my-file",
-            },
-          },
-        }),
-      });
-      if (!jobRes.ok) {
-        const err = await jobRes.text();
-        return res.status(502).json({ error: `CloudConvert job creation failed: ${err}` });
-      }
-      const job = await jobRes.json() as any;
-
-      // 2. Upload the file to the signed URL
-      const uploadTask = job.data.tasks.find((t: any) => t.name === "upload-my-file");
-      if (!uploadTask?.result?.form) {
-        return res.status(502).json({ error: "No upload form in CloudConvert response" });
-      }
-      const { url: uploadUrl, parameters } = uploadTask.result.form;
-      const formData = new FormData();
-      for (const [k, v] of Object.entries(parameters as Record<string, string>)) {
-        formData.append(k, v);
-      }
-      formData.append("file", new Blob([req.file.buffer], { type: req.file.mimetype }), req.file.originalname);
-      await fetch(uploadUrl, { method: "POST", body: formData });
-
-      // 3. Poll until finished
-      const jobId = job.data.id;
-      let finished = false;
-      let jobData: any;
-      for (let i = 0; i < 120; i++) {
-        await new Promise(r => setTimeout(r, 1000));
-        const pollRes = await fetch(`https://api.cloudconvert.com/v2/jobs/${jobId}`, {
-          headers: { Authorization: `Bearer ${apiKey}` },
-        });
-        jobData = await pollRes.json();
-        if (jobData.data?.status === "finished") { finished = true; break; }
-        if (jobData.data?.status === "error") {
-          return res.status(502).json({ error: "CloudConvert conversion failed" });
-        }
-      }
-      if (!finished) return res.status(504).json({ error: "CloudConvert conversion timed out" });
-
-      // 4. Download PNGs and convert to base64
-      const exportTask = jobData.data.tasks.find((t: any) => t.name === "export-my-file");
-      const exportFiles: { url: string; filename: string }[] = exportTask?.result?.files ?? [];
-      exportFiles.sort((a, b) => a.filename.localeCompare(b.filename, undefined, { numeric: true }));
-
-      const newFrames: PresentationFrame[] = [];
-      for (const f of exportFiles) {
-        const imgRes = await fetch(f.url);
-        const buf = await imgRes.arrayBuffer();
-        const b64 = Buffer.from(buf).toString("base64");
-        newFrames.push({
-          id: crypto.randomUUID(),
-          type: "slide",
-          imageDataUrl: `data:image/png;base64,${b64}`,
-        });
-      }
-
-      // 5. Append to existing frames
-      const updated = [...pres.frames, ...newFrames];
-      const [updatedPres] = await db.update(presentations)
-        .set({ frames: updated, updatedAt: new Date() })
-        .where(eq(presentations.id, id))
-        .returning();
-
-      res.json(updatedPres);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -405,7 +551,7 @@ export function registerPresentationRoutes(app: Express) {
         where: eq(presentations.shareToken, req.params.token),
       });
       if (!pres) return res.status(404).json({ error: "Not found" });
-      res.json({ id: pres.id, title: pres.title, frameCount: pres.frames.length });
+      res.json({ id: pres.id, title: pres.title, frameCount: pres.frames.length, hasDeck: !!pres.htmlContent });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -424,6 +570,8 @@ export function registerPresentationRoutes(app: Express) {
         currentFrame: state?.currentFrame ?? 0,
         fullscreenMode: state?.fullscreenMode ?? false,
         frameCount: pres.frames.length,
+        lastAction: state?.lastAction ?? null,
+        actionId: state?.actionId ?? null,
       });
     } catch (e: any) {
       res.status(500).json({ error: e.message });

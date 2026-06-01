@@ -11,6 +11,11 @@ if (!connectionString) {
   );
 }
 
-export const pool = new Pool({ connectionString });
+export const pool = new Pool({
+  connectionString,
+  ssl: connectionString.includes('railway') || connectionString.includes('sslmode=require')
+    ? { rejectUnauthorized: false }
+    : false,
+});
 
 export const db = drizzle({ client: pool, schema });
