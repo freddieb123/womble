@@ -32,7 +32,7 @@ export interface GroupBoardSettings {
 export const chatConfigs = pgTable("chat_configs", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
-  type: text("type", { enum: ['chat', 'upload', 'quiz', 'two-way-conversation', 'teach-ai', 'thought-partner', 'quick-fire-quiz', 'group-board', 'user-tester'] }).default('chat').notNull(),
+  type: text("type", { enum: ['chat', 'upload', 'quiz', 'two-way-conversation', 'teach-ai', 'thought-partner', 'quick-fire-quiz', 'group-board', 'user-tester', 'doc-critique', 'task-walkthrough'] }).default('chat').notNull(),
   title: text("title").notNull(),
   systemPrompt: text("system_prompt").notNull(),
   userInstructions: text("user_instructions"),

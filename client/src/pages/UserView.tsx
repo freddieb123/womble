@@ -7,6 +7,8 @@ import UploadInterface from "@/components/UploadInterface";
 import QuizInterface from "@/components/QuizInterface";
 import GroupBoardInterface from "@/components/GroupBoardInterface";
 import UserTesterInterface from "@/components/UserTesterInterface";
+import DocCritiqueInterface from "@/components/DocCritiqueInterface";
+import TaskWalkthroughInterface from "@/components/TaskWalkthroughInterface";
 import WombleHeader from "@/components/WombleHeader";
 import WombleFooter from "@/components/WombleFooter";
 import { ParticipantCount, LiveLeaderboard } from "@/components/LiveActivityPanel";
@@ -136,6 +138,40 @@ export default function UserView() {
         <WombleHeader />
         <div className="flex-1 overflow-hidden">
           <UserTesterInterface
+            config={config}
+            sessionId={sessionId}
+            userName={userName}
+            onUserNameSubmit={updateUrlWithUserName}
+          />
+        </div>
+        <WombleFooter />
+      </div>
+    );
+  }
+
+  if (config.type === 'doc-critique') {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        <WombleHeader />
+        <div className="flex-1 overflow-hidden">
+          <DocCritiqueInterface
+            config={config}
+            sessionId={sessionId}
+            userName={userName}
+            onUserNameSubmit={updateUrlWithUserName}
+          />
+        </div>
+        <WombleFooter />
+      </div>
+    );
+  }
+
+  if (config.type === 'task-walkthrough') {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        <WombleHeader />
+        <div className="flex-1 overflow-hidden">
+          <TaskWalkthroughInterface
             config={config}
             sessionId={sessionId}
             userName={userName}

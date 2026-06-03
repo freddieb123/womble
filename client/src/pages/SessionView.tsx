@@ -10,6 +10,8 @@ import QuickFireQuizInterface from "@/components/QuickFireQuizInterface";
 import UploadInterface from "@/components/UploadInterface";
 import GroupBoardInterface from "@/components/GroupBoardInterface";
 import UserTesterInterface from "@/components/UserTesterInterface";
+import DocCritiqueInterface from "@/components/DocCritiqueInterface";
+import TaskWalkthroughInterface from "@/components/TaskWalkthroughInterface";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -103,7 +105,7 @@ export default function SessionView() {
     if (!config.isLive) return;
     // Only show mode picker when switching to a subsequent activity (name already known)
     // For the first activity, the activity's own UserNameModal handles name + mode together
-    if (userName && config.interactionMode === 'both' && !chatModes[config.id] && config.type !== 'group-board' && config.type !== 'user-tester') {
+    if (userName && config.interactionMode === 'both' && !chatModes[config.id] && !['group-board', 'user-tester', 'doc-critique', 'task-walkthrough'].includes(config.type)) {
       setPendingConfigId(config.id);
       setShowModeModal(true);
     } else {
@@ -225,7 +227,7 @@ export default function SessionView() {
               Select an activity from the sidebar to get started.
             </div>
           ) : (
-            <Card className={`h-full w-full flex flex-col overflow-hidden ${selectedConfig.type === 'group-board' || selectedConfig.type === 'user-tester' ? 'max-w-6xl p-0' : 'max-w-3xl p-4'}`}>
+            <Card className={`h-full w-full flex flex-col overflow-hidden ${['group-board', 'user-tester', 'doc-critique', 'task-walkthrough'].includes(selectedConfig.type) ? 'max-w-6xl p-0' : 'max-w-3xl p-4'}`}>
               {selectedConfig.type === 'group-board' ? (
                 <GroupBoardInterface
                   config={adminConfig!}
@@ -234,6 +236,22 @@ export default function SessionView() {
                 />
               ) : selectedConfig.type === 'user-tester' ? (
                 <UserTesterInterface
+                  key={selectedConfig.id}
+                  config={adminConfig!}
+                  sessionId={getSessionId(selectedConfig.id)}
+                  userName={userName}
+                  onUserNameSubmit={handleUserNameFromActivity}
+                />
+              ) : selectedConfig.type === 'doc-critique' ? (
+                <DocCritiqueInterface
+                  key={selectedConfig.id}
+                  config={adminConfig!}
+                  sessionId={getSessionId(selectedConfig.id)}
+                  userName={userName}
+                  onUserNameSubmit={handleUserNameFromActivity}
+                />
+              ) : selectedConfig.type === 'task-walkthrough' ? (
+                <TaskWalkthroughInterface
                   key={selectedConfig.id}
                   config={adminConfig!}
                   sessionId={getSessionId(selectedConfig.id)}

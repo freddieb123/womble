@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Users, GraduationCap, Brain, Zap, ArrowLeft, ArrowRight, Sparkles, Loader2, Upload, X, Mic, MicOff, Keyboard, LayoutGrid, Monitor } from "lucide-react";
+import { MessageSquare, Users, GraduationCap, Brain, Zap, ArrowLeft, ArrowRight, Sparkles, Loader2, Upload, X, Mic, MicOff, Keyboard, LayoutGrid, Monitor, FileText, ClipboardList } from "lucide-react";
 import type { AdminConfig } from "@/lib/types";
 import QuickFireQuizEditor from "@/components/QuickFireQuizEditor";
 
@@ -15,7 +15,7 @@ interface Props {
   prefill?: AdminConfig;
 }
 
-type WizardType = 'chat' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz' | 'group-board' | 'user-tester';
+type WizardType = 'chat' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz' | 'group-board' | 'user-tester' | 'doc-critique' | 'task-walkthrough';
 
 const TYPE_CONFIG: Record<WizardType, {
   icon: React.ElementType;
@@ -73,6 +73,20 @@ const TYPE_CONFIG: Record<WizardType, {
     placeholder: "e.g. A UX review where the AI evaluates a prototype demo of a mobile banking app — it should assess whether the onboarding flow is intuitive, whether the key actions are discoverable, and whether the visual design builds trust...",
     badge: 'User Tester',
   },
+  'doc-critique': {
+    icon: FileText,
+    label: 'Critique a Document',
+    subtitle: 'Apprentices read an uploaded document and share observations — AI coaches them on what to notice',
+    placeholder: "e.g. A case study analysis where apprentices read a business case and identify the key risks, assumptions, and strategic decisions — they should notice the over-reliance on a single supplier, the optimistic revenue forecast, and the lack of a mitigation plan...",
+    badge: 'Critique a Document',
+  },
+  'task-walkthrough': {
+    icon: ClipboardList,
+    label: 'Task Walkthrough',
+    subtitle: 'Apprentices talk through how far they got with a task — AI coaches them through completion via voice',
+    placeholder: "e.g. An Excel data analysis task where apprentices create a pivot table showing Q1 sales by region — the AI should understand where they are in the process and guide them step-by-step through anything they haven't completed yet...",
+    badge: 'Task Walkthrough',
+  },
 };
 
 const KNOWLEDGE_LABELS = ['Beginner', 'Novice', 'Intermediate', 'Advanced', 'Expert'];
@@ -119,6 +133,8 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
     coachingStyle: 2,
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+  const [pdfFileName, setPdfFileName] = useState<string>('');
   const recognitionRef = useRef<any>(null);
   const [isDictating, setIsDictating] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -375,6 +391,8 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
   const isQuickFireQuiz = config.type === 'quick-fire-quiz';
   const isGroupBoard = config.type === 'group-board';
   const isUserTester = config.type === 'user-tester';
+  const isDocCritique = config.type === 'doc-critique';
+  const isTaskWalkthrough = config.type === 'task-walkthrough';
 
   if (isGroupBoard) {
     const settings = config.groupBoardSettings ?? { numGroups: 4, showOtherGroups: true };
@@ -504,6 +522,167 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
           </Button>
           <Button onClick={() => onSave(config)} disabled={isSaving || !config.title.trim()}>
             {isSaving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : 'Save User Tester'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isDocCritique) {
+    return (
+      <div className="space-y-5">
+        <StepIndicator current={3} />
+        <div className="space-y-2">
+          <Label htmlFor="dc-title">Title</Label>
+          <Input
+            id="dc-title"
+            value={config.title}
+            onChange={(e) => setConfig(prev => ({ ...prev, title: e.target.value }))}
+            placeholder="e.g. Case Study Analysis"
+          />
+        </div>
+
+        {/* PDF upload */}
+        <div className="space-y-2">
+          <Label>Document (PDF)</Label>
+          <input
+            ref={pdfInputRef}
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              if (file.size > 8 * 1024 * 1024) {
+                alert('PDF must be under 8 MB.');
+                return;
+              }
+              setPdfFileName(file.name);
+              const reader = new FileReader();
+              reader.onload = (ev) => {
+                const dataUrl = ev.target?.result as string;
+                setConfig(prev => ({ ...prev, referenceContent: dataUrl }));
+              };
+              reader.readAsDataURL(file);
+              if (pdfInputRef.current) pdfInputRef.current.value = '';
+            }}
+          />
+          <div className="flex items-center gap-3">
+            <Button type="button" variant="outline" size="sm" onClick={() => pdfInputRef.current?.click()}>
+              <Upload className="h-4 w-4 mr-2" />
+              {pdfFileName ? 'Replace PDF' : 'Upload PDF'}
+            </Button>
+            {pdfFileName && (
+              <span className="text-sm text-gray-600 flex items-center gap-1.5">
+                <FileText className="h-4 w-4 text-blue-500" /> {pdfFileName}
+                <button
+                  type="button"
+                  onClick={() => { setConfig(prev => ({ ...prev, referenceContent: '' })); setPdfFileName(''); }}
+                  className="ml-1 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">Apprentices will see this document alongside the chat. Max 8 MB.</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="dc-criteria">What should apprentices notice?</Label>
+          <Textarea
+            id="dc-criteria"
+            value={normaliseCriteria(config.feedbackCriteria || '')}
+            onChange={(e) => setConfig(prev => ({ ...prev, feedbackCriteria: e.target.value }))}
+            placeholder={"e.g.\n- The supplier dependency risk on page 3\n- The revenue forecast assumptions are too optimistic\n- There is no contingency plan for the main risk\n- The stakeholder analysis is incomplete"}
+            rows={6}
+            className="resize-none"
+          />
+          <p className="text-xs text-muted-foreground">The AI uses these to guide and evaluate apprentice observations.</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="dc-instructions">Instructions for apprentices</Label>
+          <Textarea
+            id="dc-instructions"
+            value={config.userInstructions || ''}
+            onChange={(e) => setConfig(prev => ({ ...prev, userInstructions: e.target.value }))}
+            placeholder="e.g. Read the case study on the left, then share what you notice — look for risks, assumptions, decisions, and anything that stands out."
+            rows={3}
+            className="resize-none"
+          />
+        </div>
+
+        <div className="flex justify-between pt-2">
+          <Button variant="ghost" onClick={() => setStep(2)}>
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back
+          </Button>
+          <Button onClick={() => onSave(config)} disabled={isSaving || !config.title.trim()}>
+            {isSaving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : 'Save Activity'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isTaskWalkthrough) {
+    return (
+      <div className="space-y-5">
+        <StepIndicator current={3} />
+        <div className="space-y-2">
+          <Label htmlFor="tw-title">Title</Label>
+          <Input
+            id="tw-title"
+            value={config.title}
+            onChange={(e) => setConfig(prev => ({ ...prev, title: e.target.value }))}
+            placeholder="e.g. Excel Pivot Table Walkthrough"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="tw-task">Task instructions</Label>
+          <Textarea
+            id="tw-task"
+            value={config.referenceContent || ''}
+            onChange={(e) => setConfig(prev => ({ ...prev, referenceContent: e.target.value }))}
+            placeholder={"Paste the full task instructions here — exactly what apprentices were asked to do.\n\ne.g. Using the sales dataset provided, create a pivot table in Excel that shows total revenue by product category and region for Q1 2024. The data is on the 'Raw Data' tab. Save the pivot table on a new sheet called 'Analysis'."}
+            rows={7}
+            className="resize-none"
+          />
+          <p className="text-xs text-muted-foreground">The AI uses this to understand the task and coach apprentices through it.</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="tw-criteria">Completion criteria</Label>
+          <Textarea
+            id="tw-criteria"
+            value={normaliseCriteria(config.feedbackCriteria || '')}
+            onChange={(e) => setConfig(prev => ({ ...prev, feedbackCriteria: e.target.value }))}
+            placeholder={"e.g.\n- Pivot table is on a sheet called 'Analysis'\n- Data is grouped by product category and region\n- Q1 2024 filter is applied\n- Revenue figures are correct"}
+            rows={5}
+            className="resize-none"
+          />
+          <p className="text-xs text-muted-foreground">What the task looks like when fully and correctly completed.</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="tw-instructions">Instructions for apprentices (shown before they start)</Label>
+          <Textarea
+            id="tw-instructions"
+            value={config.userInstructions || ''}
+            onChange={(e) => setConfig(prev => ({ ...prev, userInstructions: e.target.value }))}
+            placeholder="e.g. Tell the AI what task you were given and how far you've got. It will help you complete the rest."
+            rows={2}
+            className="resize-none"
+          />
+        </div>
+
+        <div className="flex justify-between pt-2">
+          <Button variant="ghost" onClick={() => setStep(2)}>
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back
+          </Button>
+          <Button onClick={() => onSave(config)} disabled={isSaving || !config.title.trim()}>
+            {isSaving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : 'Save Activity'}
           </Button>
         </div>
       </div>

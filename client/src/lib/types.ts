@@ -43,7 +43,7 @@ export interface GroupBoardSettings {
 export interface BaseConfig {
   id?: number;
   title: string;
-  type: 'chat' | 'upload' | 'quiz' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz' | 'group-board' | 'user-tester';
+  type: 'chat' | 'upload' | 'quiz' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz' | 'group-board' | 'user-tester' | 'doc-critique' | 'task-walkthrough';
   systemPrompt: string;
   userInstructions: string | null;
   feedbackCriteria: string | null;
