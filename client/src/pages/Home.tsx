@@ -25,6 +25,8 @@ import {
   Plus, Pencil, Copy, MoreVertical, BarChart2, Trash2,
   Flag, Share2, EyeOff, Keyboard, Mic, LogOut, GripVertical, Radio,
   Layers, FolderOpen, Library, Play, Users, MonitorPlay,
+  MessageSquare, GraduationCap, Brain, Zap, LayoutGrid, Monitor,
+  FileText, ClipboardList, HelpCircle, Upload, Sparkles, Link2, X,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { track, EventName } from "@/lib/mixpanel";
@@ -62,6 +64,17 @@ import AgentTimer from "@/components/AgentTimer";
 import type { Template } from "@/lib/types";
 
 const LS_SESSION_KEY = 'womble_last_session_id';
+
+type Suggestion = {
+  id: string;
+  type: AdminConfig['type'];
+  title: string;
+  description: string;
+  slideReference?: string | null;
+  systemPrompt: string;
+  feedbackCriteria: string;
+  userInstructions: string;
+};
 
 const AGENT_TYPE_FILTERS = [
   { type: 'all', label: 'All' },
@@ -320,6 +333,20 @@ function SortableAgentCard({
     'task-walkthrough': { label: 'Task Walkthrough', classes: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
   }[config.type] ?? { label: config.type, classes: 'bg-gray-50 text-gray-600 border-gray-200' };
 
+  const TypeIcon = {
+    chat: MessageSquare,
+    'two-way-conversation': Users,
+    'teach-ai': GraduationCap,
+    'thought-partner': Brain,
+    'quick-fire-quiz': Zap,
+    'group-board': LayoutGrid,
+    'user-tester': Monitor,
+    'doc-critique': FileText,
+    'task-walkthrough': ClipboardList,
+    quiz: HelpCircle,
+    upload: Upload,
+  }[config.type] ?? MessageSquare;
+
   return (
     <div ref={setNodeRef} style={style} className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-4 py-5 shadow-sm">
       <button {...attributes} {...listeners} className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing flex-shrink-0">
@@ -327,6 +354,7 @@ function SortableAgentCard({
       </button>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
+          <TypeIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
           <span className="text-sm font-medium text-gray-800 truncate">{config.title}</span>
           <Badge variant="outline" className={`text-xs flex-shrink-0 ${typeBadge.classes}`}>{typeBadge.label}</Badge>
           {config.type !== 'quick-fire-quiz' && config.type !== 'user-tester' && (() => {
@@ -455,6 +483,14 @@ export default function Home() {
   const [controllingQuizId, setControllingQuizId] = useState<number | null>(null);
   const [agentOrderOverride, setAgentOrderOverride] = useState<ChatConfig[]>([]);
   const [libraryTypeFilter, setLibraryTypeFilter] = useState<AgentTypeFilter>('all');
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestionsFile, setSuggestionsFile] = useState<{ name: string; slideCount?: number } | null>(null);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [showLinkInput, setShowLinkInput] = useState(false);
+  const [linkInputValue, setLinkInputValue] = useState('');
+  const slideFileInputRef = useRef<HTMLInputElement>(null);
+  const buildingSuggestionIdRef = useRef<string | null>(null);
+  const [buildingId, setBuildingId] = useState<string | null>(null);
   const [config, setConfig] = useState<AdminConfig>({
     title: '', type: 'chat', systemPrompt: 'Act as a...', userInstructions: '',
     feedbackCriteria: '', temperature: 0.7, maxTokens: 1000, questions: [],
@@ -464,6 +500,23 @@ export default function Home() {
     setSelectedSessionId(id);
     setAgentOrderOverride([]);
     setLibraryTypeFilter('all');
+    setShowLinkInput(false);
+    setLinkInputValue('');
+    // Restore any saved suggestions for this session
+    try {
+      const saved = localStorage.getItem(`womble_suggestions_${id}`);
+      if (saved) {
+        const { suggestions: s, file: f } = JSON.parse(saved);
+        setSuggestions(s ?? []);
+        setSuggestionsFile(f ?? null);
+      } else {
+        setSuggestions([]);
+        setSuggestionsFile(null);
+      }
+    } catch {
+      setSuggestions([]);
+      setSuggestionsFile(null);
+    }
     localStorage.setItem(LS_SESSION_KEY, String(id));
   };
 
@@ -515,6 +568,17 @@ export default function Home() {
     const first = regularSessions[0] ?? librarySessions[0];
     if (first) selectSession(first.id);
   }, [sessionList, loadingSessions]);
+
+  // Persist suggestions to localStorage whenever they change for the current session
+  useEffect(() => {
+    if (!selectedSessionId) return;
+    const key = `womble_suggestions_${selectedSessionId}`;
+    if (suggestions.length === 0 && !suggestionsFile) {
+      localStorage.removeItem(key);
+    } else {
+      localStorage.setItem(key, JSON.stringify({ suggestions, file: suggestionsFile }));
+    }
+  }, [selectedSessionId, suggestions, suggestionsFile]);
 
   const { data: selectedSession, isLoading: loadingSession } = useQuery<SessionDetail | null>({
     queryKey: ['/api/sessions', selectedSessionId],
@@ -568,6 +632,103 @@ export default function Home() {
     setAgentOrderOverride(reordered);
     reorderAgents.mutate(reordered.map(c => c.id));
   }, [allSessionAgents, reorderAgents]);
+
+  // ── Slide suggestions ─────────────────────────────────────────────────────
+
+  const handleSlideUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setSuggestionsLoading(true);
+    setSuggestionsFile({ name: file.name });
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      const chunk = 8192;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, Math.min(i + chunk, bytes.length))));
+      }
+      const base64 = btoa(binary);
+      const res = await fetch('/api/suggest-activities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: base64, fileName: file.name }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { suggestions: newSuggestions, slideCount, slideContext } = await res.json();
+      setSuggestions(newSuggestions);
+      setSuggestionsFile({ name: file.name, slideCount });
+      if (selectedSessionId && slideContext) {
+        const key = `womble_suggestions_${selectedSessionId}`;
+        const existing = JSON.parse(localStorage.getItem(key) || '{}');
+        localStorage.setItem(key, JSON.stringify({ ...existing, slideContext }));
+      }
+    } catch (err: any) {
+      toast({ variant: 'destructive', description: err.message || 'Failed to analyse slides.' });
+      setSuggestionsFile(null);
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  };
+
+  const handleLinkSubmit = async () => {
+    const trimmed = linkInputValue.trim();
+    if (!trimmed) return;
+    setSuggestionsLoading(true);
+    setSuggestionsFile({ name: trimmed });
+    try {
+      const res = await fetch('/api/suggest-activities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: trimmed }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { suggestions: newSuggestions, slideCount, slideContext } = await res.json();
+      setSuggestions(newSuggestions);
+      setSuggestionsFile({ name: trimmed, slideCount });
+      setShowLinkInput(false);
+      setLinkInputValue('');
+      if (selectedSessionId && slideContext) {
+        const key = `womble_suggestions_${selectedSessionId}`;
+        const existing = JSON.parse(localStorage.getItem(key) || '{}');
+        localStorage.setItem(key, JSON.stringify({ ...existing, slideContext }));
+      }
+    } catch (err: any) {
+      toast({ variant: 'destructive', description: err.message || 'Failed to analyse slides.' });
+      setSuggestionsFile(null);
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  };
+
+  const handleBuildSuggestion = async (suggestion: Suggestion) => {
+    setBuildingId(suggestion.id);
+    try {
+      const saved = localStorage.getItem(`womble_suggestions_${selectedSessionId}`);
+      const slideContext = saved ? (JSON.parse(saved).slideContext || '') : '';
+      const res = await fetch('/api/build-suggestion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ suggestion, slideContext }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const detailed = await res.json();
+      buildingSuggestionIdRef.current = suggestion.id;
+      setWizardPrefill({
+        ...detailed,
+        temperature: 0.7,
+        maxTokens: 1000,
+        questions: [],
+        interactionMode: 'both',
+      });
+      setIsCreateOpen(true);
+    } catch (err: any) {
+      toast({ variant: 'destructive', description: err.message || 'Failed to build activity.' });
+    } finally {
+      setBuildingId(null);
+    }
+  };
 
   // ── Session mutations ─────────────────────────────────────────────────────
 
@@ -706,6 +867,10 @@ export default function Home() {
       setIsPreviewingTemplate(false);
       setIsAddAgentOpen(false);
       setConfig({ title: '', type: 'chat', systemPrompt: 'Act as a...', userInstructions: '', feedbackCriteria: '', temperature: 0.7, maxTokens: 1000, questions: [] });
+      if (buildingSuggestionIdRef.current) {
+        setSuggestions(prev => prev.filter(s => s.id !== buildingSuggestionIdRef.current));
+        buildingSuggestionIdRef.current = null;
+      }
       toast({ description: 'Agent saved successfully!' });
     },
     onError: (error: Error) => toast({ variant: 'destructive', title: 'Error', description: error.message }),
@@ -1114,6 +1279,15 @@ export default function Home() {
               </div>
             )}
 
+            {/* Hidden file input */}
+            <input
+              ref={slideFileInputRef}
+              type="file"
+              accept=".pdf,.pptx,.ppt"
+              className="hidden"
+              onChange={handleSlideUpload}
+            />
+
             {/* Agents */}
             {sessionLoading ? (
               <div className="space-y-3">
@@ -1121,49 +1295,164 @@ export default function Home() {
                   <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
                 ))}
               </div>
-            ) : sessionAgents.length === 0 ? (
+            ) : isLibraryView && sessionAgents.length === 0 ? (
               <div className="border-2 border-dashed border-gray-200 rounded-lg p-10 text-center">
-                <p className="text-sm text-gray-400 mb-4">
-                  {isLibraryView ? 'No agents match this filter.' : 'No agents in this session yet.'}
-                </p>
-                {!isLibraryView && (
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      track(EventName.GPT_CREATE_CLICK, { location: 'empty_state' });
-                      setIsAddAgentOpen(true);
-                    }}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />Add Agent
-                  </Button>
-                )}
+                <p className="text-sm text-gray-400">No agents match this filter.</p>
               </div>
             ) : (
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={sessionAgents.map(c => c.id)} strategy={verticalListSortingStrategy}>
-                  <div className="space-y-3">
-                    {sessionAgents.map((cfg) => (
-                      <SortableAgentCard
-                        key={cfg.id}
-                        config={cfg}
-                        isLibraryView={isLibraryView}
-                        sessions={regularSessions}
-                        onToggleLive={(isLive) => toggleLive.mutate({ configId: cfg.id, isLive })}
-                        onEdit={() => handleEditConfig(cfg)}
-                        onDelete={() => setDeletingConfig(cfg)}
-                        onCopyLink={() => handleCopyLink(cfg.id)}
-                        onViewFeedback={() => handleViewFeedback(cfg)}
-                        onDuplicate={() => handleDuplicateAgent(cfg)}
-                        onAddToSession={(sessionId) => addToSession.mutate({ configId: cfg.id, sessionId })}
-                        onControlQuiz={cfg.type === 'quick-fire-quiz' ? () => setControllingQuizId(cfg.id) : undefined}
-                        onSaveAsTemplate={() => setSavingAsTemplate(cfg)}
-                        onRemoveFromTemplates={() => removeFromTemplates.mutate(cfg.id)}
-                      />
-                    ))}
+              <>
+                {/* Existing agents */}
+                {sessionAgents.length > 0 && (
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                    <SortableContext items={sessionAgents.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                      <div className="space-y-3">
+                        {sessionAgents.map((cfg) => (
+                          <SortableAgentCard
+                            key={cfg.id}
+                            config={cfg}
+                            isLibraryView={isLibraryView}
+                            sessions={regularSessions}
+                            onToggleLive={(isLive) => toggleLive.mutate({ configId: cfg.id, isLive })}
+                            onEdit={() => handleEditConfig(cfg)}
+                            onDelete={() => setDeletingConfig(cfg)}
+                            onCopyLink={() => handleCopyLink(cfg.id)}
+                            onViewFeedback={() => handleViewFeedback(cfg)}
+                            onDuplicate={() => handleDuplicateAgent(cfg)}
+                            onAddToSession={(sessionId) => addToSession.mutate({ configId: cfg.id, sessionId })}
+                            onControlQuiz={cfg.type === 'quick-fire-quiz' ? () => setControllingQuizId(cfg.id) : undefined}
+                            onSaveAsTemplate={() => setSavingAsTemplate(cfg)}
+                            onRemoveFromTemplates={() => removeFromTemplates.mutate(cfg.id)}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                )}
+
+                {/* Suggestions section */}
+                {!isLibraryView && suggestions.length > 0 && (
+                  <div className={sessionAgents.length > 0 ? 'mt-6' : ''}>
+                    {suggestionsFile && (
+                      <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-2 mb-4 text-sm text-gray-600">
+                        <FileText className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                        <span className="flex-1 truncate">{suggestionsFile.name}</span>
+                        {suggestionsFile.slideCount && (
+                          <span className="text-xs bg-white border border-gray-200 rounded-full px-2 py-0.5 flex-shrink-0">
+                            {suggestionsFile.slideCount} slides analysed
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-semibold text-gray-700">
+                        {suggestions.length} suggested {suggestions.length === 1 ? 'activity' : 'activities'}
+                      </p>
+                      <button
+                        onClick={() => { setSuggestions([]); setSuggestionsFile(null); }}
+                        className="text-xs text-gray-400 hover:text-gray-600"
+                      >
+                        Dismiss all
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {suggestions.map(s => (
+                        <SuggestionCard
+                          key={s.id}
+                          suggestion={s}
+                          isBuilding={buildingId === s.id}
+                          onBuild={() => handleBuildSuggestion(s)}
+                          onDismiss={() => setSuggestions(prev => prev.filter(x => x.id !== s.id))}
+                        />
+                      ))}
+                    </div>
+                    <div className="text-center mt-5">
+                      <span className="text-xs text-gray-400 block mb-2">or</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          track(EventName.GPT_CREATE_CLICK, { location: 'after_suggestions' });
+                          setIsAddAgentOpen(true);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-1.5" />Add agent manually
+                      </Button>
+                    </div>
                   </div>
-                </SortableContext>
-              </DndContext>
+                )}
+
+                {/* Generate-from-slides panel (shown when no agents and no suggestions) */}
+                {!isLibraryView && sessionAgents.length === 0 && suggestions.length === 0 && (
+                  <div>
+                    <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 bg-gray-50/50">
+                      {suggestionsLoading ? (
+                        <div className="text-center py-4">
+                          <div className="h-8 w-8 rounded-full border-2 border-green-500 border-t-transparent animate-spin mx-auto mb-3" />
+                          <p className="text-sm text-gray-500">Analysing your slides…</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-center mb-4">
+                            <div className="w-12 h-12 rounded-xl bg-white border border-gray-200 shadow-sm flex items-center justify-center">
+                              <Sparkles className="h-5 w-5 text-gray-600" />
+                            </div>
+                          </div>
+                          <h3 className="text-base font-semibold text-gray-800 text-center mb-1">
+                            Generate activities from your slides
+                          </h3>
+                          <p className="text-sm text-gray-500 text-center mb-5 max-w-xs mx-auto">
+                            Upload a slide deck or paste a link and Womble will suggest activities based on your content
+                          </p>
+                          {showLinkInput ? (
+                            <div className="max-w-sm mx-auto space-y-2">
+                              <div className="flex gap-2">
+                                <input
+                                  autoFocus
+                                  type="url"
+                                  value={linkInputValue}
+                                  onChange={e => setLinkInputValue(e.target.value)}
+                                  onKeyDown={e => { if (e.key === 'Enter') handleLinkSubmit(); if (e.key === 'Escape') setShowLinkInput(false); }}
+                                  placeholder="Google Slides link (set to Anyone can view)"
+                                  className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent"
+                                />
+                                <Button size="sm" onClick={handleLinkSubmit} className="bg-green-600 hover:bg-green-700 flex-shrink-0">Go</Button>
+                                <Button size="sm" variant="ghost" onClick={() => setShowLinkInput(false)} className="flex-shrink-0"><X className="h-4 w-4" /></Button>
+                              </div>
+                              {linkInputValue.includes('gamma.app') && (
+                                <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                  Gamma decks work best as PDFs — export yours and upload it instead.
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex gap-3 justify-center">
+                              <Button variant="outline" size="sm" onClick={() => slideFileInputRef.current?.click()}>
+                                <Upload className="h-3.5 w-3.5 mr-1.5" />Upload deck
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => setShowLinkInput(true)}>
+                                <Link2 className="h-3.5 w-3.5 mr-1.5" />Paste link
+                              </Button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    <div className="text-center mt-5">
+                      <span className="text-xs text-gray-400 block mb-2">or</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          track(EventName.GPT_CREATE_CLICK, { location: 'empty_state' });
+                          setIsAddAgentOpen(true);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-1.5" />Add agent manually
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -1313,6 +1602,94 @@ export default function Home() {
           onClose={() => setControllingQuizId(null)}
         />
       )}
+    </div>
+  );
+}
+
+// ── Suggestion card ───────────────────────────────────────────────────────────
+
+const SUGGESTION_ICON_MAP: Record<string, React.ElementType> = {
+  chat: MessageSquare,
+  'two-way-conversation': Users,
+  'teach-ai': GraduationCap,
+  'thought-partner': Brain,
+  'quick-fire-quiz': Zap,
+  'group-board': LayoutGrid,
+  'user-tester': Monitor,
+  'doc-critique': FileText,
+  'task-walkthrough': ClipboardList,
+  quiz: HelpCircle,
+  upload: Upload,
+};
+
+const SUGGESTION_TYPE_LABEL: Record<string, string> = {
+  chat: 'Conversation with AI',
+  'two-way-conversation': 'Two-way Conversation',
+  'teach-ai': 'Teach an AI',
+  'thought-partner': 'Thought Partner',
+  'quick-fire-quiz': 'Quick Fire Quiz',
+  'group-board': 'Group Board',
+  'user-tester': 'User Tester',
+  'doc-critique': 'Critique a Document',
+  'task-walkthrough': 'Task Walkthrough',
+  quiz: 'Quiz',
+  upload: 'Document Review',
+};
+
+const SUGGESTION_ICON_COLOR: Record<string, string> = {
+  chat: 'bg-green-50 text-green-600',
+  'two-way-conversation': 'bg-orange-50 text-orange-600',
+  'teach-ai': 'bg-blue-50 text-blue-600',
+  'thought-partner': 'bg-teal-50 text-teal-600',
+  'quick-fire-quiz': 'bg-amber-50 text-amber-600',
+  'group-board': 'bg-emerald-50 text-emerald-600',
+  'user-tester': 'bg-violet-50 text-violet-600',
+  'doc-critique': 'bg-blue-50 text-blue-600',
+  'task-walkthrough': 'bg-cyan-50 text-cyan-600',
+  quiz: 'bg-gray-50 text-gray-600',
+  upload: 'bg-purple-50 text-purple-600',
+};
+
+function SuggestionCard({
+  suggestion,
+  isBuilding,
+  onBuild,
+  onDismiss,
+}: {
+  suggestion: Suggestion;
+  isBuilding: boolean;
+  onBuild: () => void;
+  onDismiss: () => void;
+}) {
+  const Icon = SUGGESTION_ICON_MAP[suggestion.type] ?? MessageSquare;
+  const label = SUGGESTION_TYPE_LABEL[suggestion.type] ?? suggestion.type;
+  const iconColor = SUGGESTION_ICON_COLOR[suggestion.type] ?? 'bg-gray-50 text-gray-600';
+
+  return (
+    <div className="flex items-start gap-3 bg-white border border-gray-200 rounded-xl px-4 py-4 shadow-sm">
+      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${iconColor}`}>
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <span className={`text-xs font-medium ${iconColor.split(' ')[1]} mb-1 block`}>{label}</span>
+        <p className="text-sm font-semibold text-gray-800 mb-0.5">{suggestion.title}</p>
+        <p className="text-sm text-gray-500 leading-snug">{suggestion.description}</p>
+        {suggestion.slideReference && (
+          <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1">
+            <FileText className="h-3 w-3" />{suggestion.slideReference}
+          </p>
+        )}
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0 ml-2 mt-0.5">
+        <Button size="sm" onClick={onBuild} disabled={isBuilding} className="bg-green-600 hover:bg-green-700 text-white h-8 px-3 min-w-[64px]">
+          {isBuilding
+            ? <div className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+            : 'Build'}
+        </Button>
+        <button onClick={onDismiss} disabled={isBuilding} className="text-gray-300 hover:text-gray-500 transition-colors disabled:opacity-30">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }

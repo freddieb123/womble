@@ -11,6 +11,7 @@ import { z } from "zod";
 import crypto from 'crypto';
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam } from 'openai/dist/resources/chat/completions';
+import AdmZip from 'adm-zip';
 
 function harshnessGuidance(level: string | null | undefined): string {
   switch (level) {
@@ -858,6 +859,222 @@ Keep the tone conversational and direct. Write in the same voice as the original
       res.json({ enhanced });
     } catch (error: any) {
       console.error("Error enhancing prompt:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/suggest-activities", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { content, fileName, url } = req.body;
+      let slideText = '';
+      let slideCount: number | undefined;
+
+      if (content) {
+        const buffer = Buffer.from(content, 'base64');
+        const { fileName: fn } = req.body;
+        const ext = (fn || '').toLowerCase().split('.').pop();
+        if (ext === 'pptx' || ext === 'ppt') {
+          // PPTX is a ZIP of XML — extract text from slide XML files
+          try {
+            const zip = new AdmZip(buffer);
+            const textParts: string[] = [];
+            let pageCount = 0;
+            for (const entry of zip.getEntries()) {
+              if (/^ppt\/slides\/slide\d+\.xml$/.test(entry.entryName)) {
+                pageCount++;
+                const xml = entry.getData().toString('utf-8');
+                const matches = xml.match(/<a:t[^>]*>([^<]*)<\/a:t>/g) || [];
+                for (const m of matches) {
+                  const t = m.replace(/<[^>]+>/g, '').trim();
+                  if (t) textParts.push(t);
+                }
+              }
+            }
+            slideText = textParts.join(' ').replace(/\s+/g, ' ').trim().slice(0, 20000);
+            slideCount = pageCount || undefined;
+          } catch (e) {
+            return res.status(400).json({ error: 'Could not parse PPTX file. Try exporting as PDF.' });
+          }
+        } else {
+        // Pure-JS PDF text extraction (works for text-based PDFs e.g. slide exports)
+        const data = buffer.toString('binary');
+        const pageCount = (data.match(/\/Type\s*\/Page[^s]/g) || []).length;
+        const textParts: string[] = [];
+        const btEt = /BT([\s\S]*?)ET/g;
+        let bm: RegExpExecArray | null;
+        while ((bm = btEt.exec(data)) !== null) {
+          const block = bm[1];
+          const tj = /\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*(?:Tj|'|")/g;
+          let tm: RegExpExecArray | null;
+          while ((tm = tj.exec(block)) !== null) {
+            const t = tm[1].replace(/\\n/g,'\n').replace(/\\\(/g,'(').replace(/\\\)/g,')').replace(/\\\\/g,'\\');
+            if (t.trim()) textParts.push(t);
+          }
+          const tja = /\[([^\]]*)\]\s*TJ/g;
+          let ta: RegExpExecArray | null;
+          while ((ta = tja.exec(block)) !== null) {
+            const parts = ta[1].match(/\(([^)\\]*(?:\\.[^)\\]*)*)\)/g) || [];
+            for (const p of parts) {
+              const t = p.slice(1,-1).replace(/\\n/g,'\n').replace(/\\\(/g,'(').replace(/\\\)/g,')');
+              if (t.trim()) textParts.push(t);
+            }
+          }
+        }
+        slideText = textParts.join(' ').replace(/\s+/g,' ').trim().slice(0, 20000);
+        slideCount = pageCount || undefined;
+        } // end else (PDF)
+      } else if (url) {
+        let fetchUrl = url.trim();
+        // Convert Google Slides share/edit URLs to the plain text export endpoint
+        const gSlidesMatch = fetchUrl.match(/docs\.google\.com\/presentation\/d\/([a-zA-Z0-9_-]+)/);
+        if (gSlidesMatch) {
+          fetchUrl = `https://docs.google.com/presentation/d/${gSlidesMatch[1]}/export/txt`;
+        }
+        const resp = await fetch(fetchUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Womble/1.0)' },
+          redirect: 'follow',
+        });
+        if (!resp.ok) {
+          return res.status(400).json({ error: `Could not fetch that URL (status ${resp.status}). Make sure the link is set to "Anyone can view".` });
+        }
+        const contentType = resp.headers.get('content-type') || '';
+        if (contentType.includes('text/plain')) {
+          slideText = (await resp.text()).slice(0, 20000);
+        } else {
+          const html = await resp.text();
+          slideText = html
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 20000);
+        }
+      }
+
+      if (!slideText.trim()) {
+        return res.status(400).json({ error: 'Could not extract text from the provided content.' });
+      }
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert learning designer for apprenticeship training programmes in the UK. You will be given the content of a training slide deck and must suggest learning activities.
+
+QUANTITY RULE: Suggest roughly 3–5 activities per 10 slides. So a 10-slide deck → 3–5 suggestions; a 20-slide deck → 6–10; a 5-slide deck → 2–3. It is fine — and encouraged — to suggest more than one activity for the same group of slides when there are genuinely different good options (e.g. a role-play AND a quiz for the same content). The user will pick the best one.
+
+ORDER RULE: Return activities in slide order — suggestions covering earlier slides come first.
+
+Available activity types:
+- "chat": Learner has a role-play conversation with an AI playing a character (great for practising interactions, handling objections, difficult conversations)
+- "teach-ai": Learner explains a concept to an AI playing a naive learner — good for consolidating knowledge
+- "thought-partner": Open coaching conversation to help the learner apply an idea to their own context
+- "two-way-conversation": Two real people record a conversation (mock interview, role play with a partner) — AI transcribes and gives feedback
+- "doc-critique": Learner reads a document and shares observations — AI coaches on what they should have noticed
+- "task-walkthrough": Learner describes their progress on a task via voice — AI coaches them through completion
+
+Return ONLY a valid JSON array, no other text. Each item:
+{
+  "type": one of the types above,
+  "title": compelling activity title, max 8 words,
+  "description": 1-2 sentences — what participants do and what they get out of it,
+  "slideReference": which slides this relates to (e.g. "Slides 4–6") — always include this,
+  "slideStartIndex": the first slide number this activity relates to (integer, for ordering),
+  "systemPrompt": detailed, specific system prompt for the AI in this activity — reference the actual content from the slides,
+  "feedbackCriteria": specific criteria for evaluating the participant's response,
+  "userInstructions": brief friendly instructions shown to the participant (1-2 sentences)
+}
+
+Ground every activity specifically in the slide content — never generic.`,
+          },
+          {
+            role: 'user',
+            content: `Slide deck: "${fileName || url || 'uploaded presentation'}" (${slideCount ? `${slideCount} slides` : 'slide count unknown'})\n\nContent:\n${slideText.slice(0, 15000)}\n\nSuggest activities scaled to the deck length, in slide order.`,
+          },
+        ],
+        temperature: 0.7,
+      });
+
+      const raw = (completion.choices[0].message.content || '[]')
+        .replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      let suggestions: any[] = [];
+      try { suggestions = JSON.parse(raw); } catch { suggestions = []; }
+      suggestions = suggestions
+        .sort((a: any, b: any) => (a.slideStartIndex ?? 999) - (b.slideStartIndex ?? 999))
+        .map((s: any) => { const { slideStartIndex, ...rest } = s; return { ...rest, id: crypto.randomUUID() }; });
+
+      res.json({ suggestions, slideCount, slideContext: slideText });
+    } catch (error: any) {
+      console.error('Error suggesting activities:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/build-suggestion", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { suggestion, slideContext } = req.body;
+      if (!suggestion) return res.status(400).json({ error: 'suggestion is required' });
+
+      const typeDescriptions: Record<string, string> = {
+        chat: 'a role-play conversation where the learner talks with an AI playing a specific character or role',
+        'teach-ai': 'a "teach an AI" exercise where the learner explains a concept to an AI playing a naive learner',
+        'thought-partner': 'an open coaching conversation where the AI helps the learner apply an idea to their own work context',
+        'two-way-conversation': 'a recorded conversation between two real people that is transcribed and given feedback',
+        'doc-critique': 'the learner reads a document and submits their observations, which the AI evaluates',
+        'task-walkthrough': 'the learner talks through their progress on a task and the AI coaches them through completion via voice',
+      };
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert learning designer creating a detailed, production-ready learning activity configuration for an apprenticeship training platform.
+
+The activity type is: ${typeDescriptions[suggestion.type] || suggestion.type}
+
+You will be given a suggested activity and the actual slide content it relates to. Your job is to write rich, highly specific configuration fields that a trainer could use immediately without editing.
+
+Return ONLY valid JSON with these fields:
+{
+  "systemPrompt": "Detailed AI instructions (250-400 words). Be specific: reference exact concepts, frameworks, terminology and scenarios from the slide content. Include how the AI should behave, what it should probe for, what good looks like, and what common mistakes to address.",
+  "feedbackCriteria": "Specific evaluation rubric (150-250 words). List 4-6 concrete things to look for with clear indicators of what good/adequate/missing looks like. Reference the specific content from the slides.",
+  "userInstructions": "Clear, friendly participant-facing instructions (2-4 sentences). Tell them exactly what to do and what to aim for. Make it feel achievable."
+}`,
+          },
+          {
+            role: 'user',
+            content: `Activity to build:
+Title: ${suggestion.title}
+Type: ${suggestion.type}
+Description: ${suggestion.description}
+Slide reference: ${suggestion.slideReference || 'not specified'}
+
+Relevant slide content:
+${(slideContext || '').slice(0, 12000)}
+
+Write detailed, specific configuration for this activity.`,
+          },
+        ],
+        temperature: 0.6,
+      });
+
+      const raw = (completion.choices[0].message.content || '{}')
+        .replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      let detailed: any = {};
+      try { detailed = JSON.parse(raw); } catch { detailed = {}; }
+
+      res.json({
+        title: suggestion.title,
+        type: suggestion.type,
+        systemPrompt: detailed.systemPrompt || suggestion.systemPrompt || '',
+        feedbackCriteria: detailed.feedbackCriteria || suggestion.feedbackCriteria || '',
+        userInstructions: detailed.userInstructions || suggestion.userInstructions || '',
+      });
+    } catch (error: any) {
+      console.error('Error building suggestion:', error);
       res.status(500).json({ error: error.message });
     }
   });

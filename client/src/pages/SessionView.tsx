@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle } from "lucide-react";
 import WombleHeader from "@/components/WombleHeader";
@@ -12,10 +12,17 @@ import GroupBoardInterface from "@/components/GroupBoardInterface";
 import UserTesterInterface from "@/components/UserTesterInterface";
 import DocCritiqueInterface from "@/components/DocCritiqueInterface";
 import TaskWalkthroughInterface from "@/components/TaskWalkthroughInterface";
+import DualConversationRecorder from "@/components/DualConversationRecorder";
+import ParticipantsNameModal from "@/components/ParticipantsNameModal";
+import FeedbackModal from "@/components/FeedbackModal";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Keyboard, Mic } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Keyboard, Mic, MessageSquare, Users, GraduationCap, Brain,
+  Zap, LayoutGrid, Monitor, FileText, ClipboardList, HelpCircle, Upload,
+} from "lucide-react";
 import type { AdminConfig } from "@/lib/types";
 
 type SessionConfig = {
@@ -34,6 +41,8 @@ type SessionConfig = {
   referenceContent: string | null;
   sessionOrder: number | null;
   groupBoardSettings?: any;
+  participant1Role?: string | null;
+  participant2Role?: string | null;
 };
 
 type SessionData = {
@@ -55,6 +64,8 @@ export default function SessionView() {
   const [chatModes, setChatModes] = useState<Record<number, 'typed' | 'spoken'>>({});
   const [showModeModal, setShowModeModal] = useState(false);
   const [pendingConfigId, setPendingConfigId] = useState<number | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(240);
+  const isDraggingRef = useRef(false);
 
   // One stable sessionId per config
   const sessionIds = useRef<Record<number, string>>({});
@@ -105,7 +116,7 @@ export default function SessionView() {
     if (!config.isLive) return;
     // Only show mode picker when switching to a subsequent activity (name already known)
     // For the first activity, the activity's own UserNameModal handles name + mode together
-    if (userName && config.interactionMode === 'both' && !chatModes[config.id] && !['group-board', 'user-tester', 'doc-critique', 'task-walkthrough'].includes(config.type)) {
+    if (userName && config.interactionMode === 'both' && !chatModes[config.id] && !['group-board', 'user-tester', 'doc-critique', 'task-walkthrough', 'two-way-conversation'].includes(config.type)) {
       setPendingConfigId(config.id);
       setShowModeModal(true);
     } else {
@@ -147,6 +158,7 @@ export default function SessionView() {
   }
 
   const selectedConfig = configs.find(c => c.id === selectedConfigId);
+
   const adminConfig: AdminConfig | null = selectedConfig ? {
     id: selectedConfig.id,
     type: selectedConfig.type as AdminConfig['type'],
@@ -164,6 +176,8 @@ export default function SessionView() {
     referenceContent: selectedConfig.referenceContent ?? undefined,
     interactionMode: selectedConfig.interactionMode,
     groupBoardSettings: selectedConfig.groupBoardSettings ?? undefined,
+    participant1Role: selectedConfig.participant1Role ?? undefined,
+    participant2Role: selectedConfig.participant2Role ?? undefined,
   } : null;
 
   const chatMode = selectedConfig
@@ -180,13 +194,51 @@ export default function SessionView() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
-        <div className="w-56 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-y-auto">
+        <div
+          className="flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-y-auto relative"
+          style={{ width: sidebarWidth }}
+        >
+          {/* Drag handle */}
+          <div
+            className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-green-200 active:bg-green-300 transition-colors z-10"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              isDraggingRef.current = true;
+              const startX = e.clientX;
+              const startWidth = sidebarWidth;
+              const onMove = (ev: MouseEvent) => {
+                if (!isDraggingRef.current) return;
+                const next = Math.min(400, Math.max(160, startWidth + ev.clientX - startX));
+                setSidebarWidth(next);
+              };
+              const onUp = () => {
+                isDraggingRef.current = false;
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+              };
+              window.addEventListener('mousemove', onMove);
+              window.addEventListener('mouseup', onUp);
+            }}
+          />
           <div className="px-3 pt-4 pb-2">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Activities</p>
           </div>
           <nav className="flex-1 px-2 pb-4 space-y-1">
             {configs.map((cfg) => {
               const isSelected = cfg.id === selectedConfigId;
+              const SidebarIcon = ({
+                chat: MessageSquare,
+                'two-way-conversation': Users,
+                'teach-ai': GraduationCap,
+                'thought-partner': Brain,
+                'quick-fire-quiz': Zap,
+                'group-board': LayoutGrid,
+                'user-tester': Monitor,
+                'doc-critique': FileText,
+                'task-walkthrough': ClipboardList,
+                quiz: HelpCircle,
+                upload: Upload,
+              } as Record<string, React.ElementType>)[cfg.type] ?? MessageSquare;
               return (
                 <button
                   key={cfg.id}
@@ -202,6 +254,7 @@ export default function SessionView() {
                 >
                   <div className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.isLive ? 'bg-green-500' : 'bg-gray-200'}`} />
+                    <SidebarIcon className="h-3.5 w-3.5 flex-shrink-0 opacity-60" />
                     <span className="truncate">{cfg.title}</span>
                   </div>
                 </button>
@@ -227,8 +280,15 @@ export default function SessionView() {
               Select an activity from the sidebar to get started.
             </div>
           ) : (
-            <Card className={`h-full w-full flex flex-col overflow-hidden ${['group-board', 'user-tester', 'doc-critique', 'task-walkthrough'].includes(selectedConfig.type) ? 'max-w-6xl p-0' : 'max-w-3xl p-4'}`}>
-              {selectedConfig.type === 'group-board' ? (
+            <Card className={`h-full w-full flex flex-col overflow-hidden ${['group-board', 'user-tester', 'doc-critique', 'task-walkthrough', 'two-way-conversation'].includes(selectedConfig.type) ? 'max-w-6xl p-0' : 'max-w-3xl p-4'}`}>
+              {selectedConfig.type === 'two-way-conversation' ? (
+                <TwoWayConversationInSession
+                  key={selectedConfig.id}
+                  configId={selectedConfig.id}
+                  sessionId={getSessionId(selectedConfig.id)}
+                  config={adminConfig!}
+                />
+              ) : selectedConfig.type === 'group-board' ? (
                 <GroupBoardInterface
                   config={adminConfig!}
                   userName={userName}
@@ -387,6 +447,94 @@ function ActivityTimerDisplay({ configId }: { configId: number }) {
         />
       </div>
       {isDone && <p className="text-xs text-red-400 mt-2 text-center font-medium">Time's up!</p>}
+    </div>
+  );
+}
+
+function TwoWayConversationInSession({
+  configId,
+  sessionId,
+  config,
+}: {
+  configId: number;
+  sessionId: string;
+  config: AdminConfig;
+}) {
+  const [showNamesModal, setShowNamesModal] = useState(true);
+  const [participant1Name, setParticipant1Name] = useState('');
+  const [participant2Name, setParticipant2Name] = useState('');
+  const [autoStart, setAutoStart] = useState(false);
+  const [transcript, setTranscript] = useState<any[]>([]);
+  const [feedback, setFeedback] = useState<any>(null);
+  const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const { toast } = useToast();
+
+  const handleNameSubmit = (names: { participant1Name: string; participant2Name: string }) => {
+    setParticipant1Name(names.participant1Name);
+    setParticipant2Name(names.participant2Name);
+    setShowNamesModal(false);
+    setAutoStart(true);
+  };
+
+  const generateFeedback = async () => {
+    if (transcript.length === 0) return;
+    setIsGeneratingFeedback(true);
+    try {
+      const res = await fetch(`/api/dual-conversation/feedback?configId=${configId}&sessionId=${sessionId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript, participant1Name, participant2Name }),
+      });
+      if (!res.ok) throw new Error('Failed to generate feedback');
+      setFeedback(await res.json());
+      setShowFeedbackModal(true);
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error', description: err.message });
+    } finally {
+      setIsGeneratingFeedback(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full p-6 gap-4 overflow-y-auto">
+      {/* Title + instructions header */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 space-y-2">
+        <h2 className="text-base font-semibold text-gray-800 text-center">{config.title}</h2>
+        {config.userInstructions && (
+          <p className="text-sm text-gray-600 whitespace-pre-line">{config.userInstructions}</p>
+        )}
+      </div>
+
+      <ParticipantsNameModal
+        open={showNamesModal}
+        onSubmit={handleNameSubmit}
+        participant1Role={config.participant1Role ?? undefined}
+        participant2Role={config.participant2Role ?? undefined}
+      />
+      <FeedbackModal
+        open={showFeedbackModal}
+        onOpenChange={setShowFeedbackModal}
+        feedback={feedback}
+        transcript={transcript}
+      />
+      <DualConversationRecorder
+        configId={configId}
+        sessionId={sessionId}
+        participant1Name={participant1Name}
+        participant2Name={participant2Name}
+        onTranscriptReady={setTranscript}
+        autoStart={autoStart}
+      />
+      {transcript.length > 0 && (
+        <Button
+          onClick={feedback ? () => setShowFeedbackModal(true) : generateFeedback}
+          disabled={isGeneratingFeedback}
+          className="w-full"
+        >
+          {isGeneratingFeedback ? 'Generating Feedback...' : feedback ? 'View Feedback' : 'Generate Feedback'}
+        </Button>
+      )}
     </div>
   );
 }
