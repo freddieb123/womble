@@ -968,11 +968,11 @@ QUANTITY RULE: Suggest roughly 3–5 activities per 10 slides. So a 10-slide dec
 ORDER RULE: Return activities in slide order — suggestions covering earlier slides come first.
 
 Available activity types:
-- "chat": Learner has a role-play conversation with an AI playing a character (great for practising interactions, handling objections, difficult conversations)
-- "teach-ai": Learner explains a concept to an AI playing a naive learner — good for consolidating knowledge
-- "thought-partner": Open coaching conversation to help the learner apply an idea to their own context
+- "chat": Learner has a role-play conversation with an AI playing a character — great for practising interactions, applying principles in a scenario, handling objections, or difficult conversations
+- "teach-ai": Learner explains a concept, framework, or set of principles to an AI playing a naive learner — excellent for consolidating knowledge of content already covered in the slides
+- "thought-partner": Open coaching conversation to help the learner apply an idea to their own work context
 - "two-way-conversation": Two real people record a conversation (mock interview, role play with a partner) — AI transcribes and gives feedback
-- "doc-critique": Learner reads a document and shares observations — AI coaches on what they should have noticed
+- "doc-critique": Learner reads a SEPARATE external document (e.g. a case study, contract, report, or business plan that is not part of the slide deck) and shares observations — AI coaches on what they should have noticed. ONLY use this type when the slides explicitly reference an external document for participants to analyse. NEVER suggest it for principles, frameworks, theory, or content that is itself explained in the slides — use "chat" or "teach-ai" for those instead.
 - "task-walkthrough": Learner describes their progress on a task via voice — AI coaches them through completion
 
 Return ONLY a valid JSON array, no other text. Each item:
