@@ -2883,6 +2883,34 @@ Score: [1-10 based on overall coverage and quality of explanation]
     }
   });
 
+  // PATCH save suggestions for a session
+  app.patch("/api/sessions/:id/suggestions", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const sessionId = parseInt(req.params.id);
+      if (!userId || isNaN(sessionId)) return res.status(400).json({ error: "Bad request" });
+
+      const { suggestions: sugg, suggestionsFile: sf, slideContext: sc } = req.body as {
+        suggestions?: any[];
+        suggestionsFile?: { name: string; slideCount?: number } | null;
+        slideContext?: string | null;
+      };
+
+      await db.update(sessions)
+        .set({
+          suggestions: sugg ?? [],
+          suggestionsFile: sf ?? null,
+          slideContext: sc ?? null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId as number)));
+
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // PATCH reorder configs within a session by id
   app.patch("/api/sessions/:id/order", requireAuth, async (req: Request, res: Response) => {
     try {

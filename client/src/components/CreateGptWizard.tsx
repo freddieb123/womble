@@ -756,7 +756,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
 
       {isTeachAi && (
         <div className="space-y-5 border rounded-lg p-4">
-          <p className="text-sm font-medium">Learner Settings</p>
+          <p className="text-sm font-medium">AI-as-the-learner settings</p>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <Label>Knowledge Level</Label>

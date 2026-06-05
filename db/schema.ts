@@ -18,6 +18,9 @@ export const sessions = pgTable("sessions", {
   shareToken: text("share_token").unique().notNull(),
   title: text("title").notNull().default("New Session"),
   isLibrary: boolean("is_library").default(false).notNull(),
+  suggestions: jsonb("suggestions").$type<any[]>().default([]),
+  suggestionsFile: jsonb("suggestions_file").$type<{ name: string; slideCount?: number } | null>().default(null),
+  slideContext: text("slide_context"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

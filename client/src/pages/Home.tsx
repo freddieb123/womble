@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Plus, Pencil, Copy, MoreVertical, BarChart2, Trash2,
-  Flag, Share2, EyeOff, Keyboard, Mic, LogOut, GripVertical, Radio,
+  Share2, Keyboard, Mic, LogOut, GripVertical, Radio,
   Layers, FolderOpen, Library, Play, Users, MonitorPlay,
   MessageSquare, GraduationCap, Brain, Zap, LayoutGrid, Monitor,
   FileText, ClipboardList, HelpCircle, Upload, Sparkles, Link2, X,
@@ -137,7 +137,12 @@ type SessionSummary = {
   configCount: number;
 };
 
-type SessionDetail = SessionSummary & { configs: ChatConfig[] };
+type SessionDetail = SessionSummary & {
+  configs: ChatConfig[];
+  suggestions?: Suggestion[];
+  suggestionsFile?: { name: string; slideCount?: number } | null;
+  slideContext?: string | null;
+};
 
 // ─── Editable main title ──────────────────────────────────────────────────────
 
@@ -299,8 +304,6 @@ function SortableAgentCard({
   onDuplicate,
   onAddToSession,
   onControlQuiz,
-  onSaveAsTemplate,
-  onRemoveFromTemplates,
 }: {
   config: ChatConfig;
   isLibraryView: boolean;
@@ -313,8 +316,6 @@ function SortableAgentCard({
   onDuplicate: () => void;
   onAddToSession: (sessionId: number) => void;
   onControlQuiz?: () => void;
-  onSaveAsTemplate: () => void;
-  onRemoveFromTemplates: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: config.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
@@ -447,17 +448,23 @@ function SortableAgentCard({
           {!isLibraryView && config.type !== 'group-board' && (
             <DropdownMenuItem onClick={onViewFeedback}><BarChart2 className="h-4 w-4 mr-2" />View Feedback</DropdownMenuItem>
           )}
-          {!config.isTemplate && (
-            <DropdownMenuItem onClick={onSaveAsTemplate}><Flag className="h-4 w-4 mr-2" />Save as Public Template</DropdownMenuItem>
-          )}
-          {config.isTemplate && (
-            <DropdownMenuItem onClick={onRemoveFromTemplates}><EyeOff className="h-4 w-4 mr-2" />Remove from Templates</DropdownMenuItem>
-          )}
           <DropdownMenuItem className="text-red-600" onClick={onDelete}><Trash2 className="h-4 w-4 mr-2" />Delete</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
   );
+}
+
+function startProgressSimulation(setProgress: (v: number) => void): ReturnType<typeof setInterval> {
+  setProgress(5);
+  let current = 5;
+  return setInterval(() => {
+    current = current < 18 ? current + 3
+            : current < 72 ? current + 0.8
+            : current < 88 ? current + 0.3
+            : current;
+    setProgress(Math.round(current));
+  }, 400);
 }
 
 // ─── Main component ────────────────────────────────────────────────────────────
@@ -475,18 +482,19 @@ export default function Home() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [wizardPrefill, setWizardPrefill] = useState<AdminConfig | undefined>(undefined);
   const [isAddAgentOpen, setIsAddAgentOpen] = useState(false);
-  const [isPreviewingTemplate, setIsPreviewingTemplate] = useState(false);
+  const [isPreviewingTemplate, setIsPreviewingTemplate] = useState(false); // kept for wizard flow
   const [editingConfig, setEditingConfig] = useState<ChatConfig | null>(null);
   const [deletingConfig, setDeletingConfig] = useState<ChatConfig | null>(null);
-  const [savingAsTemplate, setSavingAsTemplate] = useState<ChatConfig | null>(null);
   const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null);
   const [controllingQuizId, setControllingQuizId] = useState<number | null>(null);
   const [agentOrderOverride, setAgentOrderOverride] = useState<ChatConfig[]>([]);
   const [libraryTypeFilter, setLibraryTypeFilter] = useState<AgentTypeFilter>('all');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestionsFile, setSuggestionsFile] = useState<{ name: string; slideCount?: number } | null>(null);
-  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [slideContext, setSlideContext] = useState<string>('');
+  const [suggestionsProgress, setSuggestionsProgress] = useState<number | null>(null);
   const [showLinkInput, setShowLinkInput] = useState(false);
+  const suggestionsInitializedForRef = useRef<number | null>(null);
   const [linkInputValue, setLinkInputValue] = useState('');
   const slideFileInputRef = useRef<HTMLInputElement>(null);
   const buildingSuggestionIdRef = useRef<string | null>(null);
@@ -502,21 +510,11 @@ export default function Home() {
     setLibraryTypeFilter('all');
     setShowLinkInput(false);
     setLinkInputValue('');
-    // Restore any saved suggestions for this session
-    try {
-      const saved = localStorage.getItem(`womble_suggestions_${id}`);
-      if (saved) {
-        const { suggestions: s, file: f } = JSON.parse(saved);
-        setSuggestions(s ?? []);
-        setSuggestionsFile(f ?? null);
-      } else {
-        setSuggestions([]);
-        setSuggestionsFile(null);
-      }
-    } catch {
-      setSuggestions([]);
-      setSuggestionsFile(null);
-    }
+    // Clear local state — DB data loaded via useEffect once selectedSession resolves
+    suggestionsInitializedForRef.current = null;
+    setSuggestions([]);
+    setSuggestionsFile(null);
+    setSlideContext('');
     localStorage.setItem(LS_SESSION_KEY, String(id));
   };
 
@@ -569,17 +567,6 @@ export default function Home() {
     if (first) selectSession(first.id);
   }, [sessionList, loadingSessions]);
 
-  // Persist suggestions to localStorage whenever they change for the current session
-  useEffect(() => {
-    if (!selectedSessionId) return;
-    const key = `womble_suggestions_${selectedSessionId}`;
-    if (suggestions.length === 0 && !suggestionsFile) {
-      localStorage.removeItem(key);
-    } else {
-      localStorage.setItem(key, JSON.stringify({ suggestions, file: suggestionsFile }));
-    }
-  }, [selectedSessionId, suggestions, suggestionsFile]);
-
   const { data: selectedSession, isLoading: loadingSession } = useQuery<SessionDetail | null>({
     queryKey: ['/api/sessions', selectedSessionId],
     queryFn: async () => {
@@ -591,6 +578,28 @@ export default function Home() {
     refetchInterval: 10_000,
     placeholderData: keepPreviousData,
   });
+
+  // Initialize suggestions from DB when session data first loads
+  useEffect(() => {
+    if (!selectedSession || suggestionsInitializedForRef.current === selectedSession.id) return;
+    suggestionsInitializedForRef.current = selectedSession.id;
+    setSuggestions(selectedSession.suggestions ?? []);
+    setSuggestionsFile(selectedSession.suggestionsFile ?? null);
+    setSlideContext(selectedSession.slideContext ?? '');
+  }, [selectedSession]);
+
+  // Persist suggestions to DB whenever they change (after initialization)
+  useEffect(() => {
+    if (!selectedSessionId || suggestionsInitializedForRef.current !== selectedSessionId) return;
+    const handle = setTimeout(() => {
+      fetch(`/api/sessions/${selectedSessionId}/suggestions`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ suggestions, suggestionsFile, slideContext }),
+      }).catch(() => {});
+    }, 500);
+    return () => clearTimeout(handle);
+  }, [selectedSessionId, suggestions, suggestionsFile, slideContext]);
 
   // True during the brief gap between selecting a session and the query resolving
   const sessionLoading = loadingSession || (!!selectedSessionId && selectedSession?.id !== selectedSessionId);
@@ -639,8 +648,8 @@ export default function Home() {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
-    setSuggestionsLoading(true);
     setSuggestionsFile({ name: file.name });
+    const progressInterval = startProgressSimulation(setSuggestionsProgress);
     try {
       const arrayBuffer = await file.arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
@@ -656,27 +665,26 @@ export default function Home() {
         body: JSON.stringify({ content: base64, fileName: file.name }),
       });
       if (!res.ok) throw new Error(await res.text());
-      const { suggestions: newSuggestions, slideCount, slideContext } = await res.json();
+      const { suggestions: newSuggestions, slideCount, slideContext: newCtx } = await res.json();
+      clearInterval(progressInterval);
+      setSuggestionsProgress(100);
+      setTimeout(() => setSuggestionsProgress(null), 600);
       setSuggestions(newSuggestions);
       setSuggestionsFile({ name: file.name, slideCount });
-      if (selectedSessionId && slideContext) {
-        const key = `womble_suggestions_${selectedSessionId}`;
-        const existing = JSON.parse(localStorage.getItem(key) || '{}');
-        localStorage.setItem(key, JSON.stringify({ ...existing, slideContext }));
-      }
+      setSlideContext(newCtx ?? '');
     } catch (err: any) {
+      clearInterval(progressInterval);
+      setSuggestionsProgress(null);
       toast({ variant: 'destructive', description: err.message || 'Failed to analyse slides.' });
       setSuggestionsFile(null);
-    } finally {
-      setSuggestionsLoading(false);
     }
   };
 
   const handleLinkSubmit = async () => {
     const trimmed = linkInputValue.trim();
     if (!trimmed) return;
-    setSuggestionsLoading(true);
     setSuggestionsFile({ name: trimmed });
+    const progressInterval = startProgressSimulation(setSuggestionsProgress);
     try {
       const res = await fetch('/api/suggest-activities', {
         method: 'POST',
@@ -684,29 +692,26 @@ export default function Home() {
         body: JSON.stringify({ url: trimmed }),
       });
       if (!res.ok) throw new Error(await res.text());
-      const { suggestions: newSuggestions, slideCount, slideContext } = await res.json();
+      const { suggestions: newSuggestions, slideCount, slideContext: newCtx } = await res.json();
+      clearInterval(progressInterval);
+      setSuggestionsProgress(100);
+      setTimeout(() => setSuggestionsProgress(null), 600);
       setSuggestions(newSuggestions);
       setSuggestionsFile({ name: trimmed, slideCount });
+      setSlideContext(newCtx ?? '');
       setShowLinkInput(false);
       setLinkInputValue('');
-      if (selectedSessionId && slideContext) {
-        const key = `womble_suggestions_${selectedSessionId}`;
-        const existing = JSON.parse(localStorage.getItem(key) || '{}');
-        localStorage.setItem(key, JSON.stringify({ ...existing, slideContext }));
-      }
     } catch (err: any) {
+      clearInterval(progressInterval);
+      setSuggestionsProgress(null);
       toast({ variant: 'destructive', description: err.message || 'Failed to analyse slides.' });
       setSuggestionsFile(null);
-    } finally {
-      setSuggestionsLoading(false);
     }
   };
 
   const handleBuildSuggestion = async (suggestion: Suggestion) => {
     setBuildingId(suggestion.id);
     try {
-      const saved = localStorage.getItem(`womble_suggestions_${selectedSessionId}`);
-      const slideContext = saved ? (JSON.parse(saved).slideContext || '') : '';
       const res = await fetch('/api/build-suggestion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -914,40 +919,6 @@ export default function Home() {
       toast({ description: 'Agent deleted successfully!' });
     },
     onError: (error: Error) => toast({ variant: 'destructive', title: 'Error', description: error.message }),
-  });
-
-  const saveAsTemplate = useMutation({
-    mutationFn: async ({ id, templateDescription }: { id: number; templateDescription: string }) => {
-      const response = await fetch(`/api/chat-configs/${id}/template`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateDescription }),
-      });
-      if (!response.ok) throw new Error('Failed to save as template');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] });
-      toast({ title: 'Saved as template', description: 'Your Agent is now available as a public template.' });
-      setSavingAsTemplate(null);
-    },
-    onError: (error) => toast({ title: 'Failed to save as template', description: error.message, variant: 'destructive' }),
-  });
-
-  const removeFromTemplates = useMutation({
-    mutationFn: async (id: number) => {
-      const response = await fetch(`/api/chat-configs/${id}/template/remove`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (!response.ok) throw new Error('Failed to remove from templates');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] });
-      toast({ title: 'Removed from templates' });
-    },
-    onError: (error) => toast({ title: 'Failed to remove from templates', description: error.message, variant: 'destructive' }),
   });
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -1231,26 +1202,28 @@ export default function Home() {
                 title={selectedSession.title}
                 onSave={(title) => updateSessionTitle.mutate({ id: selectedSession.id, title })}
               />
-              {/* Session actions — hidden for library view and when session is empty */}
-              {!isLibraryView && allSessionAgents.length > 0 && (
-                <div className="flex gap-2 ml-auto flex-wrap">
-                  <Button size="sm" variant="outline" onClick={handleCopySessionLink}>
-                    <Share2 className="h-3.5 w-3.5 mr-1.5" />Share Session
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={handleViewSessionFeedback}>
-                    <BarChart2 className="h-3.5 w-3.5 mr-1.5" />Feedback
-                  </Button>
-<Button
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => {
-                      track(EventName.GPT_CREATE_CLICK, { location: 'session_header' });
-                      setIsAddAgentOpen(true);
-                    }}
-                  >
-                    <Plus className="h-3.5 w-3.5 mr-1.5" />Add Agent
-                  </Button>
-                </div>
+              {!isLibraryView && (
+                <>
+                  {/* Right-side actions */}
+                  <div className="flex gap-2 ml-auto">
+                    <Button size="sm" variant="outline" onClick={handleViewSessionFeedback}>
+                      <BarChart2 className="h-3.5 w-3.5 mr-1.5" />View feedback
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        track(EventName.GPT_CREATE_CLICK, { location: 'session_header' });
+                        setIsAddAgentOpen(true);
+                      }}
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1.5" />Add agent
+                    </Button>
+                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={handleCopySessionLink}>
+                      <Share2 className="h-3.5 w-3.5 mr-1.5" />Share with participants
+                    </Button>
+                  </div>
+                </>
               )}
             </div>
 
@@ -1320,8 +1293,6 @@ export default function Home() {
                             onDuplicate={() => handleDuplicateAgent(cfg)}
                             onAddToSession={(sessionId) => addToSession.mutate({ configId: cfg.id, sessionId })}
                             onControlQuiz={cfg.type === 'quick-fire-quiz' ? () => setControllingQuizId(cfg.id) : undefined}
-                            onSaveAsTemplate={() => setSavingAsTemplate(cfg)}
-                            onRemoveFromTemplates={() => removeFromTemplates.mutate(cfg.id)}
                           />
                         ))}
                       </div>
@@ -1385,10 +1356,24 @@ export default function Home() {
                 {!isLibraryView && sessionAgents.length === 0 && suggestions.length === 0 && (
                   <div>
                     <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 bg-gray-50/50">
-                      {suggestionsLoading ? (
+                      {suggestionsProgress !== null ? (
                         <div className="text-center py-4">
-                          <div className="h-8 w-8 rounded-full border-2 border-green-500 border-t-transparent animate-spin mx-auto mb-3" />
-                          <p className="text-sm text-gray-500">Analysing your slides…</p>
+                          <div className="relative w-16 h-16 mx-auto mb-3">
+                            <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
+                              <circle cx="32" cy="32" r="26" fill="none" stroke="#e5e7eb" strokeWidth="5" />
+                              <circle cx="32" cy="32" r="26" fill="none" stroke="#22c55e" strokeWidth="5"
+                                strokeDasharray={`${2 * Math.PI * 26}`}
+                                strokeDashoffset={`${2 * Math.PI * 26 * (1 - suggestionsProgress / 100)}`}
+                                strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.4s ease' }}
+                              />
+                            </svg>
+                            <span className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-gray-700">
+                              {suggestionsProgress}%
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-500">
+                            {suggestionsProgress < 20 ? 'Reading slides…' : suggestionsProgress < 75 ? 'Analysing content…' : 'Generating suggestions…'}
+                          </p>
                         </div>
                       ) : (
                         <>
@@ -1561,39 +1546,6 @@ export default function Home() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={savingAsTemplate !== null} onOpenChange={(open) => { if (!open) setSavingAsTemplate(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Save as Public Template</DialogTitle>
-            <DialogDescription>Public templates are available to all users. Please provide a description.</DialogDescription>
-          </DialogHeader>
-          <div className="mt-4">
-            <textarea
-              className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={3}
-              placeholder="Describe what this template is for... (25 words max)"
-              value={savingAsTemplate?.templateDescription || ''}
-              onChange={(e) => {
-                const words = e.target.value.trim().split(/\s+/);
-                if (words.length <= 25 || e.target.value.length < (savingAsTemplate?.templateDescription || '').length) {
-                  savingAsTemplate && setSavingAsTemplate({ ...savingAsTemplate, templateDescription: e.target.value });
-                }
-              }}
-            />
-            <div className="text-xs text-right mt-1 text-muted-foreground">
-              {savingAsTemplate?.templateDescription ? `${savingAsTemplate.templateDescription.trim().split(/\s+/).length}/25 words` : '0/25 words'}
-            </div>
-          </div>
-          <div className="flex justify-end mt-4">
-            <Button
-              onClick={() => savingAsTemplate && saveAsTemplate.mutate({ id: savingAsTemplate.id as number, templateDescription: savingAsTemplate.templateDescription || '' })}
-              disabled={!savingAsTemplate?.templateDescription || saveAsTemplate.isPending}
-            >
-              Save as Template
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {controllingQuizId !== null && (
         <QuickFireQuizAdminControl

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Helmet } from "react-helmet";
 import { useAuth } from "@/hooks/use-auth";
@@ -10,9 +11,30 @@ import {
 } from "lucide-react";
 import "./LandingPage.css";
 
+const ROTATING_WORDS = ['workshop', 'lecture', 'lesson'];
+
 export default function LandingPage() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
+  const [wordIndex, setWordIndex] = useState(0);
+  const [animating, setAnimating] = useState(false);
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const initial = setTimeout(() => {
+      interval = setInterval(() => {
+        setAnimating(true);
+        setTimeout(() => {
+          setWordIndex(i => (i + 1) % ROTATING_WORDS.length);
+          setAnimating(false);
+        }, 300);
+      }, 3000);
+    }, 2000);
+    return () => {
+      clearTimeout(initial);
+      if (interval) clearInterval(interval);
+    };
+  }, []);
 
   if (user) {
     navigate("/dashboard");
@@ -89,9 +111,11 @@ export default function LandingPage() {
         <div className="container">
           <span className="eyebrow"><span className="dot" /> AI-powered experiences for your learners</span>
           <h1>
-            Every participant gets<br />
-            <span className="accent">bespoke feedback.</span><br />
-            Instantly.
+            Bespoke feedback for everyone<br />
+            in your{" "}
+            <span className={`accent rotating-word${animating ? ' rotating-word--exit' : ''}`}>
+              {ROTATING_WORDS[wordIndex]}
+            </span>
           </h1>
           <p className="lead">
             Create AI-powered practice activities in minutes. Share a link. Your participants get bespoke feedback and you get insights to adapt your session on the fly.
@@ -105,7 +129,7 @@ export default function LandingPage() {
           <div className="trust">
             <span><CheckCircle2 size={16} className="icon" /> No credit card required</span>
             <span><CheckCircle2 size={16} className="icon" /> Free to start</span>
-            <span>No login for participants</span>
+            <span><CheckCircle2 size={16} className="icon" /> No login for participants</span>
           </div>
         </div>
       </section>

@@ -152,6 +152,18 @@
   max-width: 880px; margin: 22px auto 0;
 }
 .lp .lp-hero h1 .accent { color: var(--lp-primary); }
+
+/* Width locked to longest word ("workshop") so the line never reflows */
+.lp .lp-hero h1 .rotating-word {
+  display: inline-block;
+  min-width: 5em;
+  text-align: left;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.lp .lp-hero h1 .rotating-word--exit {
+  opacity: 0;
+  transform: translateY(-8px);
+}
 @media (max-width: 768px) { .lp .lp-hero h1 { font-size: 40px; } }
 .lp .lp-hero .lead {
   font-size: 19px; line-height: 1.5;
