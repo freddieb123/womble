@@ -16,7 +16,7 @@ interface AdminNavbarProps {
 export default function AdminNavbar({ 
   title, 
   showNewButton = true, 
-  newButtonText = "New Agent", 
+  newButtonText = "New Activity", 
   newButtonLink = "#",
   onNewButtonClick
 }: AdminNavbarProps) {

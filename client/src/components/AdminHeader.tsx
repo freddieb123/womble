@@ -14,7 +14,7 @@ interface AdminHeaderProps {
 export default function AdminHeader({ 
   title, 
   showNewButton = true, 
-  newButtonText = "New Agent", 
+  newButtonText = "New Activity", 
   newButtonLink = "/admin/new" 
 }: AdminHeaderProps) {
   return (

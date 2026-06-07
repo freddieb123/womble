@@ -29,7 +29,7 @@ const TYPE_CONFIG: Record<WizardType, {
     label: 'Conversation with AI',
     subtitle: 'Learners chat with an AI playing a role',
     placeholder: "e.g. A sales negotiation where the AI plays a sceptical procurement manager and the learner practises handling price objections and closing the deal...",
-    badge: 'Chat with an Agent',
+    badge: 'Chat with an Activity',
   },
   'two-way-conversation': {
     icon: Users,
@@ -407,6 +407,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
             className="w-full px-3 py-2 border rounded-md text-sm"
             value={config.title}
             onChange={e => setConfig(prev => ({ ...prev, title: e.target.value }))}
+            maxLength={30}
             placeholder="e.g. Identify the key risks"
           />
         </div>
@@ -490,6 +491,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
             id="ut-title"
             value={config.title}
             onChange={(e) => setConfig(prev => ({ ...prev, title: e.target.value }))}
+            maxLength={30}
             placeholder="e.g. Prototype Demo Review"
           />
         </div>
@@ -538,6 +540,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
             id="dc-title"
             value={config.title}
             onChange={(e) => setConfig(prev => ({ ...prev, title: e.target.value }))}
+            maxLength={30}
             placeholder="e.g. Case Study Analysis"
           />
         </div>
@@ -635,6 +638,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
             id="tw-title"
             value={config.title}
             onChange={(e) => setConfig(prev => ({ ...prev, title: e.target.value }))}
+            maxLength={30}
             placeholder="e.g. Excel Pivot Table Walkthrough"
           />
         </div>
@@ -699,6 +703,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
           id="wiz-title"
           value={config.title}
           onChange={(e) => setConfig(prev => ({ ...prev, title: e.target.value }))}
+          maxLength={30}
           placeholder="Give your activity a title"
         />
       </div>
@@ -920,7 +925,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
         <Button onClick={() => onSave(config)} disabled={isSaving || !config.title.trim()}>
           {isSaving
             ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
-            : 'Save Agent'
+            : 'Save Activity'
           }
         </Button>
       </div>

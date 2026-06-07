@@ -1087,16 +1087,18 @@ Write detailed, specific configuration for this activity.`,
       const [config] = await db.select().from(chatConfigs).where(eq(chatConfigs.id, configId));
       if (!config) return res.status(404).json({ error: "Config not found" });
 
-      const sessionRes = await fetch("https://api.openai.com/v1/realtime/sessions", {
+      const sessionRes = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "gpt-4o-realtime-preview-2024-12-17",
-          instructions: config.systemPrompt,
-          voice: "alloy",
+          session: {
+            type: "realtime",
+            model: "gpt-realtime-2",
+            instructions: config.systemPrompt,
+          },
         }),
       });
 
@@ -1106,7 +1108,7 @@ Write detailed, specific configuration for this activity.`,
       }
 
       const data = await sessionRes.json();
-      res.json({ ...data, systemPrompt: config.systemPrompt });
+      res.json({ client_secret: { value: data.value }, systemPrompt: config.systemPrompt });
     } catch (error: any) {
       console.error("Error creating realtime session:", error);
       res.status(500).json({ error: error.message });

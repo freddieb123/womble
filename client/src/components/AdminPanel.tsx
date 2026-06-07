@@ -110,7 +110,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
       {/* Type selector */}
       {isEditMode ? (
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wide">Agent Type</Label>
+          <Label className="text-xs text-muted-foreground uppercase tracking-wide">Activity Type</Label>
           <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-50 border border-gray-200 w-fit">
             <Lock className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
             <span className="text-sm font-medium text-gray-700">

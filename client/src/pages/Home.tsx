@@ -793,7 +793,7 @@ export default function Home() {
     },
   });
 
-  // ── Add agent to session ──────────────────────────────────────────────────
+  // ── Add activity to session ──────────────────────────────────────────────────
 
   const addToSession = useMutation({
     mutationFn: async ({ configId, sessionId }: { configId: number; sessionId: number }) => {
@@ -807,7 +807,7 @@ export default function Home() {
       queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
       queryClient.invalidateQueries({ queryKey: ['/api/sessions', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] });
-      toast({ description: 'Agent added to session.' });
+      toast({ description: 'Activity added to session.' });
     },
     onError: () => toast({ variant: 'destructive', description: 'Failed to add agent to session.' }),
   });
@@ -856,7 +856,7 @@ export default function Home() {
       });
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save Agent');
+        throw new Error(errorData.error || 'Failed to save activity');
       }
       return response.json();
     },
@@ -876,7 +876,7 @@ export default function Home() {
         setSuggestions(prev => prev.filter(s => s.id !== buildingSuggestionIdRef.current));
         buildingSuggestionIdRef.current = null;
       }
-      toast({ description: 'Agent saved successfully!' });
+      toast({ description: 'Activity saved successfully!' });
     },
     onError: (error: Error) => toast({ variant: 'destructive', title: 'Error', description: error.message }),
   });
@@ -890,14 +890,14 @@ export default function Home() {
       });
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update Agent');
+        throw new Error(errorData.error || 'Failed to update activity');
       }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] });
       setEditingConfig(null);
-      toast({ description: 'Agent updated successfully!' });
+      toast({ description: 'Activity updated successfully!' });
     },
     onError: (error: Error) => toast({ variant: 'destructive', title: 'Error', description: error.message }),
   });
@@ -907,7 +907,7 @@ export default function Home() {
       const response = await fetch(`/api/chat-configs/${configToDelete.id}`, { method: 'DELETE' });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to delete Agent');
+        throw new Error(error.error || 'Failed to delete activity');
       }
       return response.json();
     },
@@ -916,7 +916,7 @@ export default function Home() {
       queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] });
       setAgentOrderOverride([]);
       setDeletingConfig(null);
-      toast({ description: 'Agent deleted successfully!' });
+      toast({ description: 'Activity deleted successfully!' });
     },
     onError: (error: Error) => toast({ variant: 'destructive', title: 'Error', description: error.message }),
   });
@@ -979,7 +979,7 @@ export default function Home() {
       });
       setIsCreateOpen(true);
     } catch {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to duplicate Agent' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to duplicate activity' });
     }
   };
 
@@ -1029,7 +1029,7 @@ export default function Home() {
       setIsAddAgentOpen(false);
       setIsCreateOpen(true);
     } catch {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to duplicate Agent' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to duplicate activity' });
     }
   };
 
@@ -1121,7 +1121,7 @@ export default function Home() {
           {/* My Agents section */}
           {librarySessions.length > 0 && (
             <div className="px-3 pt-3 pb-2">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-2 mb-1">Agents</p>
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-2 mb-1">Activities</p>
               <div className="space-y-0.5">
                 {librarySessions.map(session => (
                   <SessionSidebarItem
@@ -1217,7 +1217,7 @@ export default function Home() {
                         setIsAddAgentOpen(true);
                       }}
                     >
-                      <Plus className="h-3.5 w-3.5 mr-1.5" />Add agent
+                      <Plus className="h-3.5 w-3.5 mr-1.5" />Add activity
                     </Button>
                     <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={handleCopySessionLink}>
                       <Share2 className="h-3.5 w-3.5 mr-1.5" />Share with participants
@@ -1270,7 +1270,7 @@ export default function Home() {
               </div>
             ) : isLibraryView && sessionAgents.length === 0 ? (
               <div className="border-2 border-dashed border-gray-200 rounded-lg p-10 text-center">
-                <p className="text-sm text-gray-400">No agents match this filter.</p>
+                <p className="text-sm text-gray-400">No activities match this filter.</p>
               </div>
             ) : (
               <>
@@ -1346,7 +1346,7 @@ export default function Home() {
                           setIsAddAgentOpen(true);
                         }}
                       >
-                        <Plus className="h-4 w-4 mr-1.5" />Add agent manually
+                        <Plus className="h-4 w-4 mr-1.5" />Add activity manually
                       </Button>
                     </div>
                   </div>
@@ -1432,7 +1432,7 @@ export default function Home() {
                           setIsAddAgentOpen(true);
                         }}
                       >
-                        <Plus className="h-4 w-4 mr-1.5" />Add agent manually
+                        <Plus className="h-4 w-4 mr-1.5" />Add activity manually
                       </Button>
                     </div>
                   </div>
@@ -1463,7 +1463,7 @@ export default function Home() {
         if (!open) queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] });
       }}>
         <DialogContent className="max-w-2xl h-[85vh] flex flex-col">
-          <DialogHeader><DialogTitle>Create New Agent</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Create New Activity</DialogTitle></DialogHeader>
           <ScrollArea className="flex-1 -mx-6 px-6">
             <div className="py-4">
               <CreateGptWizard
@@ -1483,8 +1483,8 @@ export default function Home() {
         }}>
           <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
             <DialogHeader>
-              <DialogTitle>Edit Agent</DialogTitle>
-              <DialogDescription>Modify your Agent configuration below.</DialogDescription>
+              <DialogTitle>Edit Activity</DialogTitle>
+              <DialogDescription>Modify your activity configuration below.</DialogDescription>
             </DialogHeader>
             <ScrollArea className="flex-1 -mx-6 px-6">
               <div className="py-4">

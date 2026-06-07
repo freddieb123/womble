@@ -154,14 +154,17 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
+      const sdpForm = new FormData();
+      sdpForm.append('sdp', offer.sdp!);
+      sdpForm.append('session', JSON.stringify({ type: 'realtime', model: 'gpt-realtime-2' }));
+
       const sdpRes = await fetch(
-        'https://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17',
+        'https://api.openai.com/v1/realtime/calls',
         {
           method: 'POST',
-          body: offer.sdp,
+          body: sdpForm,
           headers: {
             Authorization: `Bearer ${client_secret.value}`,
-            'Content-Type': 'application/sdp',
           },
         }
       );

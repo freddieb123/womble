@@ -83,8 +83,8 @@ export default function AddAgentDialog({ onDuplicate, onStartFromScratch }: Prop
     <div className="flex flex-col h-full -mt-6">
       {/* Green header */}
       <div className="bg-green-700 text-white px-6 pt-6 pb-5 -mx-6 mb-5 rounded-t-lg">
-        <h2 className="text-xl font-bold mb-1">Add Agent</h2>
-        <p className="text-green-200 text-sm mb-4">Build a new agent from scratch or duplicate an existing one</p>
+        <h2 className="text-xl font-bold mb-1">Add Activity</h2>
+        <p className="text-green-200 text-sm mb-4">Build a new activity from scratch or duplicate an existing one</p>
 
         {/* Toggle — only shown when agents exist */}
         {hasAgents && (
@@ -153,7 +153,7 @@ export default function AddAgentDialog({ onDuplicate, onStartFromScratch }: Prop
                 </div>
               ))}
               {filteredAgents.length === 0 && (
-                <div className="text-center py-10 text-gray-400 text-sm">No agents match your search.</div>
+                <div className="text-center py-10 text-gray-400 text-sm">No activities match your search.</div>
               )}
             </div>
           </ScrollArea>
