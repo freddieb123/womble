@@ -361,12 +361,15 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
       {/* Header */}
       <div className="flex items-center justify-between px-8 py-4 bg-white border-b border-gray-200">
         <div className="flex items-center gap-3">
-          <div className={`rounded-full w-3 h-3 ${connectionState === 'active' ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
+          <div className={`rounded-full w-3 h-3 ${connectionState === 'active' ? 'bg-green-500 animate-pulse' : connectionState === 'ended' ? 'bg-blue-500' : 'bg-gray-300'}`} />
           <span className="font-semibold text-gray-800 text-lg">{config.title}</span>
           {connectionState === 'active' && (
             <span className="text-sm text-gray-500 flex items-center gap-1">
               <Monitor className="h-4 w-4" /> Screen sharing · <Mic className="h-4 w-4" /> Mic active
             </span>
+          )}
+          {connectionState === 'ended' && (
+            <span className="text-sm text-blue-600 font-medium">Walkthrough complete</span>
           )}
         </div>
         {screenPreviewUrl && connectionState === 'active' && (
@@ -378,7 +381,7 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
         )}
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center gap-8 px-8 py-10 min-h-0">
+      <div className={`flex-1 flex flex-col items-center gap-8 px-8 min-h-0 ${connectionState === 'ended' ? 'justify-start py-8 overflow-y-auto' : 'justify-center py-10'}`}>
 
         {connectionState === 'idle' && (
           <div className="text-center space-y-6 max-w-lg w-full">
@@ -444,13 +447,10 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
         )}
 
         {connectionState === 'ended' && (
-          <div className="w-full max-w-2xl space-y-6">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Walkthrough complete</h2>
-              <p className="text-gray-500">
-                {feedbackData ? 'Feedback is ready.' : isGettingFeedback ? 'Generating feedback…' : transcript.length < 2 ? 'Not enough transcript to generate feedback.' : 'Preparing feedback…'}
-              </p>
-            </div>
+          <div className="w-full max-w-4xl space-y-6">
+            <p className="text-center text-gray-500">
+              {feedbackData ? 'Feedback is ready.' : isGettingFeedback ? 'Generating feedback…' : transcript.length < 2 ? 'Not enough transcript to generate feedback.' : 'Preparing feedback…'}
+            </p>
 
             {!feedbackData && isGettingFeedback && (
               <div className="flex justify-center">
