@@ -117,8 +117,13 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               {config.type === 'chat' ? 'Conversation with AI' :
                config.type === 'two-way-conversation' ? 'Two-way Conversation' :
                config.type === 'teach-ai' ? 'Teach an AI' :
+               config.type === 'thought-partner' ? 'Thought Partner' :
+               config.type === 'quick-fire-quiz' ? 'Quick Fire Quiz' :
                config.type === 'group-board' ? 'Group Board' :
-               'Thought Partner'}
+               config.type === 'user-tester' ? 'User Tester' :
+               config.type === 'doc-critique' ? 'Critique a Document' :
+               config.type === 'task-walkthrough' ? 'Task Walkthrough' :
+               config.type}
             </span>
             <span className="text-xs text-gray-400 ml-1">— cannot be changed</span>
           </div>
