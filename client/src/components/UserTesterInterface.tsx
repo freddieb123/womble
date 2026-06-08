@@ -302,7 +302,7 @@ export default function UserTesterInterface({ config, sessionId, userName, onUse
         }
         // Update preview thumbnail
         setScreenPreviewUrl(dataUrl);
-      }, 3000);
+      }, 750);
 
       setConnectionState('active');
 

@@ -252,7 +252,7 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
           sessionRef.current.sendRealtimeInput({ video: { data: base64, mimeType: 'image/jpeg' } });
         }
         setScreenPreviewUrl(dataUrl);
-      }, 3000);
+      }, 750);
 
       setConnectionState('active');
 
