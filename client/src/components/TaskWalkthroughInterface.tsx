@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Mic, Square, ClipboardList } from "lucide-react";
+import { Mic, Monitor, Square, ClipboardList } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { AdminConfig, Message } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
@@ -64,12 +64,17 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
   const [transcript, setTranscript] = useState<Message[]>([]);
   const [isGettingFeedback, setIsGettingFeedback] = useState(false);
   const [feedbackData, setFeedbackData] = useState<{ bullets: string[]; score?: number; summary?: string } | null>(null);
+  const [screenPreviewUrl, setScreenPreviewUrl] = useState<string | null>(null);
   const [showNameModal, setShowNameModal] = useState<boolean>(!userName);
 
   const sessionRef = useRef<any>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const screenVideoRef = useRef<HTMLVideoElement | null>(null);
+  const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const frameIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const transcriptRef = useRef<Message[]>([]);
   const nextPlayTimeRef = useRef(0);
   const autoFeedbackFiredRef = useRef(false);
@@ -86,25 +91,19 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
 
   const addMessage = useCallback((role: 'user' | 'assistant', content: string) => {
     setTranscript(prev => [...prev, {
-      id: uuidv4(),
-      role,
-      content,
-      timestamp: Date.now(),
-      sessionId,
+      id: uuidv4(), role, content, timestamp: Date.now(), sessionId,
     }]);
   }, [sessionId]);
 
   const playAudioChunk = useCallback((float32: Float32Array) => {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
-    const SAMPLE_RATE = 24000;
-    const buffer = ctx.createBuffer(1, float32.length, SAMPLE_RATE);
+    const buffer = ctx.createBuffer(1, float32.length, 24000);
     buffer.copyToChannel(float32, 0);
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(ctx.destination);
-    const now = ctx.currentTime;
-    const startTime = Math.max(now, nextPlayTimeRef.current);
+    const startTime = Math.max(ctx.currentTime, nextPlayTimeRef.current);
     source.start(startTime);
     nextPlayTimeRef.current = startTime + buffer.duration;
   }, []);
@@ -189,7 +188,7 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
       });
       sessionRef.current = geminiSession;
 
-      // Capture mic
+      // Mic
       const micStream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
       });
@@ -206,26 +205,66 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
         const resampled = resampleBuffer(float32, nativeCtx.sampleRate, 16000);
         const int16 = float32ToInt16(resampled);
         const base64 = arrayBufferToBase64(int16.buffer);
-        sessionRef.current.sendRealtimeInput({
-          audio: { data: base64, mimeType: 'audio/pcm;rate=16000' },
-        });
+        sessionRef.current.sendRealtimeInput({ audio: { data: base64, mimeType: 'audio/pcm;rate=16000' } });
         setActivityState('listening');
       };
 
       source.connect(processor);
       processor.connect(nativeCtx.destination);
 
+      // Screen share
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 1, width: 1280, height: 720 },
+        audio: false,
+      });
+      screenStreamRef.current = screenStream;
+
+      screenStream.getVideoTracks()[0].onended = () => {
+        toast({ description: 'Screen share stopped.' });
+        stopSession();
+      };
+
+      const video = document.createElement('video');
+      video.srcObject = screenStream;
+      video.autoplay = true;
+      video.muted = true;
+      screenVideoRef.current = video;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 1280;
+      canvas.height = 720;
+      screenCanvasRef.current = canvas;
+
+      video.onloadedmetadata = () => {
+        canvas.width = video.videoWidth || 1280;
+        canvas.height = video.videoHeight || 720;
+        video.play();
+      };
+
+      frameIntervalRef.current = setInterval(() => {
+        if (!sessionRef.current || !screenVideoRef.current || !screenCanvasRef.current) return;
+        const ctx = screenCanvasRef.current.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(screenVideoRef.current, 0, 0, screenCanvasRef.current.width, screenCanvasRef.current.height);
+        const dataUrl = screenCanvasRef.current.toDataURL('image/jpeg', 0.6);
+        const base64 = dataUrl.split(',')[1];
+        if (base64) {
+          sessionRef.current.sendRealtimeInput({ video: { data: base64, mimeType: 'image/jpeg' } });
+        }
+        setScreenPreviewUrl(dataUrl);
+      }, 3000);
+
       setConnectionState('active');
 
-      // Greeting — prompt the AI to ask what the apprentice has been working on
       setTimeout(() => {
         if (sessionRef.current) {
           const greeting = userName
-            ? `Hi, I'm ${userName}. I've been working on a task and want to walk you through how far I've got.`
-            : `Hi. I've been working on a task and want to walk you through how far I've got.`;
+            ? `Hi, I'm ${userName}. I'm sharing my screen so you can see where I've got to with the task. Please greet me by name, briefly note what you can see on my screen, and ask me to start walking you through what I've done so far. Do not ask me to share my screen.`
+            : `Hi. I'm sharing my screen so you can see where I've got to with the task. Please greet me, briefly note what you can see on my screen, and ask me to start walking you through what I've done so far. Do not ask me to share my screen.`;
           sessionRef.current.sendRealtimeInput({ text: greeting });
         }
       }, 800);
+
     } catch (err: any) {
       setConnectionState('idle');
       cleanup();
@@ -234,11 +273,17 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
   };
 
   const cleanup = () => {
+    if (frameIntervalRef.current) { clearInterval(frameIntervalRef.current); frameIntervalRef.current = null; }
+    screenStreamRef.current?.getTracks().forEach(t => t.stop());
     micStreamRef.current?.getTracks().forEach(t => t.stop());
     scriptProcessorRef.current?.disconnect();
     audioCtxRef.current?.close().catch(() => {});
     scriptProcessorRef.current = null;
     micStreamRef.current = null;
+    screenStreamRef.current = null;
+    screenVideoRef.current = null;
+    screenCanvasRef.current = null;
+    setScreenPreviewUrl(null);
   };
 
   const stopSession = () => {
@@ -273,7 +318,6 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
     }
   };
 
-  // Save transcript periodically
   useEffect(() => {
     if (transcript.length === 0 || !config.id) return;
     fetch('/api/conversations/save-transcript', {
@@ -283,7 +327,6 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
     }).catch(() => {});
   }, [transcript, config.id, sessionId, userName]);
 
-  // Auto-generate feedback when session ends
   useEffect(() => {
     if (connectionState !== 'ended') return;
     if (autoFeedbackFiredRef.current) return;
@@ -293,10 +336,11 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionState]);
 
-  // Release resources on unmount
   useEffect(() => () => {
     try { sessionRef.current?.close?.(); } catch {}
     sessionRef.current = null;
+    if (frameIntervalRef.current) { clearInterval(frameIntervalRef.current); frameIntervalRef.current = null; }
+    screenStreamRef.current?.getTracks().forEach(t => t.stop());
     micStreamRef.current?.getTracks().forEach(t => t.stop());
     scriptProcessorRef.current?.disconnect();
     audioCtxRef.current?.close().catch(() => {});
@@ -315,13 +359,22 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
       <UserNameModal open={showNameModal} interactionMode="spoken" onSubmit={handleNameSubmit} />
 
       {/* Header */}
-      <div className="flex items-center gap-3 px-8 py-4 bg-white border-b border-gray-200">
-        <div className={`rounded-full w-3 h-3 ${connectionState === 'active' ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
-        <span className="font-semibold text-gray-800 text-lg">{config.title}</span>
-        {connectionState === 'active' && (
-          <span className="text-sm text-gray-500 flex items-center gap-1">
-            <Mic className="h-4 w-4" /> Mic active
-          </span>
+      <div className="flex items-center justify-between px-8 py-4 bg-white border-b border-gray-200">
+        <div className="flex items-center gap-3">
+          <div className={`rounded-full w-3 h-3 ${connectionState === 'active' ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
+          <span className="font-semibold text-gray-800 text-lg">{config.title}</span>
+          {connectionState === 'active' && (
+            <span className="text-sm text-gray-500 flex items-center gap-1">
+              <Monitor className="h-4 w-4" /> Screen sharing · <Mic className="h-4 w-4" /> Mic active
+            </span>
+          )}
+        </div>
+        {screenPreviewUrl && connectionState === 'active' && (
+          <img
+            src={screenPreviewUrl}
+            alt="Screen preview"
+            className="h-16 rounded border border-gray-200 shadow-sm opacity-80"
+          />
         )}
       </div>
 
@@ -335,11 +388,10 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Ready to walk through your work?</h2>
               <p className="text-gray-500 text-base">
-                The AI will listen to you explain how far you've got, then coach you through completing the task.
+                Share your screen so the AI can see where you've got to, then talk through what you've done. It will coach you through anything you haven't completed yet.
               </p>
             </div>
 
-            {/* Task brief */}
             {config.referenceContent && (
               <div className="text-left bg-blue-50 rounded-lg p-4 border border-blue-100">
                 <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2 flex items-center gap-1">
@@ -355,9 +407,9 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
               disabled={!userName}
               className="bg-blue-600 hover:bg-blue-700 text-white px-10 text-base"
             >
-              <Mic className="h-5 w-5 mr-2" /> Start Walkthrough
+              <Monitor className="h-5 w-5 mr-2" /> Start Walkthrough
             </Button>
-            <p className="text-xs text-gray-400">Your browser will ask for microphone permission.</p>
+            <p className="text-xs text-gray-400">Your browser will ask for screen share and microphone permissions.</p>
           </div>
         )}
 
@@ -369,23 +421,23 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
         )}
 
         {connectionState === 'active' && (
-          <div className="w-full max-w-2xl flex flex-col gap-6 min-h-0 flex-1">
-            {/* Compact task brief */}
+          <div className="w-full max-w-4xl flex flex-col gap-6 min-h-0 flex-1">
             {config.referenceContent && (
               <div className="bg-white rounded-lg border border-gray-200 px-4 py-3">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">The Task</p>
                 <p className="text-sm text-gray-600 line-clamp-3">{config.referenceContent}</p>
               </div>
             )}
-
-            {/* Orb */}
             <div className="flex flex-col items-center gap-3">
               <div className={`rounded-full w-20 h-20 ${orbColour} transition-all duration-500 flex items-center justify-center ${displayActivityState !== 'idle' ? 'animate-pulse' : ''}`}>
-                <Mic className={`h-10 w-10 ${displayActivityState === 'listening' ? 'text-green-600' : displayActivityState === 'speaking' ? 'text-blue-600' : 'text-gray-400'}`} />
+                {displayActivityState === 'speaking'
+                  ? <Monitor className="h-10 w-10 text-blue-600" />
+                  : <Mic className={`h-10 w-10 ${displayActivityState === 'listening' ? 'text-green-600' : 'text-gray-400'}`} />
+                }
               </div>
               <p className="text-sm text-gray-500 h-5 text-center">{statusLabel}</p>
               <Button onClick={stopSession} variant="destructive" size="lg" className="px-8">
-                <Square className="h-4 w-4 mr-2 fill-current" /> Stop
+                <Square className="h-4 w-4 mr-2 fill-current" /> Stop & Get Feedback
               </Button>
             </div>
           </div>
@@ -431,12 +483,7 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
             <div className="flex flex-col items-center gap-3">
               <Button
                 variant="outline"
-                onClick={() => {
-                  setConnectionState('idle');
-                  setTranscript([]);
-                  setFeedbackData(null);
-                  autoFeedbackFiredRef.current = false;
-                }}
+                onClick={() => { setConnectionState('idle'); setTranscript([]); setFeedbackData(null); autoFeedbackFiredRef.current = false; }}
               >
                 Start New Walkthrough
               </Button>
@@ -446,7 +493,7 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
       </div>
 
       <div className="py-2 text-center text-xs text-gray-400">
-        Audio is sent to Google Gemini for real-time coaching.
+        Screen content and audio are sent to Google Gemini for real-time coaching.
       </div>
     </div>
   );
