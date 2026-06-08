@@ -92,6 +92,10 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
   const isTeachAi = config.type === 'teach-ai';
   const isThoughtPartner = config.type === 'thought-partner';
   const isGroupBoard = config.type === 'group-board';
+  const isUserTester = config.type === 'user-tester';
+  const isTaskWalkthrough = config.type === 'task-walkthrough';
+  const isDocCritique = config.type === 'doc-critique';
+  const isScreenShareType = isUserTester || isTaskWalkthrough;
   const showHarshness = config.type === 'chat' || config.type === 'two-way-conversation' || config.type === 'teach-ai';
 
   const HARSHNESS_LEVELS = [
@@ -170,8 +174,8 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
         </div>
       )}
 
-      {/* Interaction mode selector — not applicable for group boards */}
-      {!isGroupBoard && <div className="space-y-1">
+      {/* Interaction mode selector — not applicable for group boards or screen-share types */}
+      {!isGroupBoard && !isScreenShareType && <div className="space-y-1">
         <Label className="text-xs text-muted-foreground uppercase tracking-wide">Interaction Mode</Label>
         <div className="inline-flex items-center gap-1 rounded-md border p-1">
           {([
@@ -437,8 +441,117 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
           </div>
         )}
 
-        {/* System prompt — hidden for auto-generated types */}
-        {!isTeachAi && !isThoughtPartner && !isGroupBoard && (
+        {/* User Tester fields */}
+        {isUserTester && (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="ut-criteria">Evaluation criteria</Label>
+              <Textarea
+                id="ut-criteria"
+                value={config.feedbackCriteria || ''}
+                onChange={(e) => onConfigChange({ ...config, feedbackCriteria: e.target.value })}
+                placeholder={"e.g.\n- Is the navigation intuitive?\n- Is the visual hierarchy clear?\n- Does it address the user need stated in the brief?"}
+                className="resize-none"
+                rows={6}
+              />
+              <p className="text-xs text-muted-foreground">The AI will ask questions and give final feedback based on these criteria.</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ut-instructions">Additional context for the AI (optional)</Label>
+              <Textarea
+                id="ut-instructions"
+                value={config.userInstructions || ''}
+                onChange={(e) => onConfigChange({ ...config, userInstructions: e.target.value })}
+                placeholder="e.g. The prototype is a mobile app for booking GP appointments. Apprentices should focus on the booking flow."
+                className="resize-none"
+                rows={3}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Task Walkthrough fields */}
+        {isTaskWalkthrough && (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="tw-task">Task instructions</Label>
+              <Textarea
+                id="tw-task"
+                value={config.referenceContent || ''}
+                onChange={(e) => onConfigChange({ ...config, referenceContent: e.target.value })}
+                placeholder={"Paste the full task instructions here — exactly what apprentices were asked to do."}
+                className="resize-none"
+                rows={7}
+              />
+              <p className="text-xs text-muted-foreground">The AI uses this to understand the task and coach apprentices through it.</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tw-criteria">Completion criteria</Label>
+              <Textarea
+                id="tw-criteria"
+                value={config.feedbackCriteria || ''}
+                onChange={(e) => onConfigChange({ ...config, feedbackCriteria: e.target.value })}
+                placeholder={"e.g.\n- Pivot table is on a sheet called 'Analysis'\n- Data is grouped by product category and region"}
+                className="resize-none"
+                rows={5}
+              />
+              <p className="text-xs text-muted-foreground">What the task looks like when fully and correctly completed.</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tw-instructions">Instructions for apprentices (shown before they start)</Label>
+              <Textarea
+                id="tw-instructions"
+                value={config.userInstructions || ''}
+                onChange={(e) => onConfigChange({ ...config, userInstructions: e.target.value })}
+                placeholder="e.g. Tell the AI what task you were given and how far you've got. It will help you complete the rest."
+                className="resize-none"
+                rows={2}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Doc Critique fields */}
+        {isDocCritique && (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="dc-system">System Prompt</Label>
+              <Textarea
+                id="dc-system"
+                value={config.systemPrompt || ''}
+                onChange={(e) => onConfigChange({ ...config, systemPrompt: e.target.value })}
+                placeholder="Act as a..."
+                className="resize-none"
+                rows={6}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dc-criteria">Feedback criteria</Label>
+              <Textarea
+                id="dc-criteria"
+                value={config.feedbackCriteria || ''}
+                onChange={(e) => onConfigChange({ ...config, feedbackCriteria: e.target.value })}
+                placeholder="e.g. Did the apprentice identify the key risks? Did they notice the over-reliance on a single supplier?"
+                className="resize-none"
+                rows={4}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dc-instructions">Instructions for apprentices (optional)</Label>
+              <Textarea
+                id="dc-instructions"
+                value={config.userInstructions || ''}
+                onChange={(e) => onConfigChange({ ...config, userInstructions: e.target.value })}
+                placeholder="e.g. Read the document carefully and share your observations."
+                className="resize-none"
+                rows={2}
+              />
+            </div>
+          </>
+        )}
+
+        {/* System prompt — hidden for auto-generated types and dedicated-form types */}
+        {!isTeachAi && !isThoughtPartner && !isGroupBoard && !isUserTester && !isTaskWalkthrough && !isDocCritique && (
           <div className="space-y-2">
             <Label htmlFor="system-prompt">System Prompt</Label>
             <Textarea
@@ -455,7 +568,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
           </div>
         )}
 
-        {!isGroupBoard && (
+        {!isGroupBoard && !isUserTester && !isTaskWalkthrough && !isDocCritique && (
           <div className="space-y-2">
             <Label htmlFor="user-instructions">
               {isTeachAi ? 'Topic & Key Points' : isThoughtPartner ? 'Topic / Focus Area' : 'User Instructions'}
@@ -513,7 +626,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
           </div>
         )}
 
-        {!isGroupBoard && <div className="space-y-2">
+        {!isGroupBoard && !isUserTester && !isTaskWalkthrough && !isDocCritique && <div className="space-y-2">
           <Label htmlFor="feedback-criteria">
             {isThoughtPartner ? 'Summary Focus (optional)' : 'Feedback Criteria'}
           </Label>
