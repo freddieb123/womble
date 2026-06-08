@@ -386,8 +386,9 @@ export default function SessionView() {
 const TIMER_TYPES = new Set(['chat', 'teach-ai', 'two-way-conversation']);
 
 function ActivityTimerDisplay({ configId }: { configId: number }) {
-  const [tick, setTick] = useState(0);
   const dingFiredRef = useRef(false);
+  const serverSnapRef = useRef<{ remaining: number; receivedAt: number } | null>(null);
+  const [displayRemaining, setDisplayRemaining] = useState(0);
 
   const { data: timer } = useQuery<{ status: string; remainingSeconds: number; totalSeconds: number }>({
     queryKey: ['/api/timer', configId, 'user'],
@@ -399,8 +400,18 @@ function ActivityTimerDisplay({ configId }: { configId: number }) {
   });
 
   useEffect(() => {
+    if (!timer) return;
+    serverSnapRef.current = { remaining: timer.remainingSeconds, receivedAt: Date.now() };
+    setDisplayRemaining(timer.remainingSeconds);
+  }, [timer]);
+
+  useEffect(() => {
     if (timer?.status !== 'running') return;
-    const id = setInterval(() => setTick(t => t + 1), 500);
+    const id = setInterval(() => {
+      if (!serverSnapRef.current) return;
+      const elapsed = (Date.now() - serverSnapRef.current.receivedAt) / 1000;
+      setDisplayRemaining(Math.max(0, serverSnapRef.current.remaining - elapsed));
+    }, 100);
     return () => clearInterval(id);
   }, [timer?.status]);
 
@@ -426,12 +437,12 @@ function ActivityTimerDisplay({ configId }: { configId: number }) {
 
   if (!timer || timer.status === 'idle' || timer.totalSeconds === 0) return null;
 
-  const secs = Math.max(0, Math.ceil(timer.remainingSeconds));
+  const secs = Math.max(0, Math.ceil(displayRemaining));
   const m = Math.floor(secs / 60);
   const s = secs % 60;
   const display = `${m}:${String(s).padStart(2, '0')}`;
-  const pct = timer.totalSeconds > 0 ? (timer.remainingSeconds / timer.totalSeconds) * 100 : 0;
-  const isLow = timer.remainingSeconds <= 60 && timer.status === 'running';
+  const pct = timer.totalSeconds > 0 ? (displayRemaining / timer.totalSeconds) * 100 : 0;
+  const isLow = displayRemaining <= 60 && timer.status === 'running';
   const isDone = timer.status === 'finished';
 
   return (

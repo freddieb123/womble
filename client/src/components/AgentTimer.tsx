@@ -35,8 +35,9 @@ export default function AgentTimer({ configId }: { configId: number }) {
   const [open, setOpen] = useState(false);
   const [editingTime, setEditingTime] = useState(false);
   const [editValue, setEditValue] = useState('');
-  const [tick, setTick] = useState(0);
   const dingFiredRef = useRef(false);
+  const serverSnapRef = useRef<{ remaining: number; receivedAt: number } | null>(null);
+  const [displayRemaining, setDisplayRemaining] = useState(0);
 
   const { data: timer } = useQuery<TimerState>({
     queryKey: ['/api/timer', configId],
@@ -44,18 +45,26 @@ export default function AgentTimer({ configId }: { configId: number }) {
       const res = await fetch(`/api/timer/${configId}`);
       return res.json();
     },
-    refetchInterval: 1000,
+    refetchInterval: 2000,
   });
 
-  // Local tick for smooth countdown
+  // Record server value + timestamp whenever a fresh poll arrives
+  useEffect(() => {
+    if (!timer) return;
+    serverSnapRef.current = { remaining: timer.remainingSeconds, receivedAt: Date.now() };
+    setDisplayRemaining(timer.remainingSeconds);
+  }, [timer]);
+
+  // Interpolate locally every 100ms so the display ticks smoothly
   useEffect(() => {
     if (timer?.status !== 'running') return;
-    const id = setInterval(() => setTick(t => t + 1), 500);
+    const id = setInterval(() => {
+      if (!serverSnapRef.current) return;
+      const elapsed = (Date.now() - serverSnapRef.current.receivedAt) / 1000;
+      setDisplayRemaining(Math.max(0, serverSnapRef.current.remaining - elapsed));
+    }, 100);
     return () => clearInterval(id);
   }, [timer?.status]);
-
-  // Compute display remaining
-  const displayRemaining = timer?.remainingSeconds ?? 0;
 
   // Ding when hitting 0
   useEffect(() => {
