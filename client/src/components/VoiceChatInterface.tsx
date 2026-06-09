@@ -418,7 +418,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
               variant="outline"
               size="sm"
               onClick={getHint}
-              disabled={isGettingHint || (connectionState !== 'ended' && transcript.length < 4)}
+              disabled={isGettingHint || connectionState === 'idle' || connectionState === 'connecting'}
             >
               <Lightbulb className="h-4 w-4 mr-1" />
               {isGettingHint ? 'Getting hint...' : 'Hint'}
