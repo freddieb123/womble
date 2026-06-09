@@ -418,7 +418,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
               variant="outline"
               size="sm"
               onClick={getHint}
-              disabled={isGettingHint || transcript.length < 2}
+              disabled={isGettingHint || (connectionState !== 'ended' && transcript.length < 4)}
             >
               <Lightbulb className="h-4 w-4 mr-1" />
               {isGettingHint ? 'Getting hint...' : 'Hint'}
@@ -427,7 +427,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
               variant={feedbackData ? 'default' : 'outline'}
               size="sm"
               onClick={() => feedbackData ? setFeedbackOpen(true) : setIsConfirmingFeedback(true)}
-              disabled={isGettingFeedback || !hasEnoughMessages}
+              disabled={isGettingFeedback || (connectionState !== 'ended' && !hasEnoughMessages)}
               className={feedbackData ? 'bg-green-600 hover:bg-green-700' : ''}
             >
               <Trophy className="h-4 w-4 mr-1" />
