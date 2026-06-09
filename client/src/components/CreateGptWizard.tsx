@@ -508,6 +508,18 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
           <p className="text-xs text-muted-foreground">The AI will ask questions and give final feedback based on these criteria.</p>
         </div>
         <div className="space-y-2">
+          <Label htmlFor="ut-persona">Evaluator persona (optional)</Label>
+          <Textarea
+            id="ut-persona"
+            value={config.referenceContent || ''}
+            onChange={(e) => setConfig(prev => ({ ...prev, referenceContent: e.target.value }))}
+            placeholder={"e.g. You are a busy HR manager at a mid-sized professional services firm. You primarily use your phone and have limited technical knowledge. You care most about whether tools are quick to learn and don't require IT support."}
+            rows={3}
+            className="resize-none"
+          />
+          <p className="text-xs text-muted-foreground">Define who the AI is playing — their role, context, and what they care about.</p>
+        </div>
+        <div className="space-y-2">
           <Label htmlFor="ut-instructions">Additional context for the AI (optional)</Label>
           <Textarea
             id="ut-instructions"

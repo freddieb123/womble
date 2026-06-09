@@ -457,6 +457,18 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               <p className="text-xs text-muted-foreground">The AI will ask questions and give final feedback based on these criteria.</p>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="ut-persona">Evaluator persona (optional)</Label>
+              <Textarea
+                id="ut-persona"
+                value={config.referenceContent || ''}
+                onChange={(e) => onConfigChange({ ...config, referenceContent: e.target.value })}
+                placeholder={"e.g. You are a busy HR manager at a mid-sized professional services firm. You primarily use your phone and have limited technical knowledge."}
+                className="resize-none"
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">Define who the AI is playing — their role, context, and what they care about.</p>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="ut-instructions">Additional context for the AI (optional)</Label>
               <Textarea
                 id="ut-instructions"

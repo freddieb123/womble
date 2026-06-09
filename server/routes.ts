@@ -209,8 +209,10 @@ HOW TO BEHAVE:
 - Never break character or acknowledge you are an AI.`;
 }
 
-function buildUserTesterSystemPrompt(feedbackCriteria: string | null, userInstructions: string | null): string {
-  return `You are a UX evaluator observing a live prototype demo via screen share and audio narration.
+function buildUserTesterSystemPrompt(feedbackCriteria: string | null, userInstructions: string | null, persona: string | null): string {
+  return `You are observing a live prototype demo via screen share and audio narration.
+
+${persona ? `YOUR PERSONA — embody this throughout the session:\n${persona}\n` : 'You are a UX evaluator — curious, constructive, and engaged.'}
 
 The presenter will walk you through their prototype. Watch the screen carefully and listen to their narration. Ask short, probing questions to understand their design decisions. Be curious, constructive, and conversational. Keep your responses brief (1–3 sentences) — you are watching and reacting, not lecturing.
 
@@ -555,7 +557,7 @@ export function registerRoutes(app: Express): Server {
         : type === 'group-board'
         ? ''
         : type === 'user-tester'
-        ? buildUserTesterSystemPrompt(feedbackCriteria ?? null, userInstructions ?? null)
+        ? buildUserTesterSystemPrompt(feedbackCriteria ?? null, userInstructions ?? null, referenceContent ?? null)
         : type === 'doc-critique'
         ? buildDocCritiqueSystemPrompt(feedbackCriteria ?? null, userInstructions ?? null)
         : type === 'task-walkthrough'
@@ -672,7 +674,7 @@ export function registerRoutes(app: Express): Server {
         : type === 'group-board'
         ? ''
         : type === 'user-tester'
-        ? buildUserTesterSystemPrompt(feedbackCriteria ?? null, userInstructions ?? null)
+        ? buildUserTesterSystemPrompt(feedbackCriteria ?? null, userInstructions ?? null, referenceContent ?? null)
         : type === 'doc-critique'
         ? buildDocCritiqueSystemPrompt(feedbackCriteria ?? null, userInstructions ?? null)
         : type === 'task-walkthrough'
