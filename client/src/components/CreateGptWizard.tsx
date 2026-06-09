@@ -373,12 +373,17 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
           <Button variant="ghost" onClick={() => setStep(1)}>
             <ArrowLeft className="h-4 w-4 mr-2" /> Back
           </Button>
-          <Button onClick={handleGenerate} disabled={!aiPrompt.trim() || isGenerating}>
-            {isGenerating
-              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating...</>
-              : <><Sparkles className="h-4 w-4 mr-2" /> Generate</>
-            }
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => { setConfig(prev => ({ ...prev, type: selectedType! })); setStep(3); }} disabled={isGenerating}>
+              Skip
+            </Button>
+            <Button onClick={handleGenerate} disabled={!aiPrompt.trim() || isGenerating}>
+              {isGenerating
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating...</>
+                : <><Sparkles className="h-4 w-4 mr-2" /> Generate</>
+              }
+            </Button>
+          </div>
         </div>
       </div>
     );
