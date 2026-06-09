@@ -781,7 +781,11 @@ IMPORTANT: This field must not be empty.`
 - Line breaks between sections
 - Plain English, no jargon
 ${type === 'two-way-conversation' ? 'This prompt guides a feedback AI that analyses the conversation after it happens — write it accordingly.' : 'Write this as instructions directly to the AI, starting with "You are..."'}
-${type === 'chat' ? `CRITICAL — the AI must stay completely in character at all times. The system prompt must NOT include any instruction to coach the learner, offer hints, suggest how they could improve their answers, or give meta-commentary. The AI is playing a role in a scenario — it must never step outside that role.` : ''}
+${type === 'chat' ? `CRITICAL — the AI must stay completely in character at all times. The system prompt must NOT:
+- Include any instruction to coach the learner, offer hints, or give meta-commentary
+- Use phrases like "give the learner an opportunity to...", "prompt the learner to use...", "create space for the learner to practise..." — these cause the AI to suggest techniques to the learner rather than behaving naturally within the scenario
+- Tell the AI to signal or hint that certain behaviours are expected from the learner
+Instead, describe only how the AI character itself should behave within the scenario (e.g. "express frustration when pushed on price" not "give the learner a chance to label your frustration"). The learner must discover and apply techniques themselves.` : ''}
 IMPORTANT: This field must not be empty for this activity type.`;
 
       const feedbackCriteriaInstruction = type === 'user-tester'
