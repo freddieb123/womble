@@ -55,6 +55,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
   const dcRef = useRef<RTCDataChannel | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const capturedResponseIds = useRef<Set<string>>(new Set());
 
   const { toast } = useToast();
 
@@ -102,7 +103,25 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
       }
       if (msg.type === 'response.audio_transcript.done') {
         const text = msg.transcript?.trim();
-        if (text) addMessage('assistant', text);
+        if (text) {
+          if (msg.response_id) capturedResponseIds.current.add(msg.response_id);
+          addMessage('assistant', text);
+        }
+      }
+      // Fallback: response.done always fires and contains full output with transcripts
+      if (msg.type === 'response.done') {
+        const responseId = msg.response?.id;
+        if (responseId && capturedResponseIds.current.has(responseId)) return;
+        const output: any[] = msg.response?.output ?? [];
+        for (const item of output) {
+          if (item.role === 'assistant' && Array.isArray(item.content)) {
+            const audioPart = item.content.find((c: any) => c.type === 'audio' && c.transcript);
+            if (audioPart?.transcript?.trim()) {
+              if (responseId) capturedResponseIds.current.add(responseId);
+              addMessage('assistant', audioPart.transcript.trim());
+            }
+          }
+        }
       }
     } catch {}
   }, [addMessage]);
@@ -385,13 +404,23 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
             </Button>
           </div>
         )}
-        {connectionState === 'active' && !isThoughtPartner && (
-          <Button onClick={stopSession} variant="destructive" size="lg" className="px-10">
-            <MicOff className="h-4 w-4 mr-2" /> End Session
+        {connectionState === 'active' && !isThoughtPartner && !isPaused && (
+          <Button onClick={pauseSession} variant="destructive" size="lg" className="px-10">
+            <MicOff className="h-4 w-4 mr-2" /> Stop Conversation
           </Button>
         )}
+        {connectionState === 'active' && !isThoughtPartner && isPaused && (
+          <div className="flex flex-col items-center gap-3">
+            <Button onClick={resumeSession} size="lg" className="px-10">
+              <PlayCircle className="h-4 w-4 mr-2" /> Continue Conversation
+            </Button>
+            <Button onClick={stopSession} variant="ghost" size="sm" className="text-red-500 hover:text-red-600">
+              <MicOff className="h-4 w-4 mr-1" /> Finish Session
+            </Button>
+          </div>
+        )}
         {connectionState === 'ended' && (
-          <Button onClick={() => { setConnectionState('idle'); setTranscript([]); }} variant="outline" size="lg" className="px-10">
+          <Button onClick={() => { setConnectionState('idle'); setTranscript([]); capturedResponseIds.current.clear(); }} variant="outline" size="lg" className="px-10">
             Start Again
           </Button>
         )}

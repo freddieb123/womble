@@ -2105,10 +2105,19 @@ Rules: all four options must be similar in length and style. Distractors should 
 
   app.post("/api/chat-feedback", async (req: Request, res: Response) => {
     try {
-      const { configId, sessionId, messages, userName, chatMode } = req.body;
+      const { configId, sessionId, messages: clientMessages, userName, chatMode } = req.body;
 
-      if (!configId || !sessionId || !messages) {
+      if (!configId || !sessionId) {
         return res.status(400).json({ error: "Missing required parameters" });
+      }
+
+      // For voice sessions the client-side transcript may be empty — fall back to DB
+      let messages = clientMessages;
+      if (!messages || messages.length === 0) {
+        const saved = await db.query.conversations.findFirst({
+          where: and(eq(conversations.configId, configId), eq(conversations.sessionId, sessionId)),
+        });
+        messages = saved?.messages ?? [];
       }
 
       const config = await db.query.chatConfigs.findFirst({
