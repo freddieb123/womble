@@ -84,6 +84,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
   const handleDataChannelMessage = useCallback((event: MessageEvent) => {
     try {
       const msg = JSON.parse(event.data);
+      console.log('[voice]', msg.type, msg);
 
       if (msg.type === 'input_audio_buffer.speech_started') {
         setActivityState('listening');
@@ -152,10 +153,15 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
       streamRef.current = stream;
       stream.getTracks().forEach(t => pc.addTrack(t, stream));
 
-      // Data channel for events
+      // Data channel for events (we create it so we can send session.update)
       const dc = pc.createDataChannel('oai-events');
       dcRef.current = dc;
       dc.onmessage = handleDataChannelMessage;
+
+      // Also listen for data channels created by OpenAI's side
+      pc.ondatachannel = (e) => {
+        e.channel.onmessage = handleDataChannelMessage;
+      };
 
       // Configure: apply system prompt, enable input transcription
       dc.onopen = () => {
