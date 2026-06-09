@@ -1296,13 +1296,14 @@ Return only the JSON object, no other text.`;
         `${m.role}: ${typeof m.content === 'string' ? m.content : m.content?.text ?? ''}`
       ).join('\n');
 
-      const prompt = `You are coaching a learner in a conversation exercise. Based on the conversation so far and the success criteria below, give the learner ONE short, specific hint about what they should try next.
+      const prompt = `You are coaching a learner in a conversation exercise. Based on the conversation so far and the success criteria, give ONE short hint about what the learner should do differently or try next.
 
 Rules:
-- One sentence only
-- Address the learner directly as "you" — never mention the AI or what the other party is doing
-- Focus on what the learner should say or do, not on analysing the situation
-- Do not start with "Hint:" or any label
+- One sentence only. No label at the start.
+- Use "you" and "your" to address the learner — their technique, their language, their approach
+- Do NOT mention the other person, the AI, or what the counterpart is thinking/feeling/doing
+- Bad example: "Ask about their priorities" — this is about the other party
+- Good example: "Try naming a specific price anchor before discussing features" — this is about the learner's own move
 
 Success criteria:
 ${feedbackCriteria}
