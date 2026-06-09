@@ -1120,7 +1120,7 @@ Write detailed, specific configuration for this activity.`,
           session: {
             type: "realtime",
             model: "gpt-realtime-2",
-            instructions: config.systemPrompt,
+            instructions: withPersonaLock(config.systemPrompt),
           },
         }),
       });
