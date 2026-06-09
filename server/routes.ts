@@ -1292,22 +1292,32 @@ Return only the JSON object, no other text.`;
         return res.status(400).json({ error: "Feedback criteria is required" });
       }
 
-      const prompt = `Based on these criteria:\n${feedbackCriteria}\n\nAnd these instructions:\n${userInstructions || 'No specific instructions'}\n\nAnalyze the current conversation and provide a helpful hint for the user to improve their responses. Keep the hint concise and specific. \nWrite the hint straight out - don't include "Hint:" at the beginning of your response.\n Limit the response to 2 sentences.`;
+      const conversation = (messages || []).map((m: any) =>
+        `${m.role}: ${typeof m.content === 'string' ? m.content : m.content?.text ?? ''}`
+      ).join('\n');
+
+      const prompt = `You are coaching a learner in a conversation exercise. Based on the conversation so far and the success criteria below, give the learner ONE short, specific hint about what they should try next.
+
+Rules:
+- One sentence only
+- Address the learner directly as "you" — never mention the AI or what the other party is doing
+- Focus on what the learner should say or do, not on analysing the situation
+- Do not start with "Hint:" or any label
+
+Success criteria:
+${feedbackCriteria}
+
+Conversation so far:
+${conversation || '(no conversation yet)'}`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-5.4-mini",
         messages: [
-          {
-            role: "system",
-            content: "You are an expert at providing constructive hints and guidance. Keep your hints brief, specific, and actionable."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
+          { role: "system", content: "You give one-sentence coaching hints to learners in conversation exercises. Be direct and specific." },
+          { role: "user", content: prompt }
         ],
         temperature: 0.7,
-        max_completion_tokens: 2000,
+        max_completion_tokens: 100,
       });
 
       const hint = completion.choices[0]?.message?.content;
