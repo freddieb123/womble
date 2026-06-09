@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { v4 as uuidv4 } from "uuid";
+import { track, EventName } from "@/lib/mixpanel";
 
 interface Props {
   config: AdminConfig;
@@ -198,6 +199,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
       await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
 
       setConnectionState('active');
+      track(EventName.SESSION_STARTED_VOICE, { type: config.type, configId: config.id });
     } catch (err: any) {
       setConnectionState('idle');
       toast({ variant: 'destructive', title: 'Connection failed', description: err.message });
@@ -216,6 +218,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
   };
 
   const stopSession = () => {
+    track(EventName.SESSION_ENDED, { type: config.type, configId: config.id });
     pcRef.current?.close();
     streamRef.current?.getTracks().forEach(t => t.stop());
     dcRef.current = null;
@@ -228,6 +231,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
 
   const getHint = async () => {
     if (!config.feedbackCriteria) return;
+    track(EventName.HINT_REQUESTED, { type: config.type, configId: config.id });
     setIsGettingHint(true);
     try {
       const res = await fetch('/api/chat-hint', {
@@ -279,6 +283,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
 
   const confirmFeedback = async () => {
     setIsConfirmingFeedback(false);
+    track(EventName.FEEDBACK_REQUESTED, { type: config.type, configId: config.id });
     setIsGettingFeedback(true);
     try {
       const res = await fetch('/api/chat-feedback', {
@@ -296,6 +301,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setFeedbackData(data);
+      if (data.score != null) track(EventName.FEEDBACK_SCORE, { type: config.type, configId: config.id, score: data.score });
       setFeedbackOpen(true);
     } catch (err: any) {
       toast({ variant: 'destructive', title: 'Error', description: err.message });

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { MessageSquare, Users, GraduationCap, Brain, Zap, ArrowLeft, ArrowRight, Sparkles, Loader2, Upload, X, Mic, MicOff, Keyboard, LayoutGrid, Monitor, FileText, ClipboardList } from "lucide-react";
 import type { AdminConfig } from "@/lib/types";
 import QuickFireQuizEditor from "@/components/QuickFireQuizEditor";
+import { track, EventName } from "@/lib/mixpanel";
 
 interface Props {
   onSave: (config: AdminConfig) => void;
@@ -199,6 +200,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
 
   const handleGenerate = async () => {
     if (!aiPrompt.trim() || !selectedType) return;
+    track(EventName.AI_GENERATION_USED, { type: selectedType });
     setIsGenerating(true);
     setGenerateError('');
     try {
@@ -303,6 +305,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
         <div className="flex justify-end pt-2">
           <Button onClick={() => {
             const skipDescribe = selectedType === 'quick-fire-quiz' || selectedType === 'group-board';
+            track(EventName.ACTIVITY_TYPE_SELECTED, { type: selectedType });
             setConfig(prev => ({
               ...prev,
               type: selectedType!,
@@ -374,7 +377,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
             <ArrowLeft className="h-4 w-4 mr-2" /> Back
           </Button>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => { setConfig(prev => ({ ...prev, type: selectedType! })); setStep(3); }} disabled={isGenerating}>
+            <Button variant="outline" onClick={() => { track(EventName.AI_GENERATION_SKIPPED, { type: selectedType }); setConfig(prev => ({ ...prev, type: selectedType! })); setStep(3); }} disabled={isGenerating}>
               Skip
             </Button>
             <Button onClick={handleGenerate} disabled={!aiPrompt.trim() || isGenerating}>

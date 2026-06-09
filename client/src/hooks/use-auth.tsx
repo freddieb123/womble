@@ -6,6 +6,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/auth";
+import { identify, reset, track, EventName } from "@/lib/mixpanel";
 import type { SelectUser, InsertUser } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -68,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user) => {
       localStorage.setItem('lastLoginMethod', 'email');
+      identify(String(user.id), { email: user.email });
       queryClient.setQueryData(["/api/user"], user);
       setLocation("/dashboard");
     },
@@ -89,9 +91,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     onSuccess: () => {
+      track(EventName.USER_LOGOUT, {});
+      reset();
       queryClient.setQueryData(["/api/user"], null);
       setLocation("/auth");
-      // Toast removed for successful logout
     },
     onError: (error: Error) => {
       // Toast removed for login/logout errors
@@ -113,10 +116,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return res.json();
     },
     onSuccess: (user) => {
+      identify(String(user.id), { email: user.email });
       queryClient.setQueryData(["/api/user"], user);
-      toast({
-        description: "Registered successfully",
-      });
+      toast({ description: "Registered successfully" });
       setLocation("/dashboard");
     },
     onError: (error: Error) => {
@@ -145,6 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const user = await res.json();
       localStorage.setItem('lastLoginMethod', 'google');
+      identify(String(user.id), { email: user.email });
       queryClient.setQueryData(["/api/user"], user);
       setLocation("/dashboard");
     } catch (error) {
@@ -181,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const user = await res.json();
       localStorage.setItem('lastLoginMethod', 'microsoft');
+      identify(String(user.id), { email: user.email });
       queryClient.setQueryData(["/api/user"], user);
       setLocation("/dashboard");
     } catch (error) {

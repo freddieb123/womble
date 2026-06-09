@@ -748,6 +748,7 @@ export default function Home() {
       return res.json() as Promise<SessionSummary>;
     },
     onSuccess: (newSession) => {
+      track(EventName.SESSION_CREATED, {});
       queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
       selectSession(newSession.id);
     },
@@ -864,6 +865,7 @@ export default function Home() {
       track(EventName.GPT_CONFIRM_CREATION, {
         type: config.type,
         hasQuestions: config.type === 'quiz' && (config.questions?.length ?? 0) > 0,
+        interactionMode: config.interactionMode ?? 'both',
       });
       queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
       queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] });
@@ -895,6 +897,7 @@ export default function Home() {
       return response.json();
     },
     onSuccess: () => {
+      track(EventName.ACTIVITY_EDITED, { type: editingConfig?.type, configId: editingConfig?.id });
       queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] });
       setEditingConfig(null);
       toast({ description: 'Activity updated successfully!' });
@@ -912,6 +915,7 @@ export default function Home() {
       return response.json();
     },
     onSuccess: () => {
+      track(EventName.ACTIVITY_DELETED, { type: deletingConfig?.type, configId: deletingConfig?.id });
       queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
       queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] });
       setAgentOrderOverride([]);
@@ -960,6 +964,7 @@ export default function Home() {
   };
 
   const handleDuplicateAgent = async (configToDuplicate: ChatConfig) => {
+    track(EventName.ACTIVITY_DUPLICATED, { type: configToDuplicate.type, configId: configToDuplicate.id });
     try {
       let fullConfig = configToDuplicate;
       if (configToDuplicate.type === 'quiz' || configToDuplicate.type === 'quick-fire-quiz') {
@@ -984,6 +989,7 @@ export default function Home() {
   };
 
   const handleTemplateSelect = async (template: Template) => {
+    track(EventName.TEMPLATE_USED, { templateId: template.id, type: template.type });
     try {
       let fullConfig = template;
       if (template.type === 'quiz') {

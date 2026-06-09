@@ -16,19 +16,39 @@ export enum EventName {
   LANDING_START_CREATING_CLICK = 'landing_start_creating_click',
   LANDING_HOW_IT_WORKS_CLICK = 'landing_how_it_works_click',
   LANDING_LOGIN_CLICK = 'landing_login_click',
-  
+
   // Pricing section events
   PRICING_BUTTON_CLICK = 'pricing_button_click',
-  
+
   // Auth events
   USER_LOGIN = 'user_login',
   USER_REGISTER = 'user_register',
   USER_GOOGLE_LOGIN = 'user_google_login',
-  
-  // GPT-related events
+  USER_MICROSOFT_LOGIN = 'user_microsoft_login',
+  USER_LOGOUT = 'user_logout',
+
+  // Activity creation
   GPT_CREATE_CLICK = 'gpt_create_click',
+  ACTIVITY_TYPE_SELECTED = 'activity_type_selected',
+  AI_GENERATION_USED = 'ai_generation_used',
+  AI_GENERATION_SKIPPED = 'ai_generation_skipped',
   GPT_CONFIRM_CREATION = 'gpt_confirm_creation',
-  GPT_SHARE_LINK = 'gpt_share_link'
+  ACTIVITY_EDITED = 'activity_edited',
+  ACTIVITY_DELETED = 'activity_deleted',
+  ACTIVITY_DUPLICATED = 'activity_duplicated',
+  GPT_SHARE_LINK = 'gpt_share_link',
+  TEMPLATE_USED = 'template_used',
+
+  // Sessions
+  SESSION_CREATED = 'session_created',
+
+  // Learner session events
+  SESSION_STARTED_TYPED = 'session_started_typed',
+  SESSION_STARTED_VOICE = 'session_started_voice',
+  SESSION_ENDED = 'session_ended',
+  HINT_REQUESTED = 'hint_requested',
+  FEEDBACK_REQUESTED = 'feedback_requested',
+  FEEDBACK_SCORE = 'feedback_score',
 }
 
 // Type for the properties that can be passed to track

@@ -36,6 +36,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { track, EventName } from "@/lib/mixpanel";
 
 
 interface Props {
@@ -95,6 +96,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
       return;
     }
 
+    track(EventName.HINT_REQUESTED, { type: config.type, configId: config.id });
     try {
       setIsGettingHint(true);
       const response = await fetch("/api/chat-hint", {
@@ -157,6 +159,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
       // Register participant on first message (not on name entry)
       if (!hasRegistered.current && userName && config.id && !isViewOnly) {
         hasRegistered.current = true;
+        track(EventName.SESSION_STARTED_TYPED, { type: config.type, configId: config.id });
         fetch('/api/conversations/save-transcript', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -343,6 +346,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
 
   const confirmFeedback = async () => {
     setIsConfirmingFeedback(false);
+    track(EventName.FEEDBACK_REQUESTED, { type: config.type, configId: config.id });
     setIsGettingFeedback(true);
     try {
       const hasUserMessage = chatState.messages.some(m => m.role === 'user');
@@ -392,6 +396,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
 
       const { bullets, score, summary } = await response.json();
       setFeedbackData({ bullets, score, summary });
+      if (score != null) track(EventName.FEEDBACK_SCORE, { type: config.type, configId: config.id, score });
       setFeedbackOpen(true);
     } catch (error) {
       console.error("Error getting feedback:", error);

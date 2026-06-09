@@ -156,7 +156,7 @@ export default function AuthPage() {
                 type="button"
                 variant="outline"
                 className="w-full flex items-center justify-center gap-2"
-                onClick={() => signInWithMicrosoft()}
+                onClick={() => { track(EventName.USER_MICROSOFT_LOGIN); signInWithMicrosoft(); }}
               >
                 <TbBrandWindows className="h-4 w-4" />
                 Sign up with Microsoft
@@ -287,7 +287,7 @@ export default function AuthPage() {
                     type="button"
                     variant="outline"
                     className="w-full flex items-center justify-between gap-2"
-                    onClick={() => signInWithMicrosoft()}
+                    onClick={() => { track(EventName.USER_MICROSOFT_LOGIN); signInWithMicrosoft(); }}
                   >
                     <span className="flex items-center gap-2">
                       <TbBrandWindows className="h-4 w-4" />
