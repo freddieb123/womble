@@ -92,17 +92,17 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
       if (msg.type === 'input_audio_buffer.speech_stopped') {
         setActivityState('idle');
       }
-      if (msg.type === 'response.audio.delta') {
+      if (msg.type === 'response.audio.delta' || msg.type === 'response.output_audio.delta') {
         setActivityState('speaking');
       }
-      if (msg.type === 'response.audio.done') {
+      if (msg.type === 'response.audio.done' || msg.type === 'response.output_audio.done') {
         setActivityState('idle');
       }
       if (msg.type === 'conversation.item.input_audio_transcription.completed') {
         const text = msg.transcript?.trim();
         if (text) addMessage('user', text);
       }
-      if (msg.type === 'response.audio_transcript.done') {
+      if (msg.type === 'response.output_audio_transcript.done' || msg.type === 'response.audio_transcript.done') {
         const text = msg.transcript?.trim();
         if (text) {
           if (msg.response_id) capturedResponseIds.current.add(msg.response_id);
