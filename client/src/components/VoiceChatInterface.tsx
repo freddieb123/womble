@@ -180,7 +180,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, attemp
           session: {
             instructions: systemPrompt,
             input_audio_transcription: { model: 'whisper-1' },
-            turn_detection: { type: 'server_vad', threshold: 0.95, silence_duration_ms: 1000 },
+            turn_detection: { type: 'server_vad', threshold: 0.9, silence_duration_ms: 1000 },
           }
         }));
       };
