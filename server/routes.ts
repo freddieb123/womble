@@ -2167,11 +2167,11 @@ Scoring standard: ${harshnessGuidance(config.feedbackHarshness)}
 
 Score: [1-10 based on overall coverage and quality of explanation]
 [One-line overall summary using 'you']`
-        : `Context:\n${config.systemPrompt}\n\nAnalyze the conversation based on these criteria:\n${config.feedbackCriteria}\n\nIMPORTANT: Your analysis must focus solely on the user's contributions—DO NOT reference or evaluate any of the GPT responses (you can identify the user as the first person to contribute to the conversation, and the gpt as the second - and then they alternate of course). When giving feedback, you MUST address the person being evaluated directly as 'you' in ALL feedback points. NEVER use phrases like 'the user' or 'they' – always speak directly (e.g. "You demonstrated strong understanding" instead of "The user demonstrated strong understanding"). You should also refer to yourself as 'me' or 'I' as the GPT. For example you might say 'You did an excellent job probing for specific details about my experiences with meal planning, particularly by asking follow-up questions that encouraged me to share more about my routines and preferences.'\n\nScoring standard: ${harshnessGuidance(config.feedbackHarshness)}\n\nPlease provide your analysis in exactly this format, evaluating ONLY the user's side of the conversation:\n\n• [3 bullet points focusing on how well your contributions meet the criteria. Each bullet must use 'you' and be 1 sentence]\n\nScore: [1-10]\n[Brief one-line summary of overall quality using 'you']`;
+        : `Context:\n${config.systemPrompt}\n\nFeedback criteria:\n${config.feedbackCriteria}\n\nThe conversation below is labelled with LEARNER (the person being assessed) and AI (the role-play counterpart). Evaluate ONLY the LEARNER's messages — ignore everything labelled AI completely.\n\nWhen giving feedback, address the learner directly as 'you'. Never say 'the user', 'the learner', or 'they'. Refer to the AI counterpart as 'me' or 'I'.\n\nScoring standard: ${harshnessGuidance(config.feedbackHarshness)}\n\nProvide your analysis in exactly this format:\n\n• [3 bullet points on how well the LEARNER's contributions meet the criteria. Each must use 'you' and be 1 sentence]\n\nScore: [1-10]\n[Brief one-line summary using 'you']`;
 
 
       const conversation = messages.map((m: Message) =>
-        `${m.role}: ${typeof m.content === 'string' ? m.content : m.content.text}`
+        `${m.role === 'user' ? 'LEARNER' : 'AI'}: ${typeof m.content === 'string' ? m.content : m.content.text}`
       ).join('\n');
 
       const completion = await openai.chat.completions.create({
