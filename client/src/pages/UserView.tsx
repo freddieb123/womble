@@ -14,7 +14,8 @@ import WombleFooter from "@/components/WombleFooter";
 import { ParticipantCount, LiveLeaderboard } from "@/components/LiveActivityPanel";
 import { AdminConfig } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Keyboard, Mic } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { SelectChatConfig } from "@db/schema";
 
 export default function UserView() {
@@ -36,7 +37,10 @@ export default function UserView() {
 
   const handleTryAgain = (interactionMode: 'typed' | 'spoken' | 'both') => {
     setCurrentAttempt(prev => prev + 1);
-    if (interactionMode === 'both') setChatMode(null);
+    if (interactionMode === 'both') {
+      setChatMode(null); // triggers mode picker
+    }
+    // single-mode activities: chatMode stays as-is, key change remounts the component
   };
 
   const updateUrlWithUserName = (name: string, mode?: 'typed' | 'spoken') => {
@@ -211,6 +215,52 @@ export default function UserView() {
 
   const showLivePanels = (config.type === 'chat' || config.type === 'teach-ai') && !isViewOnly;
 
+  // Mode picker shown when trying again on a 'both' activity
+  const modePicker = (
+    <div className="flex flex-col items-center justify-center h-full gap-6">
+      <p className="text-base font-medium text-gray-700">How would you like to practise?</p>
+      <div className="flex gap-4">
+        <Button size="lg" variant="outline" className="px-8" onClick={() => setChatMode('typed')}>
+          <Keyboard className="h-5 w-5 mr-2" /> Typed
+        </Button>
+        <Button size="lg" variant="outline" className="px-8" onClick={() => setChatMode('spoken')}>
+          <Mic className="h-5 w-5 mr-2" /> Voice
+        </Button>
+      </div>
+    </div>
+  );
+
+  const renderChatOrVoice = () => {
+    if (chatMode === null && currentAttempt > 1 && config.interactionMode === 'both') {
+      return modePicker;
+    }
+    if (chatMode === 'spoken') {
+      return (
+        <VoiceChatInterface
+          key={currentAttempt}
+          config={config}
+          sessionId={sessionId}
+          userName={userName}
+          attemptNumber={currentAttempt}
+          onUserNameSubmit={updateUrlWithUserName}
+          onTryAgain={() => handleTryAgain(config.interactionMode ?? 'both')}
+        />
+      );
+    }
+    return (
+      <ChatInterface
+        key={currentAttempt}
+        config={config}
+        sessionId={sessionId}
+        userName={userName}
+        isViewOnly={isViewOnly}
+        attemptNumber={currentAttempt}
+        onUserNameSubmit={updateUrlWithUserName}
+        onTryAgain={() => handleTryAgain(config.interactionMode ?? 'both')}
+      />
+    );
+  };
+
   return (
     <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       <WombleHeader />
@@ -222,28 +272,7 @@ export default function UserView() {
             </div>
             <div className="flex-1 min-w-0 flex flex-col">
               <Card className="flex-1 flex flex-col overflow-hidden p-4">
-                {chatMode === 'spoken' ? (
-                  <VoiceChatInterface
-                    key={currentAttempt}
-                    config={config}
-                    sessionId={sessionId}
-                    userName={userName}
-                    attemptNumber={currentAttempt}
-                    onUserNameSubmit={updateUrlWithUserName}
-                    onTryAgain={() => handleTryAgain(config.interactionMode ?? 'both')}
-                  />
-                ) : (
-                  <ChatInterface
-                    key={currentAttempt}
-                    config={config}
-                    sessionId={sessionId}
-                    userName={userName}
-                    isViewOnly={isViewOnly}
-                    attemptNumber={currentAttempt}
-                    onUserNameSubmit={updateUrlWithUserName}
-                    onTryAgain={() => handleTryAgain(config.interactionMode ?? 'both')}
-                  />
-                )}
+                {renderChatOrVoice()}
               </Card>
             </div>
             <div className="hidden lg:flex lg:flex-col w-40 flex-shrink-0 pt-1">
@@ -268,28 +297,8 @@ export default function UserView() {
                   onUserNameSubmit={updateUrlWithUserName}
                   isViewOnly={isViewOnly}
                 />
-              ) : chatMode === 'spoken' ? (
-                <VoiceChatInterface
-                  key={currentAttempt}
-                  config={config}
-                  sessionId={sessionId}
-                  userName={userName}
-                  attemptNumber={currentAttempt}
-                  onUserNameSubmit={updateUrlWithUserName}
-                  onTryAgain={() => handleTryAgain(config.interactionMode ?? 'both')}
-                />
-              ) : (
-                <ChatInterface
-                  key={currentAttempt}
-                  config={config}
-                  sessionId={sessionId}
-                  userName={userName}
-                  isViewOnly={isViewOnly}
-                  attemptNumber={currentAttempt}
-                  onUserNameSubmit={updateUrlWithUserName}
-                  onTryAgain={() => handleTryAgain(config.interactionMode ?? 'both')}
-                />
-              )}
+              ) : renderChatOrVoice()
+              }
             </Card>
           </div>
         )}
