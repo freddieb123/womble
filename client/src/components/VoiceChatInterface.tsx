@@ -238,6 +238,12 @@ export default function VoiceChatInterface({ config, sessionId, userName, attemp
     setIsPaused(false);
   };
 
+  const finishAndGetFeedback = () => {
+    stopSession();
+    // Slight delay so connectionState updates before confirmFeedback reads transcript
+    setTimeout(() => confirmFeedback(), 50);
+  };
+
   const getHint = async () => {
     if (!config.feedbackCriteria) return;
     track(EventName.HINT_REQUESTED, { type: config.type, configId: config.id });
@@ -441,56 +447,42 @@ export default function VoiceChatInterface({ config, sessionId, userName, attemp
             <Button onClick={resumeSession} size="lg" className="px-10">
               <PlayCircle className="h-4 w-4 mr-2" /> Continue Conversation
             </Button>
-            <Button onClick={stopSession} variant="ghost" size="sm" className="text-red-500 hover:text-red-600">
-              <MicOff className="h-4 w-4 mr-1" /> Finish Session
+            <Button onClick={finishAndGetFeedback} variant="outline" size="lg" className="px-10 border-green-600 text-green-700 hover:bg-green-50">
+              <Trophy className="h-4 w-4 mr-2" /> Finish and Get Feedback
             </Button>
           </div>
         )}
         {connectionState === 'ended' && (
-          <Button onClick={() => { setConnectionState('idle'); setTranscript([]); capturedResponseIds.current.clear(); }} variant="outline" size="lg" className="px-10">
-            Start Again
-          </Button>
+          <div className="flex flex-col items-center gap-3">
+            {feedbackData && (
+              <Button onClick={() => setFeedbackOpen(true)} size="lg" className="px-10 bg-green-600 hover:bg-green-700">
+                <Trophy className="h-4 w-4 mr-2" /> View Feedback
+              </Button>
+            )}
+            <Button
+              onClick={() => { if (onTryAgain) { onTryAgain(); } else { setConnectionState('idle'); setTranscript([]); capturedResponseIds.current.clear(); } }}
+              variant="outline" size="lg" className="px-10"
+            >
+              Try Again
+            </Button>
+          </div>
         )}
       </div>
 
-      {/* Summary / Hint / Feedback */}
-      {connectionState !== 'idle' && (
-        isThoughtPartner ? (
-          <div className="flex justify-center">
-            <Button
-              size="sm"
-              onClick={summaryData ? () => setSummaryOpen(true) : handleGetSummary}
-              disabled={isGettingSummary || transcript.length < 2}
-              className={summaryData ? 'bg-green-600 hover:bg-green-700 text-white' : ''}
-              variant={summaryData ? 'default' : 'outline'}
-            >
-              <Brain className="h-4 w-4 mr-1" />
-              {isGettingSummary ? 'Building thinking map...' : summaryData ? 'View Thinking Map' : 'Get Thinking Map'}
-            </Button>
-          </div>
-        ) : (
-          <div className="flex gap-2 justify-center">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={getHint}
-              disabled={isGettingHint || connectionState === 'idle' || connectionState === 'connecting'}
-            >
-              <Lightbulb className="h-4 w-4 mr-1" />
-              {isGettingHint ? 'Getting hint...' : 'Hint'}
-            </Button>
-            <Button
-              variant={feedbackData ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => feedbackData ? setFeedbackOpen(true) : setIsConfirmingFeedback(true)}
-              disabled={isGettingFeedback || (connectionState !== 'ended' && !hasEnoughMessages)}
-              className={feedbackData ? 'bg-green-600 hover:bg-green-700' : ''}
-            >
-              <Trophy className="h-4 w-4 mr-1" />
-              {isGettingFeedback ? 'Analysing...' : feedbackData ? 'View Feedback' : 'Get Feedback'}
-            </Button>
-          </div>
-        )
+      {/* Thought partner: thinking map button */}
+      {connectionState !== 'idle' && isThoughtPartner && (
+        <div className="flex justify-center">
+          <Button
+            size="sm"
+            onClick={summaryData ? () => setSummaryOpen(true) : handleGetSummary}
+            disabled={isGettingSummary || transcript.length < 2}
+            className={summaryData ? 'bg-green-600 hover:bg-green-700 text-white' : ''}
+            variant={summaryData ? 'default' : 'outline'}
+          >
+            <Brain className="h-4 w-4 mr-1" />
+            {isGettingSummary ? 'Building thinking map...' : summaryData ? 'View Thinking Map' : 'Get Thinking Map'}
+          </Button>
+        </div>
       )}
 
       {/* Transcript (collapsible, shown when ended) */}
@@ -516,22 +508,6 @@ export default function VoiceChatInterface({ config, sessionId, userName, attemp
           </CollapsibleContent>
         </Collapsible>
       )}
-
-      {/* Feedback confirm dialog */}
-      <AlertDialog open={isConfirmingFeedback} onOpenChange={setIsConfirmingFeedback}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Get Feedback?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will analyse your conversation and provide feedback. You can still continue talking after.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmFeedback}>Get Feedback</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Feedback display */}
       <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
