@@ -74,13 +74,14 @@ export const quizQuestions = pgTable("quiz_questions", {
 export const conversations = pgTable("conversations", {
   configId: integer("config_id").notNull().references(() => chatConfigs.id),
   sessionId: text("session_id").notNull(),
+  attemptNumber: integer("attempt_number").notNull().default(1),
   userName: text("user_name"),
   chatMode: text("chat_mode"),
   messages: jsonb("messages").$type<Message[]>().notNull().default([]),
   feedback: jsonb("feedback").$type<ConversationFeedback>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
-  pk: primaryKey({ columns: [table.configId, table.sessionId] })
+  pk: primaryKey({ columns: [table.configId, table.sessionId, table.attemptNumber] })
 }));
 
 export const uploads = pgTable("uploads", {

@@ -24,6 +24,7 @@ export default function UserView() {
   const sessionId = searchParams.get('sessionId') || crypto.randomUUID();
   const [userName, setUserName] = useState<string | null>(searchParams.get('userName'));
   const [chatMode, setChatMode] = useState<'typed' | 'spoken' | null>(searchParams.get('mode') as 'typed' | 'spoken' | null);
+  const [currentAttempt, setCurrentAttempt] = useState(1);
   const isViewOnly = searchParams.get('viewOnly') === 'true';
 
   const { data: savedConfig, isLoading, error } = useQuery<SelectChatConfig & { questions?: Array<{ question: string; expectedAnswer: string }> }>({
@@ -32,6 +33,11 @@ export default function UserView() {
     retry: 1,
     staleTime: Infinity,
   });
+
+  const handleTryAgain = (interactionMode: 'typed' | 'spoken' | 'both') => {
+    setCurrentAttempt(prev => prev + 1);
+    if (interactionMode === 'both') setChatMode(null);
+  };
 
   const updateUrlWithUserName = (name: string, mode?: 'typed' | 'spoken') => {
     const newParams = new URLSearchParams(window.location.search);
@@ -218,18 +224,24 @@ export default function UserView() {
               <Card className="flex-1 flex flex-col overflow-hidden p-4">
                 {chatMode === 'spoken' ? (
                   <VoiceChatInterface
+                    key={currentAttempt}
                     config={config}
                     sessionId={sessionId}
                     userName={userName}
+                    attemptNumber={currentAttempt}
                     onUserNameSubmit={updateUrlWithUserName}
+                    onTryAgain={() => handleTryAgain(config.interactionMode ?? 'both')}
                   />
                 ) : (
                   <ChatInterface
+                    key={currentAttempt}
                     config={config}
                     sessionId={sessionId}
                     userName={userName}
                     isViewOnly={isViewOnly}
+                    attemptNumber={currentAttempt}
                     onUserNameSubmit={updateUrlWithUserName}
+                    onTryAgain={() => handleTryAgain(config.interactionMode ?? 'both')}
                   />
                 )}
               </Card>
@@ -258,18 +270,24 @@ export default function UserView() {
                 />
               ) : chatMode === 'spoken' ? (
                 <VoiceChatInterface
+                  key={currentAttempt}
                   config={config}
                   sessionId={sessionId}
                   userName={userName}
+                  attemptNumber={currentAttempt}
                   onUserNameSubmit={updateUrlWithUserName}
+                  onTryAgain={() => handleTryAgain(config.interactionMode ?? 'both')}
                 />
               ) : (
                 <ChatInterface
+                  key={currentAttempt}
                   config={config}
                   sessionId={sessionId}
                   userName={userName}
                   isViewOnly={isViewOnly}
+                  attemptNumber={currentAttempt}
                   onUserNameSubmit={updateUrlWithUserName}
+                  onTryAgain={() => handleTryAgain(config.interactionMode ?? 'both')}
                 />
               )}
             </Card>

@@ -39,12 +39,20 @@ import { z } from "zod";
 import { track, EventName } from "@/lib/mixpanel";
 
 
+interface AttemptData {
+  attemptNumber: number;
+  chatMode: string | null;
+  feedback: { bullets: string[]; score?: number; summary?: string | null } | null;
+}
+
 interface Props {
   config: AdminConfig;
   sessionId: string;
   userName: string | null;
   isViewOnly: boolean;
+  attemptNumber?: number;
   onUserNameSubmit: (name: string, mode?: 'typed' | 'spoken') => string;
+  onTryAgain?: () => void;
 }
 
 interface LeaderboardEntry {
@@ -54,7 +62,7 @@ interface LeaderboardEntry {
   isCurrentUser: boolean;
 }
 
-export default function ChatInterface({ config, sessionId, userName, isViewOnly, onUserNameSubmit }: Props) {
+export default function ChatInterface({ config, sessionId, userName, isViewOnly, attemptNumber = 1, onUserNameSubmit, onTryAgain }: Props) {
   const [input, setInput] = useState("");
   const [pastedImage, setPastedImage] = useState<string | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -64,6 +72,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
   const [userRank, setUserRank] = useState<number>();
   const inputRef = useRef<HTMLInputElement>(null);
   const [feedbackData, setFeedbackData] = useState<{ bullets: string[]; score?: number; summary?: string }>({ bullets: [] });
+  const [allAttempts, setAllAttempts] = useState<AttemptData[]>([]);
   const [isGettingHint, setIsGettingHint] = useState(false);
   const [isConfirmingFeedback, setIsConfirmingFeedback] = useState(false);
   const [isGettingFeedback, setIsGettingFeedback] = useState(false);
@@ -79,8 +88,9 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
 
   const [showNameModal, setShowNameModal] = useState(!isViewOnly && !userName);
 
+  const messagesQueryKey = `/api/messages?configId=${config.id}&sessionId=${sessionId}&attempt=${attemptNumber}`;
   const { data: chatState = { messages: [], isLoading: false, error: null } } = useQuery<ChatState>({
-    queryKey: [`/api/messages?configId=${config.id}&sessionId=${sessionId}`],
+    queryKey: [messagesQueryKey],
     enabled: !!config.id && !!sessionId,
   });
 
@@ -163,7 +173,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
         fetch('/api/conversations/save-transcript', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ configId: config.id, sessionId, userName, chatMode: 'typed', messages: [] }),
+          body: JSON.stringify({ configId: config.id, sessionId, userName, chatMode: 'typed', messages: [], attemptNumber }),
         }).catch(() => {});
       }
 
@@ -198,7 +208,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
         sessionId
       };
 
-      queryClient.setQueryData<ChatState>([`/api/messages?configId=${config.id}&sessionId=${sessionId}`], (old) => ({
+      queryClient.setQueryData<ChatState>([messagesQueryKey], (old) => ({
         messages: [...(old?.messages || []), userMessage],
         isLoading: false,
         error: null
@@ -241,7 +251,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
 
               assistantMessage.content += parsed.content;
 
-              queryClient.setQueryData<ChatState>([`/api/messages?configId=${config.id}&sessionId=${sessionId}`], (old) => {
+              queryClient.setQueryData<ChatState>([messagesQueryKey], (old) => {
                 const existingMessages = old?.messages || [];
                 const updatedMessages = existingMessages.filter(m => m.id !== assistantMessage.id);
                 return {
@@ -386,7 +396,8 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
           configId: config.id,
           sessionId,
           messages: chatState.messages,
-          type: config.type
+          type: config.type,
+          attemptNumber,
         }),
       });
 
@@ -397,6 +408,11 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
       const { bullets, score, summary } = await response.json();
       setFeedbackData({ bullets, score, summary });
       if (score != null) track(EventName.FEEDBACK_SCORE, { type: config.type, configId: config.id, score });
+
+      // Fetch all attempts to display history
+      const attemptsRes = await fetch(`/api/conversations/${config.id}/session/${sessionId}`);
+      if (attemptsRes.ok) setAllAttempts(await attemptsRes.json());
+
       setFeedbackOpen(true);
     } catch (error) {
       console.error("Error getting feedback:", error);
@@ -565,37 +581,63 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
       )}
 
       <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Chat Feedback</DialogTitle>
+            <DialogTitle>Feedback</DialogTitle>
           </DialogHeader>
-          <div className="space-y-6">
-            <div className="space-y-3">
-              {feedbackData.bullets.map((bullet, index) => (
-                <div key={index} className="flex items-start gap-2 text-sm">
-                  <span>•</span>
-                  <span>{bullet}</span>
-                </div>
-              ))}
-            </div>
-            <div className="border-t pt-4">
-              <div className="flex flex-col gap-4">
-                <span className="text-2xl font-bold">{feedbackData.score}/10</span>
-                {feedbackData.summary && (
-                  <p className="text-sm text-muted-foreground">{feedbackData.summary}</p>
-                )}
-                <Button
-                  onClick={() => {
-                    fetchLeaderboard();
-                    setShowLeaderboard(true);
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Trophy className="w-4 h-4 mr-2" />
-                  View Leaderboard
-                </Button>
-              </div>
-            </div>
+          <div className="space-y-3">
+            {(allAttempts.length > 0 ? allAttempts : [{ attemptNumber, chatMode: 'typed', feedback: feedbackData }]).map((attempt, idx) => (
+              <Collapsible key={attempt.attemptNumber} defaultOpen={idx === 0}>
+                <CollapsibleTrigger className="w-full">
+                  <div className="flex items-center justify-between w-full px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">Attempt {attempt.attemptNumber}</span>
+                      {attempt.chatMode === 'spoken' ? (
+                        <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">Voice</span>
+                      ) : (
+                        <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Typed</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {attempt.feedback?.score != null && (
+                        <span className="text-sm font-bold text-blue-900">{attempt.feedback.score}/10</span>
+                      )}
+                      <ChevronDown className="h-4 w-4 text-gray-400 transition-transform [[data-state=open]_&]:rotate-180" />
+                    </div>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-3 pt-2 pb-3 space-y-3">
+                    {attempt.feedback?.bullets?.map((bullet, i) => (
+                      <div key={i} className="flex items-start gap-2 text-sm">
+                        <span>•</span><span>{bullet}</span>
+                      </div>
+                    ))}
+                    {attempt.feedback?.summary && (
+                      <p className="text-sm text-muted-foreground italic">{attempt.feedback.summary}</p>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            ))}
+          </div>
+          <div className="flex flex-col gap-2 pt-2 border-t">
+            {onTryAgain && (
+              <Button
+                onClick={() => { setFeedbackOpen(false); onTryAgain(); }}
+                variant="outline"
+                className="w-full"
+              >
+                Try Again
+              </Button>
+            )}
+            <Button
+              onClick={() => { fetchLeaderboard(); setShowLeaderboard(true); }}
+              className="w-full bg-blue-600 hover:bg-blue-700"
+            >
+              <Trophy className="w-4 h-4 mr-2" />
+              View Leaderboard
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

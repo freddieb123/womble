@@ -2111,7 +2111,8 @@ Rules: all four options must be similar in length and style. Distractors should 
 
   app.post("/api/chat-feedback", async (req: Request, res: Response) => {
     try {
-      const { configId, sessionId, messages: clientMessages, userName, chatMode } = req.body;
+      const { configId, sessionId, messages: clientMessages, userName, chatMode, attemptNumber: rawAttempt } = req.body;
+      const attemptNumber = rawAttempt ?? 1;
 
       if (!configId || !sessionId) {
         return res.status(400).json({ error: "Missing required parameters" });
@@ -2121,7 +2122,11 @@ Rules: all four options must be similar in length and style. Distractors should 
       let messages = clientMessages;
       if (!messages || messages.length === 0) {
         const saved = await db.query.conversations.findFirst({
-          where: and(eq(conversations.configId, configId), eq(conversations.sessionId, sessionId)),
+          where: and(
+            eq(conversations.configId, configId),
+            eq(conversations.sessionId, sessionId),
+            eq(conversations.attemptNumber, attemptNumber),
+          ),
         });
         messages = saved?.messages ?? [];
       }
@@ -2214,13 +2219,14 @@ Score: [1-10 based on overall coverage and quality of explanation]
         .values({
           configId,
           sessionId,
+          attemptNumber,
           userName: userName || null,
           chatMode: chatMode || 'typed',
           messages: messages || [],
           feedback: feedbackData,
         })
         .onConflictDoUpdate({
-          target: [conversations.configId, conversations.sessionId],
+          target: [conversations.configId, conversations.sessionId, conversations.attemptNumber],
           set: { feedback: feedbackData }
         });
 
@@ -2308,6 +2314,7 @@ Score: [1-10 based on overall coverage and quality of explanation]
 
         const conversationsWithMetadata = conversationData.map(conv => ({
           sessionId: conv.sessionId,
+          attemptNumber: conv.attemptNumber,
           userName: conv.userName,
           chatMode: conv.chatMode,
           messages: conv.messages,
@@ -2320,7 +2327,33 @@ Score: [1-10 based on overall coverage and quality of explanation]
       console.error("[GET /api/conversations] Error:", error);
       res.status(500).json({ error: error.message });
     }
-  });  // Fix theme analysis syntax error
+  });
+
+  // All attempts for a specific learner session (most recent first)
+  app.get("/api/conversations/:configId/session/:sessionId", async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.configId);
+      const { sessionId } = req.params;
+      if (isNaN(configId)) return res.status(400).json({ error: "Invalid config ID" });
+
+      const attempts = await db.query.conversations.findMany({
+        where: and(eq(conversations.configId, configId), eq(conversations.sessionId, sessionId)),
+        orderBy: [desc(conversations.attemptNumber)],
+      });
+
+      res.json(attempts.map(a => ({
+        attemptNumber: a.attemptNumber,
+        chatMode: a.chatMode,
+        messages: a.messages,
+        feedback: a.feedback,
+        createdAt: a.createdAt,
+      })));
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Fix theme analysis syntax error
   app.post("/api/analyze-themes", requireAuth, async (req: Request, res: Response) => {
     try {
       const { feedbacks } = req.body;
@@ -2629,15 +2662,16 @@ Score: [1-10 based on overall coverage and quality of explanation]
   // Save transcript without grading (used by VoiceChatInterface to persist in real-time)
   app.post("/api/conversations/save-transcript", async (req: Request, res: Response) => {
     try {
-      const { configId, sessionId, userName, chatMode, messages } = req.body;
+      const { configId, sessionId, userName, chatMode, messages, attemptNumber: rawAttempt } = req.body;
+      const attemptNumber = rawAttempt ?? 1;
       if (!configId || !sessionId || !Array.isArray(messages)) {
         return res.status(400).json({ error: "Missing required params" });
       }
       await db
         .insert(conversations)
-        .values({ configId, sessionId, userName: userName || null, chatMode: chatMode || 'spoken', messages })
+        .values({ configId, sessionId, attemptNumber, userName: userName || null, chatMode: chatMode || 'spoken', messages })
         .onConflictDoUpdate({
-          target: [conversations.configId, conversations.sessionId],
+          target: [conversations.configId, conversations.sessionId, conversations.attemptNumber],
           set: { messages, userName: userName || null },
         });
       res.json({ success: true });

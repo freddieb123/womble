@@ -24,17 +24,25 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { v4 as uuidv4 } from "uuid";
 import { track, EventName } from "@/lib/mixpanel";
 
+interface AttemptData {
+  attemptNumber: number;
+  chatMode: string | null;
+  feedback: { bullets: string[]; score?: number; summary?: string | null } | null;
+}
+
 interface Props {
   config: AdminConfig;
   sessionId: string;
   userName: string | null;
+  attemptNumber?: number;
   onUserNameSubmit: (name: string, mode?: 'typed' | 'spoken') => string;
+  onTryAgain?: () => void;
 }
 
 type ConnectionState = 'idle' | 'connecting' | 'active' | 'ended';
 type ActivityState = 'idle' | 'listening' | 'speaking';
 
-export default function VoiceChatInterface({ config, sessionId, userName, onUserNameSubmit }: Props) {
+export default function VoiceChatInterface({ config, sessionId, userName, attemptNumber = 1, onUserNameSubmit, onTryAgain }: Props) {
   const [showNameModal, setShowNameModal] = useState(!userName);
   const [connectionState, setConnectionState] = useState<ConnectionState>('idle');
   const [activityState, setActivityState] = useState<ActivityState>('idle');
@@ -44,6 +52,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
   const [isConfirmingFeedback, setIsConfirmingFeedback] = useState(false);
   const [feedbackData, setFeedbackData] = useState<{ bullets: string[]; score?: number; summary?: string } | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [allAttempts, setAllAttempts] = useState<AttemptData[]>([]);
   const [instructionsOpen, setInstructionsOpen] = useState(true);
   const [isGettingSummary, setIsGettingSummary] = useState(false);
   const [summaryData, setSummaryData] = useState<any>(null);
@@ -66,7 +75,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
     fetch('/api/conversations/save-transcript', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ configId: config.id, sessionId, userName, chatMode: 'spoken', messages: transcript }),
+      body: JSON.stringify({ configId: config.id, sessionId, userName, chatMode: 'spoken', messages: transcript, attemptNumber }),
     }).catch(() => {});
   }, [transcript, config.id, sessionId, userName]);
 
@@ -296,12 +305,18 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
           type: 'chat',
           userName,
           chatMode: 'spoken',
+          attemptNumber,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setFeedbackData(data);
       if (data.score != null) track(EventName.FEEDBACK_SCORE, { type: config.type, configId: config.id, score: data.score });
+
+      // Fetch all attempts to display history
+      const attemptsRes = await fetch(`/api/conversations/${config.id}/session/${sessionId}`);
+      if (attemptsRes.ok) setAllAttempts(await attemptsRes.json());
+
       setFeedbackOpen(true);
     } catch (err: any) {
       toast({ variant: 'destructive', title: 'Error', description: err.message });
@@ -520,28 +535,55 @@ export default function VoiceChatInterface({ config, sessionId, userName, onUser
 
       {/* Feedback display */}
       <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Your Feedback</DialogTitle>
+            <DialogTitle>Feedback</DialogTitle>
           </DialogHeader>
-          {feedbackData && (
-            <div className="space-y-4 pt-2">
-              {feedbackData.score !== undefined && (
-                <div className="flex items-center justify-center">
-                  <div className="text-5xl font-bold text-green-600">{feedbackData.score}<span className="text-2xl text-muted-foreground">/10</span></div>
-                </div>
-              )}
-              {feedbackData.summary && (
-                <p className="text-sm text-muted-foreground text-center italic">{feedbackData.summary}</p>
-              )}
-              <ul className="space-y-2">
-                {feedbackData.bullets.map((b, i) => (
-                  <li key={i} className="flex gap-2 text-sm">
-                    <span className="text-green-500 mt-0.5">•</span>
-                    <span>{b}</span>
-                  </li>
-                ))}
-              </ul>
+          <div className="space-y-3">
+            {(allAttempts.length > 0 ? allAttempts : feedbackData ? [{ attemptNumber, chatMode: 'spoken', feedback: feedbackData }] : []).map((attempt, idx) => (
+              <Collapsible key={attempt.attemptNumber} defaultOpen={idx === 0}>
+                <CollapsibleTrigger className="w-full">
+                  <div className="flex items-center justify-between w-full px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">Attempt {attempt.attemptNumber}</span>
+                      {attempt.chatMode === 'spoken' ? (
+                        <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">Voice</span>
+                      ) : (
+                        <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Typed</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {attempt.feedback?.score != null && (
+                        <span className="text-sm font-bold text-blue-900">{attempt.feedback.score}/10</span>
+                      )}
+                      <ChevronDown className="h-4 w-4 text-gray-400 transition-transform [[data-state=open]_&]:rotate-180" />
+                    </div>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-3 pt-2 pb-3 space-y-2">
+                    {attempt.feedback?.bullets?.map((b, i) => (
+                      <div key={i} className="flex gap-2 text-sm">
+                        <span className="text-green-500 mt-0.5">•</span><span>{b}</span>
+                      </div>
+                    ))}
+                    {attempt.feedback?.summary && (
+                      <p className="text-sm text-muted-foreground italic">{attempt.feedback.summary}</p>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            ))}
+          </div>
+          {onTryAgain && (
+            <div className="pt-2 border-t">
+              <Button
+                onClick={() => { setFeedbackOpen(false); onTryAgain(); }}
+                variant="outline"
+                className="w-full"
+              >
+                Try Again
+              </Button>
             </div>
           )}
         </DialogContent>

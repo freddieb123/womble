@@ -34,8 +34,16 @@ interface ConversationData {
   messages: Message[];
   userName: string;
   sessionId: string;
+  attemptNumber?: number;
   chatMode: string | null;
   feedback: ConversationFeedback;
+}
+
+interface LearnerGroup {
+  sessionId: string;
+  userName: string;
+  attempts: ConversationData[];
+  bestScore: number | null;
 }
 
 interface FeedbackSummary {
@@ -213,6 +221,28 @@ export default function ConversationAnalysis() {
   const showLiveStats = config?.type === 'chat' || config?.type === 'teach-ai';
   const isThoughtPartner = config?.type === 'thought-partner';
 
+  // Group conversations by sessionId for multi-attempt display
+  const learnerGroups: LearnerGroup[] = (() => {
+    const grouped = new Map<string, LearnerGroup>();
+    conversations.forEach((conv, index) => {
+      const key = conv.sessionId || String(index);
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          sessionId: key,
+          userName: conv.userName || `Anonymous ${config?.type === 'upload' ? 'Upload' : 'Participant'} ${grouped.size + 1}`,
+          attempts: [],
+          bestScore: null,
+        });
+      }
+      const group = grouped.get(key)!;
+      group.attempts.push(conv);
+      const s = conv.feedback?.score ?? null;
+      if (s !== null && (group.bestScore === null || s > group.bestScore)) group.bestScore = s;
+    });
+    grouped.forEach(g => g.attempts.sort((a, b) => (b.attemptNumber ?? 1) - (a.attemptNumber ?? 1)));
+    return Array.from(grouped.values());
+  })();
+
   const centerContent = (
     <>
       <div className="sticky top-0 z-10 pb-4">
@@ -298,80 +328,103 @@ export default function ConversationAnalysis() {
                   </CardContent>
                 </Card>
               ) : (
-                conversations.map((conversation, index) => {
-                  const hasFeedback = conversation.feedback?.bullets?.length > 0 || conversation.feedback?.score !== null;
-                  const displayName = conversation.userName ||
-                    `Anonymous ${config?.type === 'upload' ? 'Upload' : 'Participant'} ${index + 1}`;
-
-                  return (
-                    <Collapsible key={conversation.sessionId || index}>
-                      <Card>
-                        <CollapsibleTrigger asChild>
-                          <CardHeader className="flex flex-row items-center justify-between cursor-pointer hover:bg-gray-50/80 transition-colors rounded-t-lg py-4">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <h2 className="text-base font-semibold truncate">{displayName}</h2>
-                              {conversation.chatMode === 'spoken' ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 flex-shrink-0">
-                                  <Mic className="h-3 w-3" />Voice
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 flex-shrink-0">
-                                  <Keyboard className="h-3 w-3" />Typed
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3 flex-shrink-0">
-                              {!isThoughtPartner && conversation.feedback?.score !== null ? (
-                                <span className="text-lg font-bold text-blue-900">
-                                  {conversation.feedback.score}/10
-                                </span>
-                              ) : !hasFeedback ? (
-                                <span className="text-xs text-muted-foreground">No feedback yet</span>
-                              ) : null}
-                              <ChevronDown className="h-4 w-4 text-gray-400 transition-transform [[data-state=open]_&]:rotate-180" />
-                            </div>
-                          </CardHeader>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <CardContent className="pt-0 pb-4">
-                            <div className="border-t pt-4 space-y-3">
-                              {conversation.feedback?.bullets && Array.isArray(conversation.feedback.bullets) && conversation.feedback.bullets.length > 0 ? (
-                                <div className="space-y-2">
-                                  {isThoughtPartner && (
-                                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Session Summary</p>
-                                  )}
-                                  {conversation.feedback.bullets.map((bullet, bulletIndex) => (
-                                    <div key={bulletIndex} className="flex items-start gap-2 text-sm">
-                                      <span className="text-gray-400 mt-0.5">•</span><span>{bullet}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : isThoughtPartner ? (
-                                <p className="text-sm text-muted-foreground italic">No summary yet — user hasn't generated one.</p>
-                              ) : null}
-                              {!isThoughtPartner && conversation.feedback?.summary && (
-                                <p className="text-sm text-blue-700 italic">{conversation.feedback.summary}</p>
-                              )}
-                              {config?.type === 'chat' && (
-                                <div className="pt-1">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="flex items-center gap-2"
-                                    onClick={() => window.open(`/conversation?configId=${configId}&sessionId=${conversation.sessionId}&viewOnly=true`, '_blank')}
-                                  >
-                                    <MessageSquare className="h-4 w-4" />
-                                    View Chat
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          </CardContent>
-                        </CollapsibleContent>
-                      </Card>
-                    </Collapsible>
-                  );
-                })
+                learnerGroups.map((group) => {
+                    const multiAttempt = group.attempts.length > 1;
+                    return (
+                      <Collapsible key={group.sessionId}>
+                        <Card>
+                          <CollapsibleTrigger asChild>
+                            <CardHeader className="flex flex-row items-center justify-between cursor-pointer hover:bg-gray-50/80 transition-colors rounded-t-lg py-4">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <h2 className="text-base font-semibold truncate">{group.userName}</h2>
+                                {multiAttempt && (
+                                  <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 flex-shrink-0">
+                                    {group.attempts.length} attempts
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 flex-shrink-0">
+                                {!isThoughtPartner && group.bestScore !== null ? (
+                                  <span className="text-lg font-bold text-blue-900">{group.bestScore}/10</span>
+                                ) : !isThoughtPartner && group.attempts.every(a => !a.feedback?.score) ? (
+                                  <span className="text-xs text-muted-foreground">No feedback yet</span>
+                                ) : null}
+                                <ChevronDown className="h-4 w-4 text-gray-400 transition-transform [[data-state=open]_&]:rotate-180" />
+                              </div>
+                            </CardHeader>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <CardContent className="pt-0 pb-4">
+                              <div className="border-t pt-4 space-y-4">
+                                {group.attempts.map((conversation, aIdx) => (
+                                  <div key={conversation.attemptNumber ?? aIdx} className={multiAttempt ? 'border rounded-lg p-3' : ''}>
+                                    {multiAttempt && (
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <span className="text-xs font-semibold text-gray-500 uppercase">Attempt {conversation.attemptNumber ?? group.attempts.length - aIdx}</span>
+                                        {conversation.chatMode === 'spoken' ? (
+                                          <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
+                                            <Mic className="h-3 w-3" />Voice
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                                            <Keyboard className="h-3 w-3" />Typed
+                                          </span>
+                                        )}
+                                        {!isThoughtPartner && conversation.feedback?.score != null && (
+                                          <span className="ml-auto text-sm font-bold text-blue-900">{conversation.feedback.score}/10</span>
+                                        )}
+                                      </div>
+                                    )}
+                                    {!multiAttempt && (
+                                      <div className="flex items-center gap-2 mb-2">
+                                        {conversation.chatMode === 'spoken' ? (
+                                          <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
+                                            <Mic className="h-3 w-3" />Voice
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                                            <Keyboard className="h-3 w-3" />Typed
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                    {conversation.feedback?.bullets && conversation.feedback.bullets.length > 0 ? (
+                                      <div className="space-y-2">
+                                        {isThoughtPartner && <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Session Summary</p>}
+                                        {conversation.feedback.bullets.map((bullet, bulletIndex) => (
+                                          <div key={bulletIndex} className="flex items-start gap-2 text-sm">
+                                            <span className="text-gray-400 mt-0.5">•</span><span>{bullet}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : isThoughtPartner ? (
+                                      <p className="text-sm text-muted-foreground italic">No summary yet.</p>
+                                    ) : null}
+                                    {!isThoughtPartner && conversation.feedback?.summary && (
+                                      <p className="text-sm text-blue-700 italic mt-2">{conversation.feedback.summary}</p>
+                                    )}
+                                    {config?.type === 'chat' && (
+                                      <div className="pt-2">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="flex items-center gap-2"
+                                          onClick={() => window.open(`/conversation?configId=${configId}&sessionId=${conversation.sessionId}&viewOnly=true`, '_blank')}
+                                        >
+                                          <MessageSquare className="h-4 w-4" />
+                                          View Chat
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </CardContent>
+                          </CollapsibleContent>
+                        </Card>
+                      </Collapsible>
+                    );
+                  })
               )}
             </div>
           </ScrollArea>
