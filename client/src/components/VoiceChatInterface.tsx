@@ -23,6 +23,16 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { v4 as uuidv4 } from "uuid";
 import { track, EventName } from "@/lib/mixpanel";
+import LeaderboardModal from "./LeaderboardModal";
+
+interface LeaderboardEntry {
+  userName: string;
+  score: number;
+  total: number;
+  rank?: number;
+  isTied?: boolean;
+  isCurrentUser: boolean;
+}
 
 interface AttemptData {
   attemptNumber: number;
@@ -58,6 +68,10 @@ export default function VoiceChatInterface({ config, sessionId, userName, attemp
   const [summaryData, setSummaryData] = useState<any>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
+  const [currentUserEntry, setCurrentUserEntry] = useState<LeaderboardEntry | null>(null);
+  const [userRank, setUserRank] = useState<number>();
 
   const isThoughtPartner = (config.type as string) === 'thought-partner';
 
@@ -108,9 +122,24 @@ export default function VoiceChatInterface({ config, sessionId, userName, attemp
       if (msg.type === 'response.audio.done' || msg.type === 'response.output_audio.done') {
         setActivityState('idle');
       }
-      if (msg.type === 'conversation.item.input_audio_transcription.completed') {
+      if (
+        msg.type === 'conversation.item.input_audio_transcription.completed' ||
+        msg.type === 'conversation.item.input_audio_transcription.done'
+      ) {
         const text = msg.transcript?.trim();
         if (text) addMessage('user', text);
+      }
+      // Some WebRTC builds surface user speech inside conversation.item.created
+      if (msg.type === 'conversation.item.created' && msg.item?.role === 'user') {
+        const content = msg.item?.content ?? [];
+        for (const part of content) {
+          if ((part.type === 'input_audio' || part.type === 'audio') && part.transcript?.trim()) {
+            addMessage('user', part.transcript.trim());
+          }
+          if (part.type === 'input_text' && part.text?.trim()) {
+            addMessage('user', part.text.trim());
+          }
+        }
       }
       if (msg.type === 'response.output_audio_transcript.done' || msg.type === 'response.audio_transcript.done') {
         const text = msg.transcript?.trim();
@@ -328,6 +357,22 @@ export default function VoiceChatInterface({ config, sessionId, userName, attemp
       toast({ variant: 'destructive', title: 'Error', description: err.message });
     } finally {
       setIsGettingFeedback(false);
+    }
+  };
+
+  const fetchLeaderboard = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (sessionId) params.set('sessionId', sessionId);
+      if (userName) params.set('userName', userName);
+      const response = await fetch(`/api/final-leaderboard/${config.id}?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch leaderboard data');
+      const { entries, currentUserEntry: cue } = await response.json();
+      setLeaderboardData(entries);
+      setCurrentUserEntry(cue || null);
+      if (cue?.rank) setUserRank(cue.rank);
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load leaderboard data' });
     }
   };
 
@@ -551,8 +596,16 @@ export default function VoiceChatInterface({ config, sessionId, userName, attemp
               </Collapsible>
             ))}
           </div>
-          {onTryAgain && (
-            <div className="pt-2 border-t">
+          <div className="pt-2 border-t flex flex-col gap-2">
+            <Button
+              onClick={() => { fetchLeaderboard(); setShowLeaderboard(true); }}
+              variant="outline"
+              className="w-full"
+            >
+              <Trophy className="h-4 w-4 mr-2" />
+              View Leaderboard
+            </Button>
+            {onTryAgain && (
               <Button
                 onClick={() => { setFeedbackOpen(false); onTryAgain(); }}
                 variant="outline"
@@ -560,10 +613,21 @@ export default function VoiceChatInterface({ config, sessionId, userName, attemp
               >
                 Try Again
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </DialogContent>
       </Dialog>
+
+      <LeaderboardModal
+        open={showLeaderboard}
+        onOpenChange={setShowLeaderboard}
+        entries={leaderboardData}
+        currentUserRank={userRank}
+        currentUserEntry={currentUserEntry}
+        title="Final Leaderboard"
+        maxScore={10}
+        onRefresh={fetchLeaderboard}
+      />
 
       {/* Thinking map for thought-partner */}
       <ThinkingMapModal

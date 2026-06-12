@@ -248,19 +248,19 @@ function SessionSidebarItem({
     <div
       onClick={onSelect}
       onDoubleClick={startEditing}
-      className={`group flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
-        isSelected ? 'bg-green-50 text-green-800' : 'text-gray-700 hover:bg-gray-50'
+      className={`group flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer transition-colors ${
+        isSelected ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
       }`}
     >
       {icon}
       <span className="flex-1 text-sm truncate">{session.title}</span>
-      <span className="text-xs text-gray-400 tabular-nums flex-shrink-0">{session.configCount}</span>
+      <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">{session.configCount}</span>
 
       {/* Pencil — visible on hover, only for non-library or library sessions */}
       <button
         onClick={startEditing}
         title="Rename"
-        className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-gray-600 transition-opacity flex-shrink-0"
+        className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-muted-foreground hover:text-foreground transition-opacity flex-shrink-0"
       >
         <Pencil className="h-3 w-3" />
       </button>
@@ -271,7 +271,7 @@ function SessionSidebarItem({
           <DropdownMenuTrigger asChild>
             <button
               onClick={(e) => e.stopPropagation()}
-              className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-gray-600 transition-opacity flex-shrink-0"
+              className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-muted-foreground hover:text-foreground transition-opacity flex-shrink-0"
             >
               <MoreVertical className="h-3.5 w-3.5" />
             </button>
@@ -349,14 +349,14 @@ function SortableAgentCard({
   }[config.type] ?? MessageSquare;
 
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-4 py-5 shadow-sm">
+    <div ref={setNodeRef} style={style} className="flex items-center gap-3 bg-card border border-border rounded-lg px-4 py-4 shadow-sm">
       <button {...attributes} {...listeners} className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing flex-shrink-0">
         <GripVertical className="h-4 w-4" />
       </button>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <TypeIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
-          <span className="text-sm font-medium text-gray-800 truncate">{config.title}</span>
+          <span className="text-sm font-medium text-foreground truncate">{config.title}</span>
           <Badge variant="outline" className={`text-xs flex-shrink-0 ${typeBadge.classes}`}>{typeBadge.label}</Badge>
           {config.type !== 'quick-fire-quiz' && config.type !== 'user-tester' && (() => {
             const mode = config.interactionMode ?? 'both';
@@ -368,7 +368,7 @@ function SortableAgentCard({
             );
           })()}
         </div>
-        <p className="text-xs text-gray-400 mt-0.5">
+        <p className="text-xs text-muted-foreground mt-0.5">
           {config.conversationCount ?? 0} submission{(config.conversationCount ?? 0) !== 1 ? 's' : ''}
         </p>
       </div>
@@ -1063,17 +1063,17 @@ export default function Home() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
+    <div className="app-shell flex h-screen overflow-hidden">
 
       {/* ── Left Sidebar ─────────────────────────────────────── */}
-      <aside className="w-64 flex-shrink-0 flex flex-col bg-white border-r border-gray-200">
+      <aside className="app-sidebar w-64 flex-shrink-0 flex flex-col border-r">
 
         {/* Logo */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2.5 px-4 py-5 border-b border-gray-100 w-full hover:bg-gray-50 transition-colors">
+            <button className="flex items-center gap-2.5 px-4 py-5 border-b w-full hover:bg-accent transition-colors">
               <img src="/womble-icon.svg" alt="Womble" className="h-8 w-8" />
-              <span className="text-xl font-bold text-green-700">Womble</span>
+              <span className="text-xl font-bold text-primary">Womble</span>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-72 p-3 ml-2" side="right" align="start">
@@ -1093,21 +1093,21 @@ export default function Home() {
 
         {/* Action buttons */}
         <div className="px-3 pt-4 pb-3 flex flex-col gap-2">
-          <button
+          <Button
             onClick={() => createSession.mutate()}
             disabled={createSession.isPending}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors"
+            className="w-full justify-start"
           >
             <Plus className="h-4 w-4 flex-shrink-0" />
             New Session
-          </button>
+          </Button>
         </div>
 
         {/* Sessions section */}
         <div className="flex-1 overflow-y-auto">
           {regularSessions.length > 0 && (
             <div className="px-3 pb-1 pt-1">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-2 mb-1">Sessions</p>
+              <p className="app-section-label">Sessions</p>
               <div className="space-y-0.5">
                 {regularSessions.map(session => (
                   <SessionSidebarItem
@@ -1127,7 +1127,7 @@ export default function Home() {
           {/* My Agents section */}
           {librarySessions.length > 0 && (
             <div className="px-3 pt-3 pb-2">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-2 mb-1">Activities</p>
+              <p className="app-section-label">Activities</p>
               <div className="space-y-0.5">
                 {librarySessions.map(session => (
                   <SessionSidebarItem
@@ -1145,31 +1145,31 @@ export default function Home() {
           )}
 
           {loadingSessions && (
-            <p className="text-xs text-gray-400 px-5 py-3">Loading...</p>
+            <p className="text-xs text-muted-foreground px-5 py-3">Loading...</p>
           )}
 
         </div>
 
         {/* User + logout */}
-        <div className="border-t border-gray-200 p-3">
+        <div className="border-t p-3">
           <div className="flex items-center gap-3">
             <Avatar className="h-8 w-8 flex-shrink-0">
-              <AvatarFallback className="bg-green-600 text-white text-xs font-medium">
+              <AvatarFallback className="bg-primary text-primary-foreground text-xs font-medium">
                 {getInitials()}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-sm font-medium text-foreground truncate">
                 {user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user?.email}
               </p>
               {user?.firstName && (
-                <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+                <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
               )}
             </div>
             <button
               onClick={() => logoutMutation.mutate()}
               title="Log out"
-              className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded"
+              className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded"
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -1195,7 +1195,7 @@ export default function Home() {
             <p className="text-sm text-gray-500 mb-6 max-w-xs">
               Create a new session to organise your agents and share a single link with participants.
             </p>
-            <Button onClick={() => createSession.mutate()} className="bg-green-600 hover:bg-green-700">
+            <Button onClick={() => createSession.mutate()}>
               <Plus className="h-4 w-4 mr-2" />New Session
             </Button>
           </div>
@@ -1225,7 +1225,7 @@ export default function Home() {
                     >
                       <Plus className="h-3.5 w-3.5 mr-1.5" />Add activity
                     </Button>
-                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={handleCopySessionLink}>
+                    <Button size="sm" onClick={handleCopySessionLink}>
                       <Share2 className="h-3.5 w-3.5 mr-1.5" />Share with participants
                     </Button>
                   </div>
@@ -1247,8 +1247,8 @@ export default function Home() {
                       onClick={() => setLibraryTypeFilter(type)}
                       className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                         libraryTypeFilter === type
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                       }`}
                     >
                       {label} <span className="opacity-70">{count}</span>
@@ -1361,13 +1361,13 @@ export default function Home() {
                 {/* Generate-from-slides panel (shown when no agents and no suggestions) */}
                 {!isLibraryView && sessionAgents.length === 0 && suggestions.length === 0 && (
                   <div>
-                    <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 bg-gray-50/50">
+                    <div className="border-2 border-dashed border-border rounded-lg p-8 bg-card/60">
                       {suggestionsProgress !== null ? (
                         <div className="text-center py-4">
                           <div className="relative w-16 h-16 mx-auto mb-3">
                             <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
                               <circle cx="32" cy="32" r="26" fill="none" stroke="#e5e7eb" strokeWidth="5" />
-                              <circle cx="32" cy="32" r="26" fill="none" stroke="#22c55e" strokeWidth="5"
+                              <circle cx="32" cy="32" r="26" fill="none" stroke="hsl(var(--primary))" strokeWidth="5"
                                 strokeDasharray={`${2 * Math.PI * 26}`}
                                 strokeDashoffset={`${2 * Math.PI * 26 * (1 - suggestionsProgress / 100)}`}
                                 strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.4s ease' }}
@@ -1384,7 +1384,7 @@ export default function Home() {
                       ) : (
                         <>
                           <div className="flex items-center justify-center mb-4">
-                            <div className="w-12 h-12 rounded-xl bg-white border border-gray-200 shadow-sm flex items-center justify-center">
+                            <div className="app-icon-surface w-12 h-12">
                               <Sparkles className="h-5 w-5 text-gray-600" />
                             </div>
                           </div>
@@ -1404,9 +1404,9 @@ export default function Home() {
                                   onChange={e => setLinkInputValue(e.target.value)}
                                   onKeyDown={e => { if (e.key === 'Enter') handleLinkSubmit(); if (e.key === 'Escape') setShowLinkInput(false); }}
                                   placeholder="Google Slides link (set to Anyone can view)"
-                                  className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent"
+                                  className="flex-1 text-sm border border-input bg-card rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                                 />
-                                <Button size="sm" onClick={handleLinkSubmit} className="bg-green-600 hover:bg-green-700 flex-shrink-0">Go</Button>
+                                <Button size="sm" onClick={handleLinkSubmit} className="flex-shrink-0">Go</Button>
                                 <Button size="sm" variant="ghost" onClick={() => setShowLinkInput(false)} className="flex-shrink-0"><X className="h-4 w-4" /></Button>
                               </div>
                               {linkInputValue.includes('gamma.app') && (
@@ -1624,7 +1624,7 @@ function SuggestionCard({
   const iconColor = SUGGESTION_ICON_COLOR[suggestion.type] ?? 'bg-gray-50 text-gray-600';
 
   return (
-    <div className="flex items-start gap-3 bg-white border border-gray-200 rounded-xl px-4 py-4 shadow-sm">
+    <div className="flex items-start gap-3 bg-card border border-border rounded-lg px-4 py-4 shadow-sm">
       <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${iconColor}`}>
         <Icon className="h-4 w-4" />
       </div>
@@ -1639,7 +1639,7 @@ function SuggestionCard({
         )}
       </div>
       <div className="flex items-center gap-2 flex-shrink-0 ml-2 mt-0.5">
-        <Button size="sm" onClick={onBuild} disabled={isBuilding} className="bg-green-600 hover:bg-green-700 text-white h-8 px-3 min-w-[64px]">
+        <Button size="sm" onClick={onBuild} disabled={isBuilding} className="h-8 px-3 min-w-[64px]">
           {isBuilding
             ? <div className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
             : 'Build'}

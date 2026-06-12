@@ -59,6 +59,8 @@ interface LeaderboardEntry {
   userName: string;
   score: number;
   total: number;
+  rank?: number;
+  isTied?: boolean;
   isCurrentUser: boolean;
 }
 
@@ -68,7 +70,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
-  const [leaderboardTopN, setLeaderboardTopN] = useState(3);
+  const [currentUserEntry, setCurrentUserEntry] = useState<LeaderboardEntry | null>(null);
   const [userRank, setUserRank] = useState<number>();
   const inputRef = useRef<HTMLInputElement>(null);
   const [feedbackData, setFeedbackData] = useState<{ bullets: string[]; score?: number; summary?: string }>({ bullets: [] });
@@ -147,13 +149,10 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
       const response = await fetch(`/api/final-leaderboard/${config.id}?${params}`);
       if (!response.ok) throw new Error('Failed to fetch leaderboard data');
 
-      const { entries, topN } = await response.json();
-      setLeaderboardTopN(topN);
-
-      const userRankIndex = entries.findIndex((e: LeaderboardEntry) => e.isCurrentUser);
-      if (userRankIndex !== -1) setUserRank(userRankIndex + 1);
-
+      const { entries, currentUserEntry: cue } = await response.json();
       setLeaderboardData(entries);
+      setCurrentUserEntry(cue || null);
+      if (cue?.rank) setUserRank(cue.rank);
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
       toast({
@@ -532,6 +531,21 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
               >
                 {isGettingSummary ? "Building thinking map..." : summaryData ? "View Thinking Map" : "Get Thinking Map"}
               </Button>
+            ) : feedbackData.score !== undefined ? (
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => setFeedbackOpen(true)}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <Trophy className="h-4 w-4 mr-2" />
+                  View Feedback
+                </Button>
+                {onTryAgain && (
+                  <Button onClick={onTryAgain} variant="outline" className="flex-1">
+                    Try Again
+                  </Button>
+                )}
+              </div>
             ) : (
               <div className="flex gap-2">
                 <Button
@@ -543,34 +557,22 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
                   <Lightbulb className="h-4 w-4 mr-2" />
                   {isGettingHint ? 'Getting hint...' : 'Get Hint'}
                 </Button>
-
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="flex-1">
                         <Button
-                          onClick={feedbackData.score !== undefined
-                            ? () => setFeedbackOpen(true)
-                            : handleGetFeedback
-                          }
+                          onClick={handleGetFeedback}
                           variant="default"
                           disabled={!hasEnoughMessages || isGettingFeedback}
-                          className={`w-full ${feedbackData.score !== undefined ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                         >
-                          {isGettingFeedback
-                            ? "Analyzing conversation..."
-                            : feedbackData.score !== undefined
-                              ? "View Feedback"
-                              : "Get Feedback"}
+                          {isGettingFeedback ? "Analyzing..." : "Get Feedback"}
                         </Button>
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>
-                        {hasEnoughMessages
-                          ? "Get feedback on your conversation"
-                          : "Have a longer conversation (at least 5 messages) to get meaningful feedback"}
-                      </p>
+                      <p>{hasEnoughMessages ? "Get feedback on your conversation" : "Have a longer conversation (at least 5 messages) to get meaningful feedback"}</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -647,9 +649,9 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
         onOpenChange={setShowLeaderboard}
         entries={leaderboardData}
         currentUserRank={userRank}
+        currentUserEntry={currentUserEntry}
         title="Final Leaderboard"
         maxScore={10}
-        topN={leaderboardTopN}
         onRefresh={fetchLeaderboard}
       />
       <AlertDialog open={isConfirmingFeedback} onOpenChange={setIsConfirmingFeedback}>

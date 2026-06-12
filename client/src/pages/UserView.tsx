@@ -11,7 +11,7 @@ import DocCritiqueInterface from "@/components/DocCritiqueInterface";
 import TaskWalkthroughInterface from "@/components/TaskWalkthroughInterface";
 import WombleHeader from "@/components/WombleHeader";
 import WombleFooter from "@/components/WombleFooter";
-import { ParticipantCount, LiveLeaderboard } from "@/components/LiveActivityPanel";
+import { ParticipantCount, LiveLeaderboard, UserTimerDisplay } from "@/components/LiveActivityPanel";
 import { AdminConfig } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, Keyboard, Mic } from "lucide-react";
@@ -163,13 +163,21 @@ export default function UserView() {
     return (
       <div className="h-screen flex flex-col overflow-hidden">
         <WombleHeader />
-        <div className="flex-1 overflow-hidden">
-          <DocCritiqueInterface
-            config={config}
-            sessionId={sessionId}
-            userName={userName}
-            onUserNameSubmit={updateUrlWithUserName}
-          />
+        <div className="flex-1 overflow-hidden flex gap-4 px-4 py-3">
+          {!isViewOnly && (
+            <div className="hidden lg:flex lg:flex-col w-40 flex-shrink-0 pt-1">
+              <ParticipantCount configId={config.id!} />
+              <UserTimerDisplay configId={config.id!} />
+            </div>
+          )}
+          <div className="flex-1 overflow-hidden">
+            <DocCritiqueInterface
+              config={config}
+              sessionId={sessionId}
+              userName={userName}
+              onUserNameSubmit={updateUrlWithUserName}
+            />
+          </div>
         </div>
         <WombleFooter />
       </div>
@@ -213,7 +221,12 @@ export default function UserView() {
     );
   }
 
-  const showLivePanels = (config.type === 'chat' || config.type === 'teach-ai') && !isViewOnly;
+  // Left panel: participant count
+  const showParticipantCount = !isViewOnly && ['chat', 'teach-ai', 'thought-partner', 'quiz'].includes(config.type);
+  // Right panel: live leaderboard (only for graded activities)
+  const showLeaderboard = !isViewOnly && ['chat', 'teach-ai'].includes(config.type);
+  // Show side panels layout if either panel is active
+  const showSidePanels = showParticipantCount || showLeaderboard;
 
   // Mode picker shown when trying again on a 'both' activity
   const modePicker = (
@@ -261,44 +274,38 @@ export default function UserView() {
     );
   };
 
+  const renderMainContent = () => {
+    if (config.type === 'upload') return <UploadInterface config={config} sessionId={sessionId} userName={userName} onUserNameSubmit={updateUrlWithUserName} />;
+    if (config.type === 'quiz') return <QuizInterface config={config} sessionId={sessionId} userName={userName} onUserNameSubmit={updateUrlWithUserName} isViewOnly={isViewOnly} />;
+    return renderChatOrVoice();
+  };
+
   return (
     <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       <WombleHeader />
       <div className="flex-1 overflow-hidden px-4 py-3 md:px-6">
-        {showLivePanels ? (
+        {showSidePanels ? (
           <div className="flex gap-4 max-w-6xl mx-auto h-full items-stretch">
+            {/* Left: participant count */}
             <div className="hidden lg:flex lg:flex-col w-40 flex-shrink-0 pt-1">
-              <ParticipantCount configId={config.id!} />
+              {showParticipantCount && <ParticipantCount configId={config.id!} />}
             </div>
+            {/* Centre: main activity */}
             <div className="flex-1 min-w-0 flex flex-col">
               <Card className="flex-1 flex flex-col overflow-hidden p-4">
-                {renderChatOrVoice()}
+                {renderMainContent()}
               </Card>
             </div>
-            <div className="hidden lg:flex lg:flex-col w-40 flex-shrink-0 pt-1">
-              <LiveLeaderboard configId={config.id!} />
+            {/* Right: leaderboard + timer */}
+            <div className="hidden lg:flex lg:flex-col w-40 flex-shrink-0 pt-1 gap-3">
+              {showLeaderboard && <LiveLeaderboard configId={config.id!} />}
+              <UserTimerDisplay configId={config.id!} />
             </div>
           </div>
         ) : (
           <div className="max-w-5xl mx-auto h-full flex flex-col">
             <Card className="flex-1 flex flex-col overflow-hidden p-4">
-              {config.type === 'upload' ? (
-                <UploadInterface
-                  config={config}
-                  sessionId={sessionId}
-                  userName={userName}
-                  onUserNameSubmit={updateUrlWithUserName}
-                />
-              ) : config.type === 'quiz' ? (
-                <QuizInterface
-                  config={config}
-                  sessionId={sessionId}
-                  userName={userName}
-                  onUserNameSubmit={updateUrlWithUserName}
-                  isViewOnly={isViewOnly}
-                />
-              ) : renderChatOrVoice()
-              }
+              {renderMainContent()}
             </Card>
           </div>
         )}

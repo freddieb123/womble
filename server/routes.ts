@@ -2118,9 +2118,11 @@ Rules: all four options must be similar in length and style. Distractors should 
         return res.status(400).json({ error: "Missing required parameters" });
       }
 
-      // For voice sessions the client-side transcript may be empty — fall back to DB
+      // For voice sessions the client-side transcript may be incomplete — fall back to DB
+      // when there are no user messages (transcription events didn't fire)
       let messages = clientMessages;
-      if (!messages || messages.length === 0) {
+      const hasUserMessages = (msgs: any[]) => msgs?.some((m: any) => m.role === 'user');
+      if (!messages || messages.length === 0 || !hasUserMessages(messages)) {
         const saved = await db.query.conversations.findFirst({
           where: and(
             eq(conversations.configId, configId),
@@ -2128,7 +2130,13 @@ Rules: all four options must be similar in length and style. Distractors should 
             eq(conversations.attemptNumber, attemptNumber),
           ),
         });
-        messages = saved?.messages ?? [];
+        const dbMessages = saved?.messages ?? [];
+        // Use DB messages if they have user turns (even if client sent partial data)
+        if (hasUserMessages(dbMessages)) {
+          messages = dbMessages;
+        } else if (!messages || messages.length === 0) {
+          messages = dbMessages;
+        }
       }
 
       const config = await db.query.chatConfigs.findFirst({
@@ -2694,20 +2702,40 @@ Score: [1-10 based on overall coverage and quality of explanation]
         where: eq(conversations.configId, configId),
       });
 
-      const totalParticipants = convData.length;
-      const topN = totalParticipants >= 16 ? 10 : totalParticipants >= 8 ? 5 : 3;
+      // Group by sessionId — pick the best attempt score per learner
+      const bySession = new Map<string, { userName: string; score: number; isCurrentUser: boolean }>();
+      for (const c of convData) {
+        if (!c.feedback?.score) continue;
+        const existing = bySession.get(c.sessionId);
+        const isCurrentUser = !!(userName && sessionId && c.sessionId === sessionId);
+        if (!existing || c.feedback.score > existing.score) {
+          bySession.set(c.sessionId, {
+            userName: c.userName || 'Anonymous',
+            score: c.feedback.score,
+            isCurrentUser,
+          });
+        }
+      }
 
-      const allManual = withMessages
-        .filter(c => c.feedback && (c.feedback as any).manual === true)
-        .map(c => ({
-          userName: c.userName || 'Anonymous',
-          score: c.feedback!.score,
-          total: 10,
-          isCurrentUser: !!(userName && sessionId && c.userName === userName && c.sessionId === sessionId),
-        }))
-        .sort((a, b) => b.score - a.score);
+      const allEntries = Array.from(bySession.values()).sort((a, b) => b.score - a.score);
 
-      res.json({ entries: allManual, topN });
+      // Assign ranks with tie handling
+      const ranked = allEntries.map((e, i, arr) => {
+        let rank = i + 1;
+        for (let j = 0; j < i; j++) { if (arr[j].score === e.score) { rank = j + 1; break; } }
+        return { ...e, rank, total: 10 };
+      });
+
+      // Include everything through rank 3 (all ties at rank 3 included)
+      const topEntries = ranked.filter(e => e.rank <= 3);
+      // Mark ties: any rank shared by 2+ entries
+      const rankCount = topEntries.reduce((m, e) => m.set(e.rank, (m.get(e.rank) || 0) + 1), new Map<number, number>());
+      const entries = topEntries.map(e => ({ ...e, isTied: (rankCount.get(e.rank) || 1) > 1 }));
+
+      // Current user entry if outside top 3
+      const currentUserRanked = ranked.find(e => e.isCurrentUser && e.rank > 3);
+
+      res.json({ entries, topN: 3, currentUserEntry: currentUserRanked || null });
     } catch (error: any) {
       console.error("Error in final-leaderboard:", error);
       res.status(500).json({ error: error.message });
@@ -2724,11 +2752,20 @@ Score: [1-10 based on overall coverage and quality of explanation]
         where: eq(conversations.configId, configId),
       });
 
-      const participantCount = convData.length;
-      const topN = participantCount >= 16 ? 10 : participantCount >= 8 ? 5 : 3;
+      // Unique participants by sessionId (multiple attempts = same person)
+      const participantCount = new Set(convData.map(c => c.sessionId)).size;
+      const topN = participantCount > 12 ? 8 : participantCount >= 7 ? 5 : 3;
 
-      const leaderboard = convData
-        .filter(c => c.feedback && c.feedback.score !== null)
+      // Best score per sessionId for leaderboard
+      const bestBySession = new Map<string, typeof convData[0]>();
+      for (const c of convData) {
+        if (!c.feedback || c.feedback.score === null) continue;
+        const existing = bestBySession.get(c.sessionId);
+        if (!existing || (c.feedback.score ?? 0) > (existing.feedback?.score ?? 0)) {
+          bestBySession.set(c.sessionId, c);
+        }
+      }
+      const leaderboard = [...bestBySession.values()]
         .sort((a, b) => (b.feedback!.score ?? 0) - (a.feedback!.score ?? 0))
         .slice(0, topN)
         .map(c => c.userName || 'Anonymous');
@@ -2754,7 +2791,7 @@ Score: [1-10 based on overall coverage and quality of explanation]
         const convData = await db.query.conversations.findMany({
           where: eq(conversations.configId, configId),
         });
-        const participantCount = convData.filter(c => c.messages && c.messages.length > 0).length;
+        const participantCount = new Set(convData.filter(c => c.messages && c.messages.length > 0).map(c => c.sessionId)).size;
         return res.json({ participantCount, leaderboard: [] });
       }
 
@@ -2807,10 +2844,19 @@ Score: [1-10 based on overall coverage and quality of explanation]
       });
 
       const withMessages = updated.filter(c => c.messages && c.messages.length > 0);
-      const participantCount = withMessages.length;
-      const topN = participantCount >= 16 ? 10 : participantCount >= 8 ? 5 : 3;
-      const leaderboard = withMessages
-        .filter(c => c.feedback && c.feedback.score !== null)
+      const participantCount = new Set(withMessages.map(c => c.sessionId)).size;
+      const topN = participantCount > 12 ? 8 : participantCount >= 7 ? 5 : 3;
+
+      // Best score per sessionId
+      const bestBySession = new Map<string, typeof withMessages[0]>();
+      for (const c of withMessages) {
+        if (!c.feedback || c.feedback.score === null) continue;
+        const existing = bestBySession.get(c.sessionId);
+        if (!existing || (c.feedback.score ?? 0) > (existing.feedback?.score ?? 0)) {
+          bestBySession.set(c.sessionId, c);
+        }
+      }
+      const leaderboard = [...bestBySession.values()]
         .sort((a, b) => (b.feedback!.score ?? 0) - (a.feedback!.score ?? 0))
         .slice(0, topN)
         .map(c => c.userName || 'Anonymous');

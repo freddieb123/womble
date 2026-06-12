@@ -12,6 +12,8 @@ import { RefreshCw, Medal } from "lucide-react";
 interface LeaderboardEntry {
   userName: string;
   score: number;
+  rank?: number;
+  isTied?: boolean;
   isCurrentUser: boolean;
 }
 
@@ -20,6 +22,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   entries: LeaderboardEntry[];
   currentUserRank?: number;
+  currentUserEntry?: LeaderboardEntry | null;
   title: string;
   maxScore: number;
   topN?: number;
@@ -31,28 +34,23 @@ export default function LeaderboardModal({
   onOpenChange,
   entries,
   currentUserRank,
+  currentUserEntry,
   title,
   maxScore,
-  topN = 3,
   onRefresh
 }: Props) {
-  const topEntries = entries.slice(0, topN);
-
-  const currentUserEntry = currentUserRank && currentUserRank > topN
-    ? entries.find(entry => entry.isCurrentUser)
-    : null;
-
-  const getMedalColor = (index: number) => {
-    switch (index) {
-      case 0:
-        return "text-yellow-500";
-      case 1:
-        return "text-gray-400";
-      case 2:
-        return "text-amber-600";
-      default:
-        return "text-gray-400";
+  const getMedalColor = (rank: number) => {
+    switch (rank) {
+      case 1: return "text-yellow-500";
+      case 2: return "text-gray-400";
+      case 3: return "text-amber-600";
+      default: return "text-gray-400";
     }
+  };
+
+  const rankLabel = (entry: LeaderboardEntry, index: number) => {
+    const r = entry.rank ?? (index + 1);
+    return entry.isTied ? `${r}=` : `${r}`;
   };
 
   return (
@@ -62,62 +60,43 @@ export default function LeaderboardModal({
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          {/* Top 3 Podium */}
-          <div className="space-y-2">
-            {topEntries.map((entry, index) => (
+          <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
+            {entries.map((entry, index) => (
               <Card
                 key={index}
-                className={`p-4 ${
-                  entry.isCurrentUser
-                    ? "bg-blue-50 border-2 border-red-500"
-                    : "bg-white"
-                }`}
+                className={`p-4 ${entry.isCurrentUser ? "bg-blue-50 border-2 border-blue-400" : "bg-white"}`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <Medal className={`h-5 w-5 ${getMedalColor(index)}`} />
-                    <span className="font-medium">
-                      {entry.userName || "Anonymous"}
-                    </span>
+                    <Medal className={`h-5 w-5 flex-shrink-0 ${getMedalColor(entry.rank ?? index + 1)}`} />
+                    <span className="text-xs text-gray-500 w-6 text-right">{rankLabel(entry, index)}</span>
+                    <span className="font-medium">{entry.userName || "Anonymous"}</span>
                   </div>
-                  <span className="font-bold">
-                    {entry.score}/{maxScore}
-                  </span>
+                  <span className="font-bold">{entry.score}/{maxScore}</span>
                 </div>
               </Card>
             ))}
           </div>
 
-          {/* Current User (if not in top 3) */}
+          {/* Current user if outside top 3 */}
           {currentUserEntry && (
             <>
-              <div className="text-center text-sm text-gray-500">• • •</div>
-              <Card className="p-4 bg-blue-50 border-2 border-red-500">
+              <div className="text-center text-sm text-gray-400">• • •</div>
+              <Card className="p-4 bg-blue-50 border-2 border-blue-400">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <span className="text-sm text-gray-500">
-                      #{currentUserRank}
-                    </span>
-                    <span className="font-medium">
-                      {currentUserEntry.userName || "Anonymous"}
-                    </span>
+                    <span className="text-sm text-gray-500">#{currentUserRank}</span>
+                    <span className="font-medium">{currentUserEntry.userName || "Anonymous"}</span>
                   </div>
-                  <span className="font-bold">
-                    {currentUserEntry.score}/{maxScore}
-                  </span>
+                  <span className="font-bold">{currentUserEntry.score}/{maxScore}</span>
                 </div>
               </Card>
             </>
           )}
 
-          {/* Update Button */}
           {onRefresh && (
             <div className="flex justify-center pt-2">
-              <Button
-                variant="outline"
-                onClick={onRefresh}
-                className="w-full"
-              >
+              <Button variant="outline" onClick={onRefresh} className="w-full">
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Update
               </Button>

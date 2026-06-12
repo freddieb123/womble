@@ -81,22 +81,22 @@ export default function AuthPage() {
   // ── Register: two-panel layout ───────────────────────────────────────────
   if (!isLogin) {
     return (
-      <div className="min-h-screen flex flex-col lg:flex-row">
+      <div className="min-h-[100svh] lg:h-[100svh] lg:overflow-hidden flex flex-col lg:flex-row">
         {/* Left: form panel */}
-        <div className="w-full lg:w-[45%] bg-green-700 flex flex-col p-8 lg:p-12">
+        <div className="w-full lg:w-[45%] bg-green-700 flex flex-col p-6 sm:p-8 lg:p-[clamp(1.5rem,4vh,3rem)]">
           <Link href="/">
-            <div className="flex items-center gap-2 mb-10">
+            <div className="flex items-center gap-2 mb-8 lg:mb-[clamp(1.5rem,4vh,2.5rem)]">
               <img src="/womble-icon.svg" alt="Womble" className="h-8 w-8 brightness-0 invert" />
               <span className="text-2xl font-bold text-white">Womble</span>
             </div>
           </Link>
 
           <h1 className="text-3xl font-bold text-white mb-1">Create your account</h1>
-          <p className="text-green-200 text-sm mb-8">Start building activities in minutes — free to get started</p>
+          <p className="text-green-200 text-sm mb-6 lg:mb-[clamp(1.25rem,3vh,2rem)]">Start building activities in minutes — free to get started</p>
 
-          <div className="bg-white rounded-2xl p-6 shadow-xl space-y-4">
+          <div className="bg-white rounded-2xl p-5 lg:p-[clamp(1.125rem,3vh,1.5rem)] shadow-xl space-y-3 lg:space-y-[clamp(0.75rem,2vh,1rem)]">
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 lg:space-y-[clamp(0.75rem,2vh,1rem)]">
                 <FormField
                   control={form.control}
                   name="email"
@@ -125,7 +125,7 @@ export default function AuthPage() {
                 />
                 <Button
                   type="submit"
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold"
+                  className="w-full font-semibold"
                   disabled={registerMutation.isPending}
                 >
                   Create account
@@ -165,7 +165,7 @@ export default function AuthPage() {
           </div>
 
           <button
-            className="mt-6 text-green-200 text-sm hover:text-white transition-colors"
+            className="mt-5 lg:mt-[clamp(1rem,3vh,1.5rem)] text-green-200 text-sm hover:text-white transition-colors"
             onClick={() => setIsLogin(true)}
           >
             Already have an account? <span className="underline">Log in</span>
@@ -173,18 +173,18 @@ export default function AuthPage() {
         </div>
 
         {/* Right: activity showcase */}
-        <div className="hidden lg:flex w-[55%] bg-gray-50 flex-col items-center justify-center p-12">
-          <h2 className="text-3xl font-bold text-gray-900 text-center leading-snug mb-1">
+        <div className="hidden lg:flex w-[55%] bg-gray-50 flex-col items-center justify-center p-[clamp(1.5rem,4vh,3rem)]">
+          <h2 className="text-[clamp(1.5rem,4vh,1.875rem)] font-bold text-gray-900 text-center leading-snug mb-1">
             Nine ways to make learning
           </h2>
-          <h2 className="text-3xl font-bold text-center mb-2">
+          <h2 className="text-[clamp(1.5rem,4vh,1.875rem)] font-bold text-center mb-2">
             <span className="bg-green-100 text-green-700 px-2 rounded">actually stick</span>
           </h2>
-          <p className="text-gray-400 text-center text-sm mb-10">
+          <p className="text-gray-400 text-center text-sm mb-[clamp(1.5rem,5vh,2.5rem)]">
             Pick an activity type, write a prompt, share the link — done.
           </p>
 
-          <div className="grid grid-cols-3 gap-x-8 gap-y-7 max-w-lg">
+          <div className="grid grid-cols-3 gap-x-8 gap-y-[clamp(1rem,3vh,1.75rem)] max-w-lg">
             {ACTIVITY_TYPES.map(({ icon: Icon, label, subtitle }) => (
               <div key={label} className="flex flex-col items-center text-center gap-2">
                 <div className="w-12 h-12 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center">
@@ -207,7 +207,7 @@ export default function AuthPage() {
         <Link href="/">
           <div className="flex items-center gap-2">
             <img src="/womble-icon.svg" alt="Womble" className="h-10 w-10" />
-            <span className="text-2xl font-bold text-green-700">Womble</span>
+            <span className="text-2xl font-bold text-primary">Womble</span>
           </div>
         </Link>
       </div>

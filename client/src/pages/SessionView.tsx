@@ -24,6 +24,7 @@ import {
   Zap, LayoutGrid, Monitor, FileText, ClipboardList, HelpCircle, Upload,
 } from "lucide-react";
 import type { AdminConfig } from "@/lib/types";
+import { ParticipantCount, LiveLeaderboard } from "@/components/LiveActivityPanel";
 
 type SessionConfig = {
   id: number;
@@ -269,18 +270,22 @@ export default function SessionView() {
         </div>
 
         {/* Main content */}
-        <div className="flex-1 overflow-hidden p-4 flex justify-center relative">
-          {selectedConfig && TIMER_TYPES.has(selectedConfig.type) && (
-            <div className="absolute top-4 right-4 z-10">
-              <ActivityTimerDisplay configId={selectedConfig.id} />
-            </div>
-          )}
+        <div className="flex-1 overflow-hidden p-4 flex gap-4">
+          {/* Left panel: participant count */}
+          <div className="hidden lg:flex lg:flex-col w-40 flex-shrink-0 pt-1">
+            {selectedConfig && ['chat', 'teach-ai', 'thought-partner', 'quiz'].includes(selectedConfig.type) && (
+              <ParticipantCount configId={selectedConfig.id} />
+            )}
+          </div>
+
+          {/* Centre: activity */}
+          <div className="flex-1 overflow-hidden flex flex-col">
           {!selectedConfig ? (
             <div className="h-full flex items-center justify-center text-gray-400 text-sm">
               Select an activity from the sidebar to get started.
             </div>
           ) : (
-            <Card className={`h-full w-full flex flex-col overflow-hidden ${['group-board', 'user-tester', 'doc-critique', 'task-walkthrough', 'two-way-conversation'].includes(selectedConfig.type) ? 'max-w-6xl p-0' : 'max-w-3xl p-4'}`}>
+            <Card className={`h-full w-full flex flex-col overflow-hidden ${['group-board', 'user-tester', 'doc-critique', 'task-walkthrough', 'two-way-conversation'].includes(selectedConfig.type) ? 'max-w-6xl self-center p-0' : 'max-w-3xl self-center p-4'}`}>
               {selectedConfig.type === 'two-way-conversation' ? (
                 <TwoWayConversationInSession
                   key={selectedConfig.id}
@@ -356,6 +361,17 @@ export default function SessionView() {
               )}
             </Card>
           )}
+          </div>
+
+          {/* Right panel: leaderboard + timer */}
+          <div className="hidden lg:flex lg:flex-col w-48 flex-shrink-0 pt-1 gap-3">
+            {selectedConfig && ['chat', 'teach-ai'].includes(selectedConfig.type) && (
+              <LiveLeaderboard configId={selectedConfig.id} />
+            )}
+            {selectedConfig && TIMER_TYPES.has(selectedConfig.type) && (
+              <ActivityTimerDisplay configId={selectedConfig.id} />
+            )}
+          </div>
         </div>
       </div>
 
@@ -446,7 +462,7 @@ function ActivityTimerDisplay({ configId }: { configId: number }) {
   const isDone = timer.status === 'finished';
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl shadow-sm px-5 py-4 w-52">
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm px-5 py-4 w-full">
       <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Time remaining</p>
       <p className={`text-4xl font-mono font-bold mb-3 ${isDone ? 'text-red-500' : isLow ? 'text-amber-500' : 'text-gray-900'}`}>
         {isDone ? "0:00" : display}

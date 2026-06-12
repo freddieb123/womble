@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, Plus, User } from "lucide-react";
+import { LogOut, Plus } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -46,27 +46,27 @@ export default function AdminNavbar({
   };
 
   return (
-    <div className="w-full bg-blue-50 py-4 border-b border-blue-100">
+    <div className="w-full border-b bg-card">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center">
+        <div className="flex h-16 justify-between items-center">
           {/* Logo and Name - Left aligned */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <div className="flex items-center gap-2 cursor-pointer">
+              <div className="flex items-center gap-2 cursor-pointer rounded-md px-1 py-1 hover:bg-accent transition-colors">
                 <img src="/womble-icon.svg" alt="Womble" className="h-10 w-10" />
-                <span className="text-2xl font-bold text-green-700">Womble</span>
+                <span className="text-xl font-bold text-primary">Womble</span>
               </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-72 p-3">
               <div className="space-y-2">
                 <h4 className="font-bold">Womble</h4>
                 <p className="text-sm">
-                  <span className="font-italic text-muted-foreground">noun</span>
+                  <span className="italic text-muted-foreground">noun</span>
                   <br />
                   A fictional animal inhabiting Wimbledon Common in London, characterized as clearing up litter.
                 </p>
                 <p className="text-sm">
-                  <span className="font-italic text-muted-foreground">verb (informal)</span>
+                  <span className="italic text-muted-foreground">verb (informal)</span>
                   <br />
                   Wander in a casual or relaxed way.
                   <br />
@@ -77,14 +77,13 @@ export default function AdminNavbar({
           </DropdownMenu>
           
           {/* Page Title - Center aligned, hidden on mobile */}
-          <h1 className="text-2xl font-bold text-primary hidden md:block">{title}</h1>
+          <h1 className="text-lg font-semibold text-foreground hidden md:block">{title}</h1>
           
           {/* New Agent Button and User Profile - Right aligned */}
           <div className="flex items-center gap-4">
             {showNewButton && (
               newButtonLink === "#" && onNewButtonClick ? (
                 <Button 
-                  className="bg-purple-600 hover:bg-purple-700" 
                   onClick={onNewButtonClick}
                 >
                   <Plus className="h-5 w-5 mr-2" />
@@ -92,7 +91,7 @@ export default function AdminNavbar({
                 </Button>
               ) : (
                 <Link href={newButtonLink}>
-                  <Button className="bg-purple-600 hover:bg-purple-700">
+                  <Button>
                     <Plus className="h-5 w-5 mr-2" />
                     {newButtonText}
                   </Button>

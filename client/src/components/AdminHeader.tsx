@@ -18,26 +18,26 @@ export default function AdminHeader({
   newButtonLink = "/admin/new" 
 }: AdminHeaderProps) {
   return (
-    <div className="w-full bg-blue-50 py-6">
+    <div className="w-full border-b bg-card">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center">
+        <div className="flex h-16 justify-between items-center">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <div className="flex items-center gap-2 cursor-pointer">
+              <div className="flex items-center gap-2 cursor-pointer rounded-md px-1 py-1 hover:bg-accent transition-colors">
                 <img src="/womble-icon.svg" alt="Womble" className="h-8 w-8" />
-                <span className="text-xl font-bold text-green-700">Womble</span>
+                <span className="text-xl font-bold text-primary">Womble</span>
               </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-72 p-3">
               <div className="space-y-2">
                 <h4 className="font-bold">Womble</h4>
                 <p className="text-sm">
-                  <span className="font-italic text-muted-foreground">noun</span>
+                  <span className="italic text-muted-foreground">noun</span>
                   <br />
                   A fictional animal inhabiting Wimbledon Common in London, characterized as clearing up litter.
                 </p>
                 <p className="text-sm">
-                  <span className="font-italic text-muted-foreground">verb (informal)</span>
+                  <span className="italic text-muted-foreground">verb (informal)</span>
                   <br />
                   Wander in a casual or relaxed way.
                   <br />
@@ -47,12 +47,12 @@ export default function AdminHeader({
             </DropdownMenuContent>
           </DropdownMenu>
           
-          <h1 className="text-2xl font-bold text-primary">{title}</h1>
+          <h1 className="text-lg font-semibold text-foreground">{title}</h1>
           
           <div className="flex items-center gap-4">
             {showNewButton && (
               <Link href={newButtonLink}>
-                <Button className="bg-purple-600 hover:bg-purple-700">
+                <Button>
                   <Plus className="h-5 w-5 mr-2" />
                   {newButtonText}
                 </Button>

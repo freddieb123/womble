@@ -134,38 +134,38 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
         </div>
       ) : (
         <div className="space-y-1">
-          <div className="inline-flex items-center justify-start space-x-px rounded-md border overflow-hidden flex-wrap">
+          <div className="inline-flex items-center justify-start gap-1 rounded-md border bg-card p-1 flex-wrap">
             <button
               type="button"
-              className={`px-4 py-2 text-sm font-medium focus:outline-none ${config.type === 'chat' ? "bg-green-200 text-green-900" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+              className={`px-3 py-1.5 rounded text-sm font-medium focus:outline-none transition-colors ${config.type === 'chat' ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"}`}
               onClick={() => handleTypeChange('chat')}
             >
               Conversation with AI
             </button>
             <button
               type="button"
-              className={`px-4 py-2 text-sm font-medium focus:outline-none ${config.type === 'two-way-conversation' ? "bg-green-200 text-green-900" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+              className={`px-3 py-1.5 rounded text-sm font-medium focus:outline-none transition-colors ${config.type === 'two-way-conversation' ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"}`}
               onClick={() => handleTypeChange('two-way-conversation')}
             >
               Two-way Conversation
             </button>
             <button
               type="button"
-              className={`px-4 py-2 text-sm font-medium focus:outline-none ${isTeachAi ? "bg-green-200 text-green-900" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+              className={`px-3 py-1.5 rounded text-sm font-medium focus:outline-none transition-colors ${isTeachAi ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"}`}
               onClick={() => handleTypeChange('teach-ai')}
             >
               Teach an AI
             </button>
             <button
               type="button"
-              className={`px-4 py-2 text-sm font-medium focus:outline-none ${isThoughtPartner ? "bg-green-200 text-green-900" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+              className={`px-3 py-1.5 rounded text-sm font-medium focus:outline-none transition-colors ${isThoughtPartner ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"}`}
               onClick={() => handleTypeChange('thought-partner')}
             >
               Thought Partner
             </button>
             <button
               type="button"
-              className={`px-4 py-2 text-sm font-medium focus:outline-none ${isGroupBoard ? "bg-green-200 text-green-900" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+              className={`px-3 py-1.5 rounded text-sm font-medium focus:outline-none transition-colors ${isGroupBoard ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"}`}
               onClick={() => handleTypeChange('group-board')}
             >
               Group Board
@@ -177,7 +177,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
       {/* Interaction mode selector — not applicable for group boards or screen-share types */}
       {!isGroupBoard && !isScreenShareType && <div className="space-y-1">
         <Label className="text-xs text-muted-foreground uppercase tracking-wide">Interaction Mode</Label>
-        <div className="inline-flex items-center gap-1 rounded-md border p-1">
+        <div className="inline-flex items-center gap-1 rounded-md border bg-card p-1">
           {([
             { value: 'typed', label: 'Typed only', icon: <Keyboard className="h-4 w-4" /> },
             { value: 'spoken', label: 'Voice only', icon: <Mic className="h-4 w-4" /> },
@@ -191,7 +191,7 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
               className={`flex items-center gap-1 px-3 py-1.5 rounded text-sm font-medium transition-colors
                 ${(config.interactionMode ?? 'both') === value
                   ? 'bg-green-100 text-green-800'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  : 'text-muted-foreground hover:text-accent-foreground hover:bg-accent'
                 }`}
             >
               {icon}
@@ -248,13 +248,12 @@ export default function AdminPanel({ config, onConfigChange, isEditMode = false 
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="title">Title</Label>
-          <input
+          <Input
             id="title"
             type="text"
             value={config.title}
             onChange={(e) => onConfigChange({ ...config, title: e.target.value })}
             placeholder="Give your activity a memorable title"
-            className="w-full px-3 py-2 border rounded-md"
           />
         </div>
 
