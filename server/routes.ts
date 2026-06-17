@@ -352,15 +352,40 @@ export function registerRoutes(app: Express): Server {
   pool.query(`ALTER TABLE presentation_state ADD COLUMN IF NOT EXISTS last_action TEXT`).catch(() => {});
   pool.query(`ALTER TABLE presentation_state ADD COLUMN IF NOT EXISTS action_id TEXT`).catch(() => {});
 
-  // Backfill: mark any existing "My Agents" sessions as library (runs after DDL has settled)
-  setTimeout(() => {
-    pool.query(`UPDATE sessions SET is_library = true WHERE title = 'My Agents' AND is_library = false`).catch(() => {});
-  }, 1000);
-
-  // Migrate orphaned agents (no sessionId) into a per-user "My Agents" session
+  // Library session migrations (runs after DDL has settled)
   setTimeout(async () => {
     try {
+      // Backfill: mark legacy "My Agents" / "My Activities" sessions as library
+      await pool.query(`UPDATE sessions SET is_library = true WHERE title IN ('My Agents', 'My Activities') AND is_library = false`);
 
+      // Rename any remaining "My Agents" library sessions to "My Activities"
+      await pool.query(`UPDATE sessions SET title = 'My Activities' WHERE title = 'My Agents' AND is_library = true`);
+
+      // Consolidate duplicate library sessions per user: merge smaller ones into the largest
+      const dupes = await pool.query<{ user_id: number; ids: number[] }>(`
+        SELECT user_id, array_agg(id ORDER BY (SELECT COUNT(*) FROM chat_configs WHERE session_id = sessions.id) DESC) AS ids
+        FROM sessions
+        WHERE is_library = true
+        GROUP BY user_id
+        HAVING COUNT(*) > 1
+      `);
+      for (const row of dupes.rows) {
+        const [keepId, ...mergeIds] = row.ids;
+        for (const mergeId of mergeIds) {
+          // Re-order merged configs after existing ones in the canonical session
+          const { rows: existing } = await pool.query<{ max_order: number | null }>(
+            `SELECT MAX(session_order) AS max_order FROM chat_configs WHERE session_id = $1`, [keepId]
+          );
+          const offset = (existing[0].max_order ?? -1) + 1;
+          await pool.query(
+            `UPDATE chat_configs SET session_id = $1, session_order = session_order + $2 WHERE session_id = $3`,
+            [keepId, offset, mergeId]
+          );
+          await pool.query(`DELETE FROM sessions WHERE id = $1`, [mergeId]);
+        }
+      }
+
+      // Migrate orphaned agents (no sessionId) into the user's library session, creating one if needed
       const orphaned = await db.query.chatConfigs.findMany({
         where: and(isNull(chatConfigs.sessionId), eq(chatConfigs.deleted, false)),
       });
@@ -374,24 +399,34 @@ export function registerRoutes(app: Express): Server {
 
       for (const [userIdStr, cfgs] of Object.entries(byUser)) {
         const userId = parseInt(userIdStr);
-        const [session] = await db.insert(sessions).values({
-          userId,
-          shareToken: crypto.randomUUID(),
-          title: 'My Agents',
-          isLibrary: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }).returning();
+        let librarySession = await db.query.sessions.findFirst({
+          where: and(eq(sessions.userId, userId), eq(sessions.isLibrary, true)),
+        });
+        if (!librarySession) {
+          const [created] = await db.insert(sessions).values({
+            userId,
+            shareToken: crypto.randomUUID(),
+            title: 'My Activities',
+            isLibrary: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }).returning();
+          librarySession = created;
+        }
+        const { rows: existing } = await pool.query<{ max_order: number | null }>(
+          `SELECT MAX(session_order) AS max_order FROM chat_configs WHERE session_id = $1`, [librarySession.id]
+        );
+        const offset = (existing[0].max_order ?? -1) + 1;
         for (let i = 0; i < cfgs.length; i++) {
           await db.update(chatConfigs)
-            .set({ sessionId: session.id, sessionOrder: i, isLive: i === 0 })
+            .set({ sessionId: librarySession.id, sessionOrder: offset + i, isLive: offset + i === 0 })
             .where(eq(chatConfigs.id, cfgs[i].id));
         }
       }
     } catch (e) {
-      console.error('Orphan migration error:', e);
+      console.error('Library session migration error:', e);
     }
-  }, 2000);;
+  }, 1000);
 
   // Set up authentication routes and middleware
   setupAuth(app);
@@ -1118,8 +1153,7 @@ Write detailed, specific configuration for this activity.`,
         body: JSON.stringify({
           session: {
             type: "realtime",
-            model: "gpt-realtime-2",
-            instructions: withPersonaLock(config.systemPrompt),
+            model: "gpt-realtime-1.5",
           },
         }),
       });
@@ -1135,6 +1169,25 @@ Write detailed, specific configuration for this activity.`,
       console.error("Error creating realtime session:", error);
       res.status(500).json({ error: error.message });
     }
+  });
+
+  // Transcribe a short audio blob (user utterance from voice session)
+  app.post("/api/voice/transcribe-chunk", (req: Request, res: Response) => {
+    const multer = require('multer');
+    const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+    upload.single('audio')(req, res, async (err: any) => {
+      if (err) return res.status(400).json({ error: err.message });
+      if (!req.file) return res.status(400).json({ error: "No audio file" });
+      try {
+        const { toFile } = await import('openai');
+        const audioFile = await toFile(req.file.buffer, 'utterance.webm', { type: req.file.mimetype || 'audio/webm' });
+        const result = await openai.audio.transcriptions.create({ model: 'whisper-1', file: audioFile });
+        res.json({ text: result.text });
+      } catch (e: any) {
+        console.error('Voice chunk transcription error:', e);
+        res.status(500).json({ error: e.message });
+      }
+    });
   });
 
   app.post("/api/gemini-live/session", async (req: Request, res: Response) => {
@@ -1257,19 +1310,20 @@ Return only the JSON object, no other text.`;
             ...(summary.keyThemes || []).slice(0, 2),
           ].slice(0, 4);
 
-          const feedbackPayload = { bullets: summaryBullets, score: null, summary: null };
+          const feedbackPayload = { bullets: summaryBullets, score: null, summary: null, thinkingMap: summary };
 
-          // Upsert: update if exists, insert if not
+          // Upsert: update if exists, insert if not (PK is configId + sessionId + attemptNumber)
           await db
             .insert(conversations)
             .values({
               configId: parsedConfigId,
               sessionId: String(sessionId),
+              attemptNumber: 1,
               messages: [],
               feedback: feedbackPayload as any,
             })
             .onConflictDoUpdate({
-              target: [conversations.configId, conversations.sessionId],
+              target: [conversations.configId, conversations.sessionId, conversations.attemptNumber],
               set: { feedback: feedbackPayload as any },
             });
         } catch (saveErr) {
@@ -2111,8 +2165,8 @@ Rules: all four options must be similar in length and style. Distractors should 
 
   app.post("/api/chat-feedback", async (req: Request, res: Response) => {
     try {
-      const { configId, sessionId, messages: clientMessages, userName, chatMode, attemptNumber: rawAttempt } = req.body;
-      const attemptNumber = rawAttempt ?? 1;
+      const { configId, sessionId, messages: clientMessages, userName, chatMode, attemptNumber: clientAttemptNumber } = req.body;
+      const attemptNumber = typeof clientAttemptNumber === 'number' ? clientAttemptNumber : 1;
 
       if (!configId || !sessionId) {
         return res.status(400).json({ error: "Missing required parameters" });
@@ -2121,7 +2175,8 @@ Rules: all four options must be similar in length and style. Distractors should 
       // For voice sessions the client-side transcript may be incomplete — fall back to DB
       // when there are no user messages (transcription events didn't fire)
       let messages = clientMessages;
-      const hasUserMessages = (msgs: any[]) => msgs?.some((m: any) => m.role === 'user');
+      const messageText = (message: any) => typeof message?.content === 'string' ? message.content : message?.content?.text;
+      const hasUserMessages = (msgs: any[]) => msgs?.some((m: any) => m.role === 'user' && String(messageText(m) || '').trim());
       if (!messages || messages.length === 0 || !hasUserMessages(messages)) {
         const saved = await db.query.conversations.findFirst({
           where: and(
@@ -2153,6 +2208,12 @@ Rules: all four options must be similar in length and style. Distractors should 
         return res.status(400).json({ error: "Feedback criteria not set for this configuration" });
       }
 
+      if (!messages || messages.length === 0) {
+        return res.status(422).json({
+          error: "No conversation was captured. Please try again.",
+        });
+      }
+
       const prompt = isTeachAiFeedback
         ? `You are evaluating a "Teach the AI" session. The learner was asked to explain a topic to you (the AI playing the role of a learner).
 
@@ -2175,7 +2236,7 @@ Scoring standard: ${harshnessGuidance(config.feedbackHarshness)}
 
 Score: [1-10 based on overall coverage and quality of explanation]
 [One-line overall summary using 'you']`
-        : `Context:\n${config.systemPrompt}\n\nFeedback criteria:\n${config.feedbackCriteria}\n\nThe conversation below is labelled with LEARNER (the person being assessed) and AI (the role-play counterpart). Evaluate ONLY the LEARNER's messages — ignore everything labelled AI completely.\n\nWhen giving feedback, address the learner directly as 'you'. Never say 'the user', 'the learner', or 'they'. Refer to the AI counterpart as 'me' or 'I'.\n\nScoring standard: ${harshnessGuidance(config.feedbackHarshness)}\n\nProvide your analysis in exactly this format:\n\n• [3 bullet points on how well the LEARNER's contributions meet the criteria. Each must use 'you' and be 1 sentence]\n\nScore: [1-10]\n[Brief one-line summary using 'you']`;
+        : `You are grading a LEARNER's performance in a role-play conversation. Your sole job is to evaluate the LEARNER — not the AI.\n\nRole-play scenario (background context only — do NOT evaluate the AI's behaviour):\n${config.systemPrompt}\n\nWhat to assess the LEARNER against:\n${config.feedbackCriteria}\n\nCRITICAL RULES:\n- Lines labelled "LEARNER:" are the person you are grading.\n- Lines labelled "AI:" are the role-play character. Do NOT comment on them, do NOT score them, do NOT use them as evidence of the learner's performance.\n- If the AI gave a good or bad answer, that is irrelevant — only the LEARNER's messages matter.\n- Address the learner directly as 'you'. Never say 'the user', 'the learner', or 'they'. Refer to the AI as 'me' or 'I'.\n\nScoring standard: ${harshnessGuidance(config.feedbackHarshness)}\n\nProvide your analysis in exactly this format:\n\n• [bullet 1: one sentence using 'you', evaluating a specific thing the LEARNER said or did]\n• [bullet 2: one sentence using 'you']\n• [bullet 3: one sentence using 'you']\n\nScore: [1-10]\n[Brief one-line overall summary using 'you']`;
 
 
       const conversation = messages.map((m: Message) =>
@@ -2187,7 +2248,7 @@ Score: [1-10 based on overall coverage and quality of explanation]
         messages: [
           {
             role: "system",
-            content: "You are an expert at analyzing conversations and providing constructive feedback. Focus on communication effectiveness and how well the content meets the specified criteria."
+            content: "You are an assessor grading a learner's performance in a training activity. You assess only the learner's contributions — never the AI's. The AI is a role-play character, not the person being graded."
           },
           {
             role: "user",
@@ -2235,7 +2296,12 @@ Score: [1-10 based on overall coverage and quality of explanation]
         })
         .onConflictDoUpdate({
           target: [conversations.configId, conversations.sessionId, conversations.attemptNumber],
-          set: { feedback: feedbackData }
+          set: {
+            userName: userName || null,
+            chatMode: chatMode || 'typed',
+            messages: messages || [],
+            feedback: feedbackData,
+          }
         });
 
       res.json(feedbackData);
@@ -2670,17 +2736,35 @@ Score: [1-10 based on overall coverage and quality of explanation]
   // Save transcript without grading (used by VoiceChatInterface to persist in real-time)
   app.post("/api/conversations/save-transcript", async (req: Request, res: Response) => {
     try {
-      const { configId, sessionId, userName, chatMode, messages, attemptNumber: rawAttempt } = req.body;
-      const attemptNumber = rawAttempt ?? 1;
+      const { configId, sessionId, userName, chatMode, messages } = req.body;
+      const attemptNumber = 1;
       if (!configId || !sessionId || !Array.isArray(messages)) {
         return res.status(400).json({ error: "Missing required params" });
       }
+
+      const messageText = (message: any) => typeof message?.content === 'string' ? message.content : message?.content?.text;
+      const hasUserMessages = (msgs: any[]) => msgs?.some((m: any) => m.role === 'user' && String(messageText(m) || '').trim());
+      const existing = await db.query.conversations.findFirst({
+        where: and(
+          eq(conversations.configId, configId),
+          eq(conversations.sessionId, sessionId),
+          eq(conversations.attemptNumber, attemptNumber),
+        ),
+      });
+      const existingMessages = existing?.messages ?? [];
+      const messagesToSave =
+        hasUserMessages(existingMessages) && !hasUserMessages(messages)
+          ? existingMessages
+          : messages.length >= existingMessages.length
+            ? messages
+            : existingMessages;
+
       await db
         .insert(conversations)
-        .values({ configId, sessionId, attemptNumber, userName: userName || null, chatMode: chatMode || 'spoken', messages })
+        .values({ configId, sessionId, attemptNumber, userName: userName || null, chatMode: chatMode || 'spoken', messages: messagesToSave })
         .onConflictDoUpdate({
           target: [conversations.configId, conversations.sessionId, conversations.attemptNumber],
-          set: { messages, userName: userName || null },
+          set: { messages: messagesToSave, userName: userName || null, chatMode: chatMode || 'spoken' },
         });
       res.json({ success: true });
     } catch (error: any) {
@@ -2752,17 +2836,23 @@ Score: [1-10 based on overall coverage and quality of explanation]
         where: eq(conversations.configId, configId),
       });
 
-      // Unique participants by sessionId (multiple attempts = same person)
-      const participantCount = new Set(convData.map(c => c.sessionId)).size;
+      // Prefer userName for participant identity so reloads/restarts from the
+      // same named learner do not inflate the live count with new sessionIds.
+      const participantKey = (c: { userName: string | null; sessionId: string }) => {
+        const name = c.userName?.trim().toLowerCase();
+        return name ? `name:${name}` : `session:${c.sessionId}`;
+      };
+      const participantCount = new Set(convData.map(participantKey)).size;
       const topN = participantCount > 12 ? 8 : participantCount >= 7 ? 5 : 3;
 
-      // Best score per sessionId for leaderboard
+      // Best score per participant for leaderboard
       const bestBySession = new Map<string, typeof convData[0]>();
       for (const c of convData) {
         if (!c.feedback || c.feedback.score === null) continue;
-        const existing = bestBySession.get(c.sessionId);
+        const key = participantKey(c);
+        const existing = bestBySession.get(key);
         if (!existing || (c.feedback.score ?? 0) > (existing.feedback?.score ?? 0)) {
-          bestBySession.set(c.sessionId, c);
+          bestBySession.set(key, c);
         }
       }
       const leaderboard = [...bestBySession.values()]
@@ -2791,7 +2881,11 @@ Score: [1-10 based on overall coverage and quality of explanation]
         const convData = await db.query.conversations.findMany({
           where: eq(conversations.configId, configId),
         });
-        const participantCount = new Set(convData.filter(c => c.messages && c.messages.length > 0).map(c => c.sessionId)).size;
+        const participantKey = (c: { userName: string | null; sessionId: string }) => {
+          const name = c.userName?.trim().toLowerCase();
+          return name ? `name:${name}` : `session:${c.sessionId}`;
+        };
+        const participantCount = new Set(convData.filter(c => c.messages && c.messages.length > 0).map(participantKey)).size;
         return res.json({ participantCount, leaderboard: [] });
       }
 
@@ -2843,17 +2937,22 @@ Score: [1-10 based on overall coverage and quality of explanation]
         where: eq(conversations.configId, configId),
       });
 
+      const participantKey = (c: { userName: string | null; sessionId: string }) => {
+        const name = c.userName?.trim().toLowerCase();
+        return name ? `name:${name}` : `session:${c.sessionId}`;
+      };
       const withMessages = updated.filter(c => c.messages && c.messages.length > 0);
-      const participantCount = new Set(withMessages.map(c => c.sessionId)).size;
+      const participantCount = new Set(withMessages.map(participantKey)).size;
       const topN = participantCount > 12 ? 8 : participantCount >= 7 ? 5 : 3;
 
-      // Best score per sessionId
+      // Best score per participant
       const bestBySession = new Map<string, typeof withMessages[0]>();
       for (const c of withMessages) {
         if (!c.feedback || c.feedback.score === null) continue;
-        const existing = bestBySession.get(c.sessionId);
+        const key = participantKey(c);
+        const existing = bestBySession.get(key);
         if (!existing || (c.feedback.score ?? 0) > (existing.feedback?.score ?? 0)) {
-          bestBySession.set(c.sessionId, c);
+          bestBySession.set(key, c);
         }
       }
       const leaderboard = [...bestBySession.values()]

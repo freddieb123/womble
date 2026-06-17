@@ -122,9 +122,10 @@ export interface Message {
 
 export interface ConversationFeedback {
   bullets: string[];
-  score: number;
+  score: number | null;
   summary: string | null;
   manual?: boolean;
+  thinkingMap?: { keyThemes: string[]; insights: string[]; openQuestions: string[]; nextSteps: string[] };
 }
 
 export interface DualConversationFeedback {

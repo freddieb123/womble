@@ -17,6 +17,7 @@ interface Props {
 }
 
 type WizardType = 'chat' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz' | 'group-board' | 'user-tester' | 'doc-critique' | 'task-walkthrough';
+const TITLE_MAX_LENGTH = 60;
 
 const TYPE_CONFIG: Record<WizardType, {
   icon: React.ElementType;
@@ -415,7 +416,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
             className="w-full px-3 py-2 border rounded-md text-sm"
             value={config.title}
             onChange={e => setConfig(prev => ({ ...prev, title: e.target.value }))}
-            maxLength={30}
+            maxLength={TITLE_MAX_LENGTH}
             placeholder="e.g. Identify the key risks"
           />
         </div>
@@ -499,7 +500,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
             id="ut-title"
             value={config.title}
             onChange={(e) => setConfig(prev => ({ ...prev, title: e.target.value }))}
-            maxLength={30}
+            maxLength={TITLE_MAX_LENGTH}
             placeholder="e.g. Prototype Demo Review"
           />
         </div>
@@ -560,7 +561,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
             id="dc-title"
             value={config.title}
             onChange={(e) => setConfig(prev => ({ ...prev, title: e.target.value }))}
-            maxLength={30}
+            maxLength={TITLE_MAX_LENGTH}
             placeholder="e.g. Case Study Analysis"
           />
         </div>
@@ -658,7 +659,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
             id="tw-title"
             value={config.title}
             onChange={(e) => setConfig(prev => ({ ...prev, title: e.target.value }))}
-            maxLength={30}
+            maxLength={TITLE_MAX_LENGTH}
             placeholder="e.g. Excel Pivot Table Walkthrough"
           />
         </div>
@@ -723,7 +724,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
           id="wiz-title"
           value={config.title}
           onChange={(e) => setConfig(prev => ({ ...prev, title: e.target.value }))}
-          maxLength={30}
+          maxLength={TITLE_MAX_LENGTH}
           placeholder="Give your activity a title"
         />
       </div>

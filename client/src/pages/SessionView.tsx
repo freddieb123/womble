@@ -55,6 +55,27 @@ type SessionData = {
 type LiveStatus = { configId: number; isLive: boolean }[];
 
 const LS_NAME_KEY = 'womble_session_name';
+type ChatMode = 'typed' | 'spoken';
+
+const getChatModeStorageKey = (token: string | null, configId: number) =>
+  `womble_chat_mode:${token ?? 'unknown'}:${configId}`;
+
+const getStoredChatMode = (token: string | null, configId: number): ChatMode | null => {
+  try {
+    const storedMode = sessionStorage.getItem(getChatModeStorageKey(token, configId));
+    return storedMode === 'typed' || storedMode === 'spoken' ? storedMode : null;
+  } catch {
+    return null;
+  }
+};
+
+const setStoredChatMode = (token: string | null, configId: number, mode: ChatMode) => {
+  try {
+    sessionStorage.setItem(getChatModeStorageKey(token, configId), mode);
+  } catch {
+    // Storage can be unavailable in private browsing; in-memory state still covers the active page.
+  }
+};
 
 export default function SessionView() {
   const searchParams = new URLSearchParams(window.location.search);
@@ -62,7 +83,7 @@ export default function SessionView() {
 
   const [userName, setUserName] = useState<string | null>(() => localStorage.getItem(LS_NAME_KEY));
   const [selectedConfigId, setSelectedConfigId] = useState<number | null>(null);
-  const [chatModes, setChatModes] = useState<Record<number, 'typed' | 'spoken'>>({});
+  const [chatModes, setChatModes] = useState<Record<number, ChatMode>>({});
   const [showModeModal, setShowModeModal] = useState(false);
   const [pendingConfigId, setPendingConfigId] = useState<number | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(240);
@@ -72,7 +93,18 @@ export default function SessionView() {
   const sessionIds = useRef<Record<number, string>>({});
   const getSessionId = (configId: number) => {
     if (!sessionIds.current[configId]) {
-      sessionIds.current[configId] = crypto.randomUUID();
+      const storageKey = `womble_session_id:${token}:${configId}`;
+      try {
+        const storedSessionId = sessionStorage.getItem(storageKey);
+        if (storedSessionId) {
+          sessionIds.current[configId] = storedSessionId;
+        } else {
+          sessionIds.current[configId] = crypto.randomUUID();
+          sessionStorage.setItem(storageKey, sessionIds.current[configId]);
+        }
+      } catch {
+        sessionIds.current[configId] = crypto.randomUUID();
+      }
     }
     return sessionIds.current[configId];
   };
@@ -106,6 +138,21 @@ export default function SessionView() {
     isLive: liveStatus?.find(s => s.configId === c.id)?.isLive ?? c.isLive,
   })) ?? [];
 
+  useEffect(() => {
+    if (!sessionData?.configs.length) return;
+    setChatModes(prev => {
+      let next = prev;
+      for (const config of sessionData.configs) {
+        if (next[config.id]) continue;
+        const storedMode = getStoredChatMode(token, config.id);
+        if (!storedMode) continue;
+        if (next === prev) next = { ...prev };
+        next[config.id] = storedMode;
+      }
+      return next;
+    });
+  }, [sessionData?.configs, token]);
+
   // Auto-select first live config
   useEffect(() => {
     if (selectedConfigId !== null || configs.length === 0) return;
@@ -115,28 +162,43 @@ export default function SessionView() {
 
   const handleSelectActivity = (config: SessionConfig) => {
     if (!config.isLive) return;
+    const rememberedMode = chatModes[config.id] ?? getStoredChatMode(token, config.id);
     // Only show mode picker when switching to a subsequent activity (name already known)
     // For the first activity, the activity's own UserNameModal handles name + mode together
-    if (userName && config.interactionMode === 'both' && !chatModes[config.id] && !['group-board', 'user-tester', 'doc-critique', 'task-walkthrough', 'two-way-conversation'].includes(config.type)) {
+    if (userName && config.interactionMode === 'both' && !rememberedMode && !['group-board', 'user-tester', 'doc-critique', 'task-walkthrough', 'two-way-conversation'].includes(config.type)) {
       setPendingConfigId(config.id);
       setShowModeModal(true);
     } else {
+      if (rememberedMode) {
+        setChatModes(prev => ({ ...prev, [config.id]: rememberedMode }));
+      }
       setSelectedConfigId(config.id);
     }
   };
 
-  const handleModeSelect = (mode: 'typed' | 'spoken') => {
+  const handleModeSelect = (mode: ChatMode) => {
     if (pendingConfigId === null) return;
+    setStoredChatMode(token, pendingConfigId, mode);
     setChatModes(prev => ({ ...prev, [pendingConfigId]: mode }));
     setSelectedConfigId(pendingConfigId);
     setPendingConfigId(null);
     setShowModeModal(false);
   };
 
-  const handleUserNameFromActivity = (name: string, mode?: 'typed' | 'spoken') => {
+  const handleSwitchMode = (configId: number, mode: ChatMode) => {
+    // Clear the session ID so the switched mode starts a completely fresh session
+    const storageKey = `womble_session_id:${token}:${configId}`;
+    try { sessionStorage.removeItem(storageKey); } catch {}
+    delete sessionIds.current[configId];
+    setStoredChatMode(token, configId, mode);
+    setChatModes(prev => ({ ...prev, [configId]: mode }));
+  };
+
+  const handleUserNameFromActivity = (name: string, mode?: ChatMode) => {
     localStorage.setItem(LS_NAME_KEY, name);
     setUserName(name);
     if (mode && selectedConfigId !== null) {
+      setStoredChatMode(token, selectedConfigId, mode);
       setChatModes(prev => ({ ...prev, [selectedConfigId]: mode }));
     }
     return window.location.href;
@@ -186,7 +248,7 @@ export default function SessionView() {
         ? 'spoken'
         : selectedConfig.interactionMode === 'typed'
           ? 'typed'
-          : chatModes[selectedConfig.id] ?? 'typed')
+          : chatModes[selectedConfig.id] ?? getStoredChatMode(token, selectedConfig.id) ?? 'typed')
     : 'typed';
 
   return (
@@ -325,10 +387,12 @@ export default function SessionView() {
                 />
               ) : chatMode === 'spoken' ? (
                 <VoiceChatInterface
+                  key={selectedConfig.id}
                   config={adminConfig!}
                   sessionId={getSessionId(selectedConfig.id)}
                   userName={userName}
                   onUserNameSubmit={handleUserNameFromActivity}
+                  onSwitchMode={selectedConfig.interactionMode === 'both' ? (mode) => handleSwitchMode(selectedConfig.id, mode) : undefined}
                 />
               ) : selectedConfig.type === 'quick-fire-quiz' ? (
                 <QuickFireQuizInterface
@@ -337,6 +401,7 @@ export default function SessionView() {
                 />
               ) : selectedConfig.type === 'quiz' ? (
                 <QuizInterface
+                  key={selectedConfig.id}
                   config={adminConfig!}
                   sessionId={getSessionId(selectedConfig.id)}
                   userName={userName}
@@ -345,6 +410,7 @@ export default function SessionView() {
                 />
               ) : selectedConfig.type === 'upload' ? (
                 <UploadInterface
+                  key={selectedConfig.id}
                   config={adminConfig!}
                   sessionId={getSessionId(selectedConfig.id)}
                   userName={userName}
@@ -352,11 +418,13 @@ export default function SessionView() {
                 />
               ) : (
                 <ChatInterface
+                  key={selectedConfig.id}
                   config={adminConfig!}
                   sessionId={getSessionId(selectedConfig.id)}
                   userName={userName}
                   isViewOnly={false}
                   onUserNameSubmit={handleUserNameFromActivity}
+                  onSwitchMode={selectedConfig.interactionMode === 'both' ? (mode) => handleSwitchMode(selectedConfig.id, mode) : undefined}
                 />
               )}
             </Card>

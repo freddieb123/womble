@@ -64,6 +64,18 @@ import AgentTimer from "@/components/AgentTimer";
 import type { Template } from "@/lib/types";
 
 const LS_SESSION_KEY = 'womble_last_session_id';
+const MAX_SLIDE_UPLOAD_BYTES = 100 * 1024 * 1024;
+const MAX_SLIDE_UPLOAD_LABEL = '100MB';
+
+async function readApiError(response: Response, fallback: string) {
+  const text = await response.text();
+  try {
+    const body = JSON.parse(text);
+    return body.error || body.message || fallback;
+  } catch {
+    return text || fallback;
+  }
+}
 
 type Suggestion = {
   id: string;
@@ -609,6 +621,7 @@ export default function Home() {
   const allSessionAgents = agentOrderOverride.length > 0 && selectedSession
     ? agentOrderOverride
     : (selectedSession?.configs ?? []);
+  const hasSessionActivities = allSessionAgents.length > 0;
 
   const sessionAgents = isLibraryView && libraryTypeFilter !== 'all'
     ? allSessionAgents.filter(a => a.type === libraryTypeFilter)
@@ -648,6 +661,15 @@ export default function Home() {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
+
+    if (file.size > MAX_SLIDE_UPLOAD_BYTES) {
+      toast({
+        variant: 'destructive',
+        description: `That deck is too large. Please upload a PDF, PPT, or PPTX under ${MAX_SLIDE_UPLOAD_LABEL}.`,
+      });
+      return;
+    }
+
     setSuggestionsFile({ name: file.name });
     const progressInterval = startProgressSimulation(setSuggestionsProgress);
     try {
@@ -664,7 +686,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: base64, fileName: file.name }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new Error(await readApiError(res, 'Failed to analyse slides.'));
       const { suggestions: newSuggestions, slideCount, slideContext: newCtx } = await res.json();
       clearInterval(progressInterval);
       setSuggestionsProgress(100);
@@ -691,7 +713,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: trimmed }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new Error(await readApiError(res, 'Failed to analyse slides.'));
       const { suggestions: newSuggestions, slideCount, slideContext: newCtx } = await res.json();
       clearInterval(progressInterval);
       setSuggestionsProgress(100);
@@ -1124,7 +1146,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* My Agents section */}
+          {/* My Activities section */}
           {librarySessions.length > 0 && (
             <div className="px-3 pt-3 pb-2">
               <p className="app-section-label">Activities</p>
@@ -1208,7 +1230,7 @@ export default function Home() {
                 title={selectedSession.title}
                 onSave={(title) => updateSessionTitle.mutate({ id: selectedSession.id, title })}
               />
-              {!isLibraryView && (
+              {!isLibraryView && hasSessionActivities && (
                 <>
                   {/* Right-side actions */}
                   <div className="flex gap-2 ml-auto">
@@ -1506,8 +1528,8 @@ export default function Home() {
                   />
                 ) : (
                   <AdminPanel
-                    config={{ title: editingConfig.title, type: editingConfig.type, systemPrompt: editingConfig.systemPrompt, userInstructions: editingConfig.userInstructions || '', feedbackCriteria: editingConfig.feedbackCriteria || '', feedbackHarshness: editingConfig.feedbackHarshness ?? 'standard', temperature: 0.7, maxTokens: 1000, questions: editingConfig.questions || [], interactionMode: editingConfig.interactionMode ?? 'both' }}
-                    onConfigChange={(u) => setEditingConfig({ ...editingConfig, title: u.title, type: u.type, systemPrompt: u.systemPrompt, userInstructions: u.userInstructions || null, feedbackCriteria: u.feedbackCriteria || null, feedbackHarshness: u.feedbackHarshness, questions: u.questions || [], interactionMode: u.interactionMode ?? 'both' })}
+                    config={{ title: editingConfig.title, type: editingConfig.type, systemPrompt: editingConfig.systemPrompt, userInstructions: editingConfig.userInstructions || '', feedbackCriteria: editingConfig.feedbackCriteria || '', feedbackHarshness: editingConfig.feedbackHarshness ?? 'standard', temperature: 0.7, maxTokens: 1000, questions: editingConfig.questions || [], interactionMode: editingConfig.interactionMode ?? 'both', coachingStyle: editingConfig.coachingStyle ?? undefined, knowledgeLevel: editingConfig.knowledgeLevel ?? undefined, attitude: editingConfig.attitude ?? undefined, referenceContent: editingConfig.referenceContent ?? undefined }}
+                    onConfigChange={(u) => setEditingConfig({ ...editingConfig, title: u.title, type: u.type, systemPrompt: u.systemPrompt, userInstructions: u.userInstructions || null, feedbackCriteria: u.feedbackCriteria || null, feedbackHarshness: u.feedbackHarshness, questions: u.questions || [], interactionMode: u.interactionMode ?? 'both', coachingStyle: u.coachingStyle ?? null, knowledgeLevel: u.knowledgeLevel ?? null, attitude: u.attitude ?? null, referenceContent: u.referenceContent ?? null })}
                     isEditMode={true}
                   />
                 )}

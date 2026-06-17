@@ -264,7 +264,7 @@ export default function LandingPage() {
               <h3>Share a link</h3>
               <p>One link in the chat. No logins or app downloads needed for participants. Works typed or as a live voice conversation.</p>
               <div className="visual visual-link">
-                <div className="link-pill">womble.co/p/neg-prc-9k2x</div>
+                <div className="link-pill">womblefeedback.com/p/neg-prc-9k2x</div>
                 <span className="copy"><Copy style={{ width: 11, height: 11 }} /> Copy</span>
               </div>
             </div>

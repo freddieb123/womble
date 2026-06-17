@@ -14,8 +14,7 @@ import WombleFooter from "@/components/WombleFooter";
 import { ParticipantCount, LiveLeaderboard, UserTimerDisplay } from "@/components/LiveActivityPanel";
 import { AdminConfig } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, Keyboard, Mic } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { AlertCircle } from "lucide-react";
 import { SelectChatConfig } from "@db/schema";
 
 export default function UserView() {
@@ -24,8 +23,10 @@ export default function UserView() {
   const configId = searchParams.get('configId');
   const sessionId = searchParams.get('sessionId') || crypto.randomUUID();
   const [userName, setUserName] = useState<string | null>(searchParams.get('userName'));
-  const [chatMode, setChatMode] = useState<'typed' | 'spoken' | null>(searchParams.get('mode') as 'typed' | 'spoken' | null);
-  const [currentAttempt, setCurrentAttempt] = useState(1);
+  const initialMode = searchParams.get('mode');
+  const [chatMode, setChatMode] = useState<'typed' | 'spoken' | null>(
+    initialMode === 'typed' || initialMode === 'spoken' ? initialMode : null
+  );
   const isViewOnly = searchParams.get('viewOnly') === 'true';
 
   const { data: savedConfig, isLoading, error } = useQuery<SelectChatConfig & { questions?: Array<{ question: string; expectedAnswer: string }> }>({
@@ -34,14 +35,6 @@ export default function UserView() {
     retry: 1,
     staleTime: Infinity,
   });
-
-  const handleTryAgain = (interactionMode: 'typed' | 'spoken' | 'both') => {
-    setCurrentAttempt(prev => prev + 1);
-    if (interactionMode === 'both') {
-      setChatMode(null); // triggers mode picker
-    }
-    // single-mode activities: chatMode stays as-is, key change remounts the component
-  };
 
   const updateUrlWithUserName = (name: string, mode?: 'typed' | 'spoken') => {
     const newParams = new URLSearchParams(window.location.search);
@@ -228,48 +221,24 @@ export default function UserView() {
   // Show side panels layout if either panel is active
   const showSidePanels = showParticipantCount || showLeaderboard;
 
-  // Mode picker shown when trying again on a 'both' activity
-  const modePicker = (
-    <div className="flex flex-col items-center justify-center h-full gap-6">
-      <p className="text-base font-medium text-gray-700">How would you like to practise?</p>
-      <div className="flex gap-4">
-        <Button size="lg" variant="outline" className="px-8" onClick={() => setChatMode('typed')}>
-          <Keyboard className="h-5 w-5 mr-2" /> Typed
-        </Button>
-        <Button size="lg" variant="outline" className="px-8" onClick={() => setChatMode('spoken')}>
-          <Mic className="h-5 w-5 mr-2" /> Voice
-        </Button>
-      </div>
-    </div>
-  );
-
   const renderChatOrVoice = () => {
-    if (chatMode === null && currentAttempt > 1 && config.interactionMode === 'both') {
-      return modePicker;
-    }
     if (chatMode === 'spoken') {
       return (
         <VoiceChatInterface
-          key={currentAttempt}
           config={config}
           sessionId={sessionId}
           userName={userName}
-          attemptNumber={currentAttempt}
           onUserNameSubmit={updateUrlWithUserName}
-          onTryAgain={() => handleTryAgain(config.interactionMode ?? 'both')}
         />
       );
     }
     return (
       <ChatInterface
-        key={currentAttempt}
         config={config}
         sessionId={sessionId}
         userName={userName}
         isViewOnly={isViewOnly}
-        attemptNumber={currentAttempt}
         onUserNameSubmit={updateUrlWithUserName}
-        onTryAgain={() => handleTryAgain(config.interactionMode ?? 'both')}
       />
     );
   };

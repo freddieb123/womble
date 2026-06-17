@@ -7,9 +7,10 @@ import fs from "fs";
 
 const app = express();
 
-// Increase JSON payload size limit to 50MB for handling base64 encoded images
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+// Slide decks are posted as base64 JSON, which adds roughly 33% overhead.
+const requestBodyLimit = process.env.REQUEST_BODY_LIMIT || '150mb';
+app.use(express.json({ limit: requestBodyLimit }));
+app.use(express.urlencoded({ extended: false, limit: requestBodyLimit }));
 
 // Enhanced logging middleware
 app.use((req, res, next) => {
@@ -51,7 +52,10 @@ const startServer = async () => {
     // Global error handler with enhanced logging
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
+      const isPayloadTooLarge = status === 413 || err.type === 'entity.too.large';
+      const message = isPayloadTooLarge
+        ? "Uploaded file is too large. Please use a deck under 100MB."
+        : err.message || "Internal Server Error";
 
       console.error("Server Error:", {
         status,

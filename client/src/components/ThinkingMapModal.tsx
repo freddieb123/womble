@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Brain, Lightbulb, HelpCircle, ArrowRight } from 'lucide-react';
+import { Brain, Lightbulb, HelpCircle, ArrowRight, Copy, Check } from 'lucide-react';
 
 interface ThinkingMap {
   keyThemes: string[];
@@ -17,16 +17,39 @@ interface ThinkingMapModalProps {
 }
 
 export default function ThinkingMapModal({ open, onOpenChange, summary }: ThinkingMapModalProps) {
+  const [copied, setCopied] = useState(false);
+
   if (!summary) return null;
+
+  const handleCopy = () => {
+    const sections: string[] = [];
+    if (summary.keyThemes?.length) sections.push(`Key Themes Explored\n${summary.keyThemes.map(t => `• ${t}`).join('\n')}`);
+    if (summary.insights?.length) sections.push(`Insights Reached\n${summary.insights.map(t => `• ${t}`).join('\n')}`);
+    if (summary.openQuestions?.length) sections.push(`Open Questions\n${summary.openQuestions.map(t => `• ${t}`).join('\n')}`);
+    if (summary.nextSteps?.length) sections.push(`Suggested Next Steps\n${summary.nextSteps.map(t => `• ${t}`).join('\n')}`);
+    navigator.clipboard.writeText(sections.join('\n\n')).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold flex items-center gap-2">
-            <Brain className="h-5 w-5 text-green-600" />
-            Your Thinking Map
-          </DialogTitle>
+          <div className="flex items-center justify-between pr-6">
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <Brain className="h-5 w-5 text-green-600" />
+              Your Thinking Map
+            </DialogTitle>
+            <button
+              onClick={handleCopy}
+              title="Copy to clipboard"
+              className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded"
+            >
+              {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+            </button>
+          </div>
         </DialogHeader>
 
         <div className="space-y-6 mt-2">

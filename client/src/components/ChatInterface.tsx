@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Lightbulb, Info, X, Trophy, ChevronDown } from "lucide-react";
+import { Send, Lightbulb, Info, X, Trophy, ChevronDown, Loader2, Brain, Copy, Check, Mic, Keyboard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -39,10 +39,17 @@ import { z } from "zod";
 import { track, EventName } from "@/lib/mixpanel";
 
 
+interface ThinkingMap {
+  keyThemes: string[];
+  insights: string[];
+  openQuestions: string[];
+  nextSteps: string[];
+}
+
 interface AttemptData {
   attemptNumber: number;
   chatMode: string | null;
-  feedback: { bullets: string[]; score?: number; summary?: string | null } | null;
+  feedback: { bullets: string[]; score?: number | null; summary?: string | null; thinkingMap?: ThinkingMap } | null;
 }
 
 interface Props {
@@ -52,7 +59,7 @@ interface Props {
   isViewOnly: boolean;
   attemptNumber?: number;
   onUserNameSubmit: (name: string, mode?: 'typed' | 'spoken') => string;
-  onTryAgain?: () => void;
+  onSwitchMode?: (mode: 'typed' | 'spoken') => void;
 }
 
 interface LeaderboardEntry {
@@ -64,7 +71,7 @@ interface LeaderboardEntry {
   isCurrentUser: boolean;
 }
 
-export default function ChatInterface({ config, sessionId, userName, isViewOnly, attemptNumber = 1, onUserNameSubmit, onTryAgain }: Props) {
+export default function ChatInterface({ config, sessionId, userName, isViewOnly, attemptNumber = 1, onUserNameSubmit, onSwitchMode }: Props) {
   const [input, setInput] = useState("");
   const [pastedImage, setPastedImage] = useState<string | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -81,8 +88,10 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
   const [isGettingSummary, setIsGettingSummary] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [summaryData, setSummaryData] = useState<any>(null);
+  const [copiedFeedback, setCopiedFeedback] = useState(false);
 
   const isThoughtPartner = (config.type as string) === 'thought-partner';
+  const [confirmSwitchMode, setConfirmSwitchMode] = useState(false);
   const [instructionsOpen, setInstructionsOpen] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -95,6 +104,18 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
     queryKey: [messagesQueryKey],
     enabled: !!config.id && !!sessionId,
   });
+
+  const { data: existingAttempts = [] } = useQuery<AttemptData[]>({
+    queryKey: [`/api/conversations/${config.id}/session/${sessionId}`],
+    enabled: !!config.id && !!sessionId,
+  });
+
+  const existingAttempt = existingAttempts.find(a => a.attemptNumber === attemptNumber) ?? existingAttempts[0];
+  const isComplete = isThoughtPartner
+    ? summaryData !== null || existingAttempt?.feedback?.thinkingMap != null
+    : feedbackData.score !== undefined || (existingAttempt?.feedback?.score != null);
+  const displayFeedback = feedbackData.score !== undefined ? feedbackData : existingAttempt?.feedback ?? null;
+  const displayThinkingMap: ThinkingMap | null = summaryData ?? existingAttempt?.feedback?.thinkingMap ?? null;
 
   const hasEnoughMessages = chatState.messages.length >= 5;
 
@@ -321,10 +342,6 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
   }, [sendMessage.isPending, showNameModal]);
 
   const handleGetSummary = async () => {
-    if (!chatState.messages || chatState.messages.length < 2) {
-      toast({ title: "Not enough conversation yet", description: "Have a conversation first before generating a summary." });
-      return;
-    }
     setIsGettingSummary(true);
     try {
       const response = await fetch('/api/thought-partner/summary', {
@@ -341,6 +358,13 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
       if (!response.ok) throw new Error('Failed to generate summary');
       const data = await response.json();
       setSummaryData(data);
+      queryClient.setQueryData<AttemptData[]>(
+        [`/api/conversations/${config.id}/session/${sessionId}`],
+        (old = []) => {
+          const updated: AttemptData = { attemptNumber, chatMode: 'typed', feedback: { bullets: [], score: null, thinkingMap: data } };
+          return [updated, ...(old).filter(a => a.attemptNumber !== attemptNumber)];
+        }
+      );
       setSummaryOpen(true);
     } catch (error) {
       toast({ title: "Error", description: "Failed to generate thinking map. Please try again.", variant: "destructive" });
@@ -407,6 +431,13 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
       const { bullets, score, summary } = await response.json();
       setFeedbackData({ bullets, score, summary });
       if (score != null) track(EventName.FEEDBACK_SCORE, { type: config.type, configId: config.id, score });
+      queryClient.setQueryData<AttemptData[]>(
+        [`/api/conversations/${config.id}/session/${sessionId}`],
+        (old = []) => {
+          const updated: AttemptData = { attemptNumber, chatMode: 'typed', feedback: { bullets, score, summary } };
+          return [updated, ...(old).filter(a => a.attemptNumber !== attemptNumber)];
+        }
+      );
 
       // Fetch all attempts to display history
       const attemptsRes = await fetch(`/api/conversations/${config.id}/session/${sessionId}`);
@@ -486,114 +517,190 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
       </ScrollArea>
       {!isViewOnly && (
         <>
-          {pastedImage && (
-            <div className="px-4 pb-2">
-              <div className="relative inline-block">
-                <img
-                  src={pastedImage}
-                  alt="Pasted screenshot"
-                  className="max-h-32 rounded-lg border border-gray-200"
-                />
-                <button
-                  onClick={() => setPastedImage(null)}
-                  className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-sm border border-gray-200"
-                >
-                  <X className="h-4 w-4 text-gray-500" />
-                </button>
-              </div>
-            </div>
-          )}
-          <div className="p-4 border-t">
-            <form onSubmit={handleSubmit} className="flex gap-2">
-              <Input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder={pastedImage ? "Add a message (optional) and press send..." : "Type your message..."}
-                className="flex-1"
-                disabled={sendMessage.isPending || showNameModal}
-                ref={inputRef}
-                autoFocus
-              />
-              <Button
-                type="submit"
-                disabled={sendMessage.isPending || !input.trim() && !pastedImage}
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </form>
-          </div>
-          <div className="px-4 pb-4 space-y-2">
-            {isThoughtPartner ? (
-              <Button
-                onClick={summaryData ? () => setSummaryOpen(true) : handleGetSummary}
-                disabled={isGettingSummary}
-                className="w-full bg-green-600 hover:bg-green-700 text-white"
-              >
-                {isGettingSummary ? "Building thinking map..." : summaryData ? "View Thinking Map" : "Get Thinking Map"}
-              </Button>
-            ) : feedbackData.score !== undefined ? (
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => setFeedbackOpen(true)}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                >
-                  <Trophy className="h-4 w-4 mr-2" />
-                  View Feedback
-                </Button>
-                {onTryAgain && (
-                  <Button onClick={onTryAgain} variant="outline" className="flex-1">
-                    Try Again
+          {isComplete ? (
+            /* ── Frozen / completed view ─────────────────────── */
+            <div className="border-t bg-gray-50 px-4 py-4 space-y-4 overflow-y-auto max-h-[50vh]">
+              {isThoughtPartner && displayThinkingMap ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                      <Brain className="h-4 w-4 text-green-600" />
+                      Your Thinking Map
+                    </div>
+                    <button
+                      onClick={() => {
+                        const sections: string[] = [];
+                        if (displayThinkingMap.keyThemes?.length) sections.push(`Key Themes Explored\n${displayThinkingMap.keyThemes.map(t => `• ${t}`).join('\n')}`);
+                        if (displayThinkingMap.insights?.length) sections.push(`Insights Reached\n${displayThinkingMap.insights.map(t => `• ${t}`).join('\n')}`);
+                        if (displayThinkingMap.openQuestions?.length) sections.push(`Open Questions\n${displayThinkingMap.openQuestions.map(t => `• ${t}`).join('\n')}`);
+                        if (displayThinkingMap.nextSteps?.length) sections.push(`Suggested Next Steps\n${displayThinkingMap.nextSteps.map(t => `• ${t}`).join('\n')}`);
+                        navigator.clipboard.writeText(sections.join('\n\n')).then(() => { setCopiedFeedback(true); setTimeout(() => setCopiedFeedback(false), 2000); });
+                      }}
+                      className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded"
+                      title="Copy to clipboard"
+                    >
+                      {copiedFeedback ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {displayThinkingMap.keyThemes?.length > 0 && (
+                    <InlineMapSection color="blue" title="Key Themes Explored" items={displayThinkingMap.keyThemes} />
+                  )}
+                  {displayThinkingMap.insights?.length > 0 && (
+                    <InlineMapSection color="yellow" title="Insights Reached" items={displayThinkingMap.insights} />
+                  )}
+                  {displayThinkingMap.openQuestions?.length > 0 && (
+                    <InlineMapSection color="purple" title="Open Questions" items={displayThinkingMap.openQuestions} />
+                  )}
+                  {displayThinkingMap.nextSteps?.length > 0 && (
+                    <InlineMapSection color="green" title="Suggested Next Steps" items={displayThinkingMap.nextSteps} />
+                  )}
+                  {displayFeedback && displayFeedback.bullets.length > 0 && (
+                    <div className="pt-2 border-t space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Feedback</span>
+                        {displayFeedback.score != null && <span className="text-sm font-bold text-blue-900">{displayFeedback.score}/10</span>}
+                      </div>
+                      {displayFeedback.bullets.map((b, i) => (
+                        <div key={i} className="flex items-start gap-2 text-sm text-gray-700"><span className="text-green-500 mt-0.5">•</span><span>{b}</span></div>
+                      ))}
+                      {displayFeedback.summary && <p className="text-sm text-muted-foreground italic">{displayFeedback.summary}</p>}
+                    </div>
+                  )}
+                </>
+              ) : displayFeedback ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                      <Trophy className="h-4 w-4 text-blue-600" />
+                      Session Complete
+                      {displayFeedback.score != null && <span className="text-blue-900 font-bold">{displayFeedback.score}/10</span>}
+                    </div>
+                    <button
+                      onClick={() => {
+                        const text = [...(displayFeedback.bullets || []).map(b => `• ${b}`), displayFeedback.summary].filter(Boolean).join('\n');
+                        navigator.clipboard.writeText(text).then(() => { setCopiedFeedback(true); setTimeout(() => setCopiedFeedback(false), 2000); });
+                      }}
+                      className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded"
+                      title="Copy to clipboard"
+                    >
+                      {copiedFeedback ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {displayFeedback.bullets.map((b, i) => (
+                    <div key={i} className="flex items-start gap-2 text-sm text-gray-700"><span className="text-green-500 mt-0.5">•</span><span>{b}</span></div>
+                  ))}
+                  {displayFeedback.summary && <p className="text-sm text-muted-foreground italic">{displayFeedback.summary}</p>}
+                  <Button size="sm" variant="outline" className="w-full" onClick={() => { fetchLeaderboard(); setShowLeaderboard(true); }}>
+                    <Trophy className="h-4 w-4 mr-2" />View Leaderboard
                   </Button>
+                </>
+              ) : (
+                <div className="text-sm text-gray-500 text-center py-2">Session complete</div>
+              )}
+            </div>
+          ) : (
+            <>
+              {pastedImage && (
+                <div className="px-4 pb-2">
+                  <div className="relative inline-block">
+                    <img src={pastedImage} alt="Pasted screenshot" className="max-h-32 rounded-lg border border-gray-200" />
+                    <button onClick={() => setPastedImage(null)} className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-sm border border-gray-200">
+                      <X className="h-4 w-4 text-gray-500" />
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div className="p-4 border-t">
+                <form onSubmit={handleSubmit} className="flex gap-2">
+                  <Input
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder={pastedImage ? "Add a message (optional) and press send..." : "Type your message..."}
+                    className="flex-1"
+                    disabled={sendMessage.isPending || showNameModal}
+                    ref={inputRef}
+                    autoFocus
+                  />
+                  <Button type="submit" disabled={sendMessage.isPending || !input.trim() && !pastedImage}>
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </form>
+              </div>
+              <div className="px-4 pb-4 space-y-2">
+                {isThoughtPartner ? (() => {
+                  const userMsgCount = chatState.messages?.filter((m: any) => m.role === 'user').length ?? 0;
+                  const hasEnough = userMsgCount >= 5;
+                  return (
+                    <div className="space-y-2">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="w-full block">
+                              <Button onClick={handleGetSummary} disabled={isGettingSummary || !hasEnough} className="w-full bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed">
+                                {isGettingSummary ? "Building summary..." : "Get Summary"}
+                              </Button>
+                            </span>
+                          </TooltipTrigger>
+                          {!hasEnough && <TooltipContent><p>We need at least 5 messages from you before we can create this</p></TooltipContent>}
+                        </Tooltip>
+                      </TooltipProvider>
+                      <Button onClick={handleGetFeedback} variant="outline" disabled={isGettingFeedback} className="w-full">
+                        {isGettingFeedback ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating summary...</> : "End & Get Summary"}
+                      </Button>
+                    </div>
+                  );
+                })() : (
+                  <div className="flex gap-2">
+                    <Button onClick={getHint} variant="outline" className="flex-1" disabled={isGettingHint}>
+                      <Lightbulb className="h-4 w-4 mr-2" />{isGettingHint ? 'Getting hint...' : 'Get Hint'}
+                    </Button>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex-1">
+                            <Button onClick={handleGetFeedback} variant="default" disabled={!hasEnoughMessages || isGettingFeedback} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                              {isGettingFeedback ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating feedback...</> : "End & Get Feedback"}
+                            </Button>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{hasEnoughMessages ? "End your conversation and get feedback" : "Have a longer conversation (at least 5 messages) to get meaningful feedback"}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                )}
+                {onSwitchMode && (
+                  <button
+                    onClick={() => setConfirmSwitchMode(true)}
+                    className="w-full text-xs text-gray-400 hover:text-gray-600 py-1 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Mic className="h-3 w-3" />Switch to Voice
+                  </button>
                 )}
               </div>
-            ) : (
-              <div className="flex gap-2">
-                <Button
-                  onClick={getHint}
-                  variant="outline"
-                  className="flex-1"
-                  disabled={isGettingHint}
-                >
-                  <Lightbulb className="h-4 w-4 mr-2" />
-                  {isGettingHint ? 'Getting hint...' : 'Get Hint'}
-                </Button>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex-1">
-                        <Button
-                          onClick={handleGetFeedback}
-                          variant="default"
-                          disabled={!hasEnoughMessages || isGettingFeedback}
-                          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                        >
-                          {isGettingFeedback ? "Analyzing..." : "Get Feedback"}
-                        </Button>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{hasEnoughMessages ? "Get feedback on your conversation" : "Have a longer conversation (at least 5 messages) to get meaningful feedback"}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-            )}
-          </div>
+            </>
+          )}
         </>
       )}
 
-      <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+      {/* Legacy feedback Dialog — retained only if somehow needed */}
+      <Dialog open={feedbackOpen && !isComplete} onOpenChange={setFeedbackOpen}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Feedback</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            {(allAttempts.length > 0 ? allAttempts : [{ attemptNumber, chatMode: 'typed', feedback: feedbackData }]).map((attempt, idx) => (
+            {[
+              allAttempts.find(attempt => attempt.attemptNumber === attemptNumber)
+                ?? allAttempts[0]
+                ?? { attemptNumber, chatMode: 'typed', feedback: feedbackData },
+            ].map((attempt, idx) => (
               <Collapsible key={attempt.attemptNumber} defaultOpen={idx === 0}>
                 <CollapsibleTrigger className="w-full">
                   <div className="flex items-center justify-between w-full px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">Attempt {attempt.attemptNumber}</span>
+                      <span className="text-sm font-medium">Feedback</span>
                       {attempt.chatMode === 'spoken' ? (
                         <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">Voice</span>
                       ) : (
@@ -624,15 +731,6 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
             ))}
           </div>
           <div className="flex flex-col gap-2 pt-2 border-t">
-            {onTryAgain && (
-              <Button
-                onClick={() => { setFeedbackOpen(false); onTryAgain(); }}
-                variant="outline"
-                className="w-full"
-              >
-                Try Again
-              </Button>
-            )}
             <Button
               onClick={() => { fetchLeaderboard(); setShowLeaderboard(true); }}
               className="w-full bg-blue-600 hover:bg-blue-700"
@@ -657,27 +755,62 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
       <AlertDialog open={isConfirmingFeedback} onOpenChange={setIsConfirmingFeedback}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Feedback Request</AlertDialogTitle>
+            <AlertDialogTitle>{isThoughtPartner ? "End & Get Summary?" : "End & Get Feedback?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will end your session and generate your {isThoughtPartner ? "summary" : "feedback"}. You can dismiss this to continue.
+            </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogDescription>
-            Are you sure you want to get feedback? This will end your conversation.
-          </AlertDialogDescription>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={cancelFeedback}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmFeedback}>Confirm</AlertDialogAction>
+            <AlertDialogCancel onClick={cancelFeedback}>Continue session</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmFeedback}>{isThoughtPartner ? "End & Get Summary" : "End & Get Feedback"}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
       
-      <ThinkingMapModal
-        open={summaryOpen}
-        onOpenChange={setSummaryOpen}
-        summary={summaryData}
-      />
+      <AlertDialog open={confirmSwitchMode} onOpenChange={setConfirmSwitchMode}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Switch to Voice?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Switching will discard your current conversation and start this activity again in voice mode. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay in Typed</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setConfirmSwitchMode(false); onSwitchMode?.('spoken'); }}>
+              Switch to Voice
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="mt-auto py-2 text-center text-xs text-gray-400">
         Your trainer has access to the transcript and feedback.
       </div>
+    </div>
+  );
+}
+
+const sectionColors = {
+  blue:   { card: 'bg-blue-50 border-blue-100',   dot: 'bg-blue-400' },
+  yellow: { card: 'bg-yellow-50 border-yellow-100', dot: 'bg-yellow-400' },
+  purple: { card: 'bg-purple-50 border-purple-100', dot: 'bg-purple-400' },
+  green:  { card: 'bg-green-50 border-green-100',  dot: 'bg-green-500' },
+} as const;
+
+function InlineMapSection({ color, title, items }: { color: keyof typeof sectionColors; title: string; items: string[] }) {
+  const { card, dot } = sectionColors[color];
+  return (
+    <div className={`rounded-lg border p-3 ${card}`}>
+      <p className="font-semibold text-xs text-gray-600 mb-2">{title}</p>
+      <ul className="space-y-1.5">
+        {items.map((item, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+            <span className={`mt-1.5 h-1.5 w-1.5 rounded-full flex-shrink-0 ${dot}`} />
+            {item}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

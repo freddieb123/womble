@@ -463,16 +463,6 @@ export default function DualConversationRecorder({
           </div>
         )}
 
-        {transcript.length > 0 && (
-          <div className="pt-2 max-h-60 overflow-y-auto border rounded-md p-2">
-            <Label className="mb-2 block">Transcript</Label>
-            <div className="p-3 bg-gray-50 rounded-md">
-              <div className="text-sm leading-relaxed">
-                {transcript.map((entry) => entry.content).join(' ')}
-              </div>
-            </div>
-          </div>
-        )}
       </CardContent>
       {/* Only show card footer with buttons if transcript is not ready */}
       {transcript.length === 0 && (
@@ -499,8 +489,8 @@ export default function DualConversationRecorder({
                 <p className="text-xs text-gray-500 mt-2 text-center">
                   A transcript will be saved, but not the audio recording. Your
                   trainer has access to your transcript. Powered by{" "}
-                  <a href="https://womble.co" style={{ color: "blue" }}>
-                    Womble.co
+                  <a href="https://womblefeedback.com" style={{ color: "blue" }}>
+                    womblefeedback.com
                   </a>
                 </p>
               )}

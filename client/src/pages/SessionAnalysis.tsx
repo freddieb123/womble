@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, TrendingUp, ChevronDown, Brain } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import GroupBoardInterface from "@/components/GroupBoardInterface";
 
 type SessionConfig = {
@@ -23,10 +24,18 @@ type SessionData = {
   configs: SessionConfig[];
 };
 
+type ThinkingMap = {
+  keyThemes: string[];
+  insights: string[];
+  openQuestions: string[];
+  nextSteps: string[];
+};
+
 type ConversationFeedback = {
   bullets: string[];
   score: number | null;
   summary: string | null;
+  thinkingMap?: ThinkingMap;
 };
 
 type Submission = {
@@ -37,11 +46,26 @@ type Submission = {
   messages?: any[];
 };
 
+const TRAFFIC_LIGHTS = ['🔴', '🟡', '🟢'];
+
+function extractTrafficLight(text: string): { emoji: string | null; rest: string } {
+  for (const emoji of TRAFFIC_LIGHTS) {
+    const idx = text.indexOf(emoji);
+    if (idx !== -1) {
+      const before = text.slice(0, idx).replace(/:\s*$/, '').trim();
+      const after = text.slice(idx + emoji.length).trim();
+      return { emoji, rest: before ? `${before}: ${after}` : after };
+    }
+  }
+  return { emoji: null, rest: text };
+}
+
 export default function SessionAnalysis() {
   const { user } = useAuth();
   const searchParams = new URLSearchParams(window.location.search);
   const token = searchParams.get('token');
   const [selectedConfigId, setSelectedConfigId] = useState<number | null>(null);
+  const [summaryOpen, setSummaryOpen] = useState(true);
 
   const { data: sessionData, isLoading } = useQuery<SessionData>({
     queryKey: [`/api/sessions/join/${token}`],
@@ -69,15 +93,40 @@ export default function SessionAnalysis() {
     refetchInterval: 30_000,
   });
 
+  const selectedConfig = sessionData?.configs.find(c => c.id === activeConfigId);
+  const isThoughtPartner = selectedConfig?.type === 'thought-partner';
+  const allBullets = (submissions ?? []).flatMap(s => s.feedback?.bullets ?? []).filter(Boolean);
+
+  const { data: themes } = useQuery<{ positive: string; constructive: string }>({
+    queryKey: ['/api/analyze-themes', activeConfigId, allBullets.length],
+    queryFn: async () => {
+      const res = await fetch('/api/analyze-themes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedbacks: (submissions ?? []).map(s => s.feedback).filter(Boolean) }),
+      });
+      if (!res.ok) return { positive: '', constructive: '' };
+      return res.json();
+    },
+    enabled: !isThoughtPartner && allBullets.length > 0,
+    staleTime: 60_000,
+  });
+
   if (!token) return <ErrorScreen message="No session token provided." />;
   if (isLoading) return <div className="h-screen flex items-center justify-center text-gray-400">Loading...</div>;
   if (!sessionData) return <ErrorScreen message="Session not found." />;
 
-  const selectedConfig = sessionData.configs.find(c => c.id === activeConfigId);
-  const withFeedback = (submissions ?? []).filter(s => s.feedback && s.feedback.score !== null);
-  const avgScore = withFeedback.length > 0
+  const withFeedback = isThoughtPartner
+    ? (submissions ?? []).filter(s => s.feedback?.thinkingMap != null)
+    : (submissions ?? []).filter(s => s.feedback && s.feedback.score !== null);
+  const avgScore = !isThoughtPartner && withFeedback.length > 0
     ? withFeedback.reduce((sum, s) => sum + (s.feedback!.score ?? 0), 0) / withFeedback.length
     : null;
+
+  // Collect key themes from thought-partner thinking maps
+  const tpKeyThemes = isThoughtPartner
+    ? [...new Set((submissions ?? []).flatMap(s => s.feedback?.thinkingMap?.keyThemes ?? []))]
+    : [];
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
@@ -139,13 +188,15 @@ export default function SessionAnalysis() {
               <div className={`flex items-center gap-3 mb-6 ${selectedConfig.type === 'quick-fire-quiz' ? 'justify-center' : ''}`}>
                 <h1 className="text-xl font-bold text-gray-900">{selectedConfig.title}</h1>
                 <Badge variant="outline">{selectedConfig.type}</Badge>
-                {selectedConfig.type !== 'quick-fire-quiz' && avgScore !== null && (
+                {!isThoughtPartner && selectedConfig.type !== 'quick-fire-quiz' && avgScore !== null && (
                   <span className="ml-auto text-sm font-medium text-gray-600">
-                    Avg score: <span className="text-green-700">{avgScore.toFixed(1)}</span>
+                    Avg score: <span className="text-green-700">{avgScore.toFixed(1)}/10</span>
                   </span>
                 )}
                 {selectedConfig.type !== 'quick-fire-quiz' && (
-                  <span className="text-sm text-gray-400">{(submissions ?? []).length} submission{(submissions ?? []).length !== 1 ? 's' : ''}</span>
+                  <span className={`text-sm text-gray-400 ${isThoughtPartner || avgScore === null ? 'ml-auto' : ''}`}>
+                    {(submissions ?? []).length} submission{(submissions ?? []).length !== 1 ? 's' : ''}
+                  </span>
                 )}
               </div>
 
@@ -159,48 +210,122 @@ export default function SessionAnalysis() {
                 <div className="text-center py-16 text-gray-400 text-sm">No submissions yet for this activity.</div>
               ) : (
                 <div className="space-y-4">
-                  {(submissions ?? []).map((s) => (
-                    <Card key={s.sessionId}>
-                      <CardHeader className="pb-2">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-base">{s.userName || 'Anonymous'}</CardTitle>
-                          <div className="flex items-center gap-2">
-                            {s.chatMode && (
-                              <Badge variant="outline" className="text-xs">{s.chatMode}</Badge>
+                  {/* Analysis Summary */}
+                  {(submissions ?? []).some(s => s.feedback) && (
+                    <Card className="bg-white">
+                      <Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>
+                        <CollapsibleTrigger asChild>
+                          <CardHeader className="pb-2 cursor-pointer hover:bg-gray-50 transition-colors rounded-t-lg">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <TrendingUp className="h-4 w-4 text-blue-600" />
+                                <span className="font-semibold text-base">Analysis Summary</span>
+                              </div>
+                              <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${summaryOpen ? 'rotate-180' : ''}`} />
+                            </div>
+                          </CardHeader>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <CardContent className="pt-0">
+                            <div className={`grid ${!isThoughtPartner && avgScore !== null ? 'grid-cols-2' : 'grid-cols-1'} gap-6 pb-4`}>
+                              <div>
+                                <p className="text-xs font-medium text-gray-500 mb-1">{isThoughtPartner ? 'Completion Coverage' : 'Feedback Coverage'}</p>
+                                <p className="text-2xl font-bold text-blue-900">{withFeedback.length}/{(submissions ?? []).length}</p>
+                                <p className="text-xs text-gray-500">{isThoughtPartner ? 'summaries generated' : 'submissions with feedback'}</p>
+                              </div>
+                              {!isThoughtPartner && avgScore !== null && (
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500 mb-1">Average Score</p>
+                                  <p className="text-2xl font-bold text-blue-900">{avgScore.toFixed(1)}/10</p>
+                                  <p className="text-xs text-gray-500">across all feedback</p>
+                                </div>
+                              )}
+                            </div>
+                            {isThoughtPartner && tpKeyThemes.length > 0 && (
+                              <div className="border-t pt-4">
+                                <p className="text-xs font-medium text-gray-500 mb-2">Key Themes Across All Discussions</p>
+                                <ul className="space-y-1">
+                                  {tpKeyThemes.map((theme, i) => (
+                                    <li key={i} className="text-sm text-gray-700 flex gap-2">
+                                      <span className="text-blue-400 flex-shrink-0 mt-0.5">•</span>{theme}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
                             )}
-                            {s.feedback?.score != null && (
-                              <span className={`text-sm font-semibold ${
-                                s.feedback.score >= 70 ? 'text-green-600' :
-                                s.feedback.score >= 40 ? 'text-amber-600' : 'text-red-500'
-                              }`}>
-                                {s.feedback.score}/100
-                              </span>
+                            {!isThoughtPartner && themes && (themes.positive || themes.constructive) && (
+                              <div className="border-t pt-4 space-y-3">
+                                <p className="text-xs font-medium text-gray-500">Key Themes</p>
+                                {themes.positive && (
+                                  <div>
+                                    <p className="text-xs font-semibold text-green-600 mb-0.5">Positive theme:</p>
+                                    <p className="text-sm text-gray-800">{themes.positive}</p>
+                                  </div>
+                                )}
+                                {themes.constructive && (
+                                  <div>
+                                    <p className="text-xs font-semibold text-amber-600 mb-0.5">Constructive theme:</p>
+                                    <p className="text-sm text-gray-800">{themes.constructive}</p>
+                                  </div>
+                                )}
+                              </div>
                             )}
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        {s.feedback ? (
-                          <>
-                            {s.feedback.summary && (
-                              <p className="text-sm text-gray-600 mb-3">{s.feedback.summary}</p>
-                            )}
-                            {s.feedback.bullets && s.feedback.bullets.length > 0 && (
-                              <ul className="space-y-1">
-                                {s.feedback.bullets.map((b, i) => (
-                                  <li key={i} className="text-sm text-gray-700 flex gap-2">
-                                    <span className="text-gray-300 flex-shrink-0">·</span>
-                                    <span>{b}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </>
-                        ) : (
-                          <p className="text-sm text-gray-400 italic">No feedback yet.</p>
-                        )}
-                      </CardContent>
+                          </CardContent>
+                        </CollapsibleContent>
+                      </Collapsible>
                     </Card>
+                  )}
+
+                  {/* Individual submissions */}
+                  {(submissions ?? []).map((s) => (
+                    isThoughtPartner ? (
+                      <ThoughtPartnerSubmissionCard key={s.sessionId} submission={s} />
+                    ) : (
+                      <Card key={s.sessionId}>
+                        <CardHeader className="pb-2">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-base">{s.userName || 'Anonymous'}</CardTitle>
+                            <div className="flex items-center gap-2">
+                              {s.chatMode && (
+                                <Badge variant="outline" className="text-xs">{s.chatMode}</Badge>
+                              )}
+                              {s.feedback?.score != null && (
+                                <span className={`text-sm font-semibold ${
+                                  s.feedback.score >= 7 ? 'text-green-600' :
+                                  s.feedback.score >= 4 ? 'text-amber-600' : 'text-red-500'
+                                }`}>
+                                  {s.feedback.score}/10
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          {s.feedback ? (
+                            <>
+                              {s.feedback.summary && (
+                                <p className="text-sm text-gray-600 mb-3">{s.feedback.summary}</p>
+                              )}
+                              {s.feedback.bullets && s.feedback.bullets.length > 0 && (
+                                <ul className="space-y-1.5">
+                                  {s.feedback.bullets.map((b, i) => {
+                                    const { emoji, rest } = extractTrafficLight(b);
+                                    return (
+                                      <li key={i} className="text-sm text-gray-700 flex gap-2">
+                                        <span className="flex-shrink-0 w-5 text-center">{emoji ?? '·'}</span>
+                                        <span>{rest}</span>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              )}
+                            </>
+                          ) : (
+                            <p className="text-sm text-gray-400 italic">No feedback yet.</p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )
                   ))}
                 </div>
               )}
@@ -209,6 +334,70 @@ export default function SessionAnalysis() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ThoughtPartnerSubmissionCard({ submission: s }: { submission: Submission }) {
+  const [open, setOpen] = useState(false);
+  const tm = s.feedback?.thinkingMap;
+
+  return (
+    <Card>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CollapsibleTrigger asChild>
+          <CardHeader className="cursor-pointer hover:bg-gray-50 transition-colors rounded-lg py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Brain className="h-4 w-4 text-teal-600 flex-shrink-0" />
+                <span className="font-medium text-base">{s.userName || 'Anonymous'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {s.chatMode && <Badge variant="outline" className="text-xs">{s.chatMode}</Badge>}
+                {tm ? (
+                  <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+                ) : (
+                  <span className="text-xs text-gray-400 italic">No summary yet</span>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+        </CollapsibleTrigger>
+        {tm && (
+          <CollapsibleContent>
+            <CardContent className="pt-0 pb-4 space-y-3">
+              {tm.keyThemes?.length > 0 && <TPMapSection color="blue" title="Key Themes Explored" items={tm.keyThemes} />}
+              {tm.insights?.length > 0 && <TPMapSection color="yellow" title="Insights Reached" items={tm.insights} />}
+              {tm.openQuestions?.length > 0 && <TPMapSection color="purple" title="Open Questions" items={tm.openQuestions} />}
+              {tm.nextSteps?.length > 0 && <TPMapSection color="green" title="Suggested Next Steps" items={tm.nextSteps} />}
+            </CardContent>
+          </CollapsibleContent>
+        )}
+      </Collapsible>
+    </Card>
+  );
+}
+
+const tpSectionColors = {
+  blue:   { card: 'bg-blue-50 border-blue-100',   dot: 'bg-blue-400' },
+  yellow: { card: 'bg-yellow-50 border-yellow-100', dot: 'bg-yellow-400' },
+  purple: { card: 'bg-purple-50 border-purple-100', dot: 'bg-purple-400' },
+  green:  { card: 'bg-green-50 border-green-100',  dot: 'bg-green-500' },
+} as const;
+
+function TPMapSection({ color, title, items }: { color: keyof typeof tpSectionColors; title: string; items: string[] }) {
+  const { card, dot } = tpSectionColors[color];
+  return (
+    <div className={`rounded-lg border p-3 ${card}`}>
+      <p className="font-semibold text-xs text-gray-600 mb-2">{title}</p>
+      <ul className="space-y-1.5">
+        {items.map((item, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+            <span className={`mt-1.5 h-1.5 w-1.5 rounded-full flex-shrink-0 ${dot}`} />
+            {item}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

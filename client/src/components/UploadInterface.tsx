@@ -365,12 +365,12 @@ export default function UploadInterface({
       <div className="mt-auto py-2 text-center text-xs text-gray-400">
         This page is powered by{" "}
         <a
-          href="https://www.womble.co"
+          href="https://womblefeedback.com"
           target="_blank"
           rel="noopener noreferrer"
           className="text-blue-500 hover:text-blue-700"
         >
-          Womble.co
+          womblefeedback.com
         </a>
         . Your trainer has access to the feedback.
       </div>
