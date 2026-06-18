@@ -112,7 +112,7 @@ export default function AddAgentDialog({ onDuplicate, onStartFromScratch }: Prop
       {tab === 'scratch' && (
         <div className="flex flex-col items-center justify-center flex-1 gap-4 py-8">
           <p className="text-sm text-gray-500 text-center max-w-xs">
-            Configure a new agent from scratch — choose the type, write a prompt, and set feedback criteria.
+            Configure a new activity from scratch — choose the type, write a prompt, and set feedback criteria.
           </p>
           <Button className="bg-green-600 hover:bg-green-700" onClick={onStartFromScratch}>
             Start building
@@ -125,7 +125,7 @@ export default function AddAgentDialog({ onDuplicate, onStartFromScratch }: Prop
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search your agents…"
+              placeholder="Search your activities…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"

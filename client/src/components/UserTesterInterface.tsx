@@ -97,6 +97,7 @@ export default function UserTesterInterface({ config, sessionId, userName, onUse
   const audioQueueRef = useRef<Float32Array[]>([]);
   const isPlayingRef = useRef(false);
   const nextPlayTimeRef = useRef(0);
+  const scheduledSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const autoFeedbackFiredRef = useRef(false);
 
   const { toast } = useToast();
@@ -121,6 +122,13 @@ export default function UserTesterInterface({ config, sessionId, userName, onUse
     }]);
   }, [sessionId]);
 
+  const stopAllAudio = useCallback(() => {
+    scheduledSourcesRef.current.forEach(src => { try { src.stop(); } catch {} });
+    scheduledSourcesRef.current = [];
+    if (audioCtxRef.current) nextPlayTimeRef.current = audioCtxRef.current.currentTime;
+    setActivityState('idle');
+  }, []);
+
   const playAudioChunk = useCallback((float32: Float32Array) => {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
@@ -136,11 +144,20 @@ export default function UserTesterInterface({ config, sessionId, userName, onUse
     const startTime = Math.max(now, nextPlayTimeRef.current);
     source.start(startTime);
     nextPlayTimeRef.current = startTime + buffer.duration;
+    scheduledSourcesRef.current.push(source);
+    source.onended = () => {
+      scheduledSourcesRef.current = scheduledSourcesRef.current.filter(s => s !== source);
+    };
   }, []);
 
   const handleGeminiMessage = useCallback((msg: any) => {
     console.log('[Gemini] message:', JSON.stringify(msg, null, 2));
     try {
+      // Interruption — stop buffered audio immediately
+      if (msg.serverContent?.interrupted) {
+        stopAllAudio();
+        return;
+      }
       // Audio output chunks
       if (msg.serverContent?.modelTurn?.parts) {
         for (const part of msg.serverContent.modelTurn.parts) {
@@ -174,7 +191,7 @@ export default function UserTesterInterface({ config, sessionId, userName, onUse
         if (text) addMessage('user', text);
       }
     } catch {}
-  }, [addMessage, playAudioChunk, sessionId]);
+  }, [addMessage, playAudioChunk, stopAllAudio, sessionId]);
 
   const startSession = async () => {
     setConnectionState('connecting');

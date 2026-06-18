@@ -13,6 +13,19 @@ import OpenAI from 'openai';
 import type { ChatCompletionMessageParam } from 'openai/dist/resources/chat/completions';
 import AdmZip from 'adm-zip';
 
+function withWalkthroughGuide(systemPrompt: string): string {
+  return `${systemPrompt}
+
+WALKTHROUGH COACH RULES — CRITICAL:
+- Your primary purpose is to conduct a WALKTHROUGH: the learner shares their screen and talks you through what they have done so far on the task. You observe, ask clarifying questions, and coach them through anything they have not completed yet.
+- If the learner starts asking for direct help, instructions, or answers instead of walking you through their work, acknowledge this openly and honestly. Say something like: "I can see you're looking for some help here — happy to assist. Just to flag, the purpose of this activity is for you to walk me through what you've done, not for me to guide you through it. But let me help you with this, and then let's get back to the walkthrough."
+- After helping, always gently steer back to the walkthrough format: ask them to continue showing you what they have done, where they got to, and what their thinking was.
+- You CAN acknowledge that this is a walkthrough activity and explain its purpose if the learner asks or seems confused.
+- Be warm, supportive, and non-judgmental — never make the learner feel bad for asking for help.
+
+`;
+}
+
 function withPersonaLock(systemPrompt: string): string {
   return `${systemPrompt}
 
@@ -1201,9 +1214,13 @@ Write detailed, specific configuration for this activity.`,
       const geminiApiKey = process.env.GEMINI_API_KEY;
       if (!geminiApiKey) return res.status(500).json({ error: "GEMINI_API_KEY not configured" });
 
+      const systemPrompt = config.type === 'task-walkthrough'
+        ? withWalkthroughGuide(config.systemPrompt)
+        : withPersonaLock(config.systemPrompt);
+
       res.json({
         apiKey: geminiApiKey,
-        systemPrompt: withPersonaLock(config.systemPrompt),
+        systemPrompt,
         model: "gemini-3.1-flash-live-preview",
       });
     } catch (error: any) {
@@ -1217,32 +1234,21 @@ Write detailed, specific configuration for this activity.`,
       const { messages, userInstructions, feedbackCriteria, configId, sessionId } = req.body;
 
       let allMessages = messages || [];
-      let sessionCount = 1;
 
-      // If configId provided, aggregate all stored conversations for this GPT
-      if (configId) {
-        const storedConversations = await db.query.conversations.findMany({
-          where: eq(conversations.configId, parseInt(configId)),
-          orderBy: [conversations.createdAt],
+      // Merge any already-saved messages for THIS user's session only
+      if (configId && sessionId) {
+        const storedConversation = await db.query.conversations.findFirst({
+          where: and(
+            eq(conversations.configId, parseInt(configId)),
+            eq(conversations.sessionId, String(sessionId)),
+          ),
         });
 
-        if (storedConversations.length > 0) {
-          // Combine all messages from all sessions, adding session breaks
-          const combined: any[] = [];
-          storedConversations.forEach((conv, idx) => {
-            if (idx > 0) combined.push({ role: 'system-divider', sessionNumber: idx + 1 });
-            combined.push(...(conv.messages || []));
-          });
-          // Merge with any unsaved messages from current session
-          const storedIds = new Set(storedConversations.flatMap(c => (c.messages || []).map((m: any) => m.id)));
-          const unsavedCurrentMessages = allMessages.filter((m: any) => !storedIds.has(m.id));
-          if (unsavedCurrentMessages.length > 0) {
-            if (combined.length > 0) combined.push({ role: 'system-divider', sessionNumber: storedConversations.length + 1 });
-            combined.push(...unsavedCurrentMessages);
-          }
-          allMessages = combined;
-          sessionCount = storedConversations.length + (unsavedCurrentMessages.length > 0 ? 1 : 0);
-          sessionCount = Math.max(sessionCount, storedConversations.length);
+        if (storedConversation?.messages?.length) {
+          // Use stored messages but top up with any unsaved ones from the client
+          const storedIds = new Set((storedConversation.messages as any[]).map((m: any) => m.id));
+          const unsaved = allMessages.filter((m: any) => !storedIds.has(m.id));
+          allMessages = [...(storedConversation.messages as any[]), ...unsaved];
         }
       }
 
@@ -1252,42 +1258,42 @@ Write detailed, specific configuration for this activity.`,
       }
 
       let transcript = '';
-      let currentSession = 1;
       allMessages.forEach((m: any) => {
-        if (m.role === 'system-divider') {
-          transcript += `\n--- Conversation ${m.sessionNumber} ---\n`;
-          currentSession = m.sessionNumber;
-        } else {
-          const speaker = m.role === 'user' ? 'Learner' : 'Thought Partner';
-          const text = typeof m.content === 'string' ? m.content : m.content?.text || '';
-          transcript += `${speaker}: ${text}\n`;
-        }
+        const speaker = m.role === 'user' ? 'Learner' : 'Thought Partner';
+        const text = typeof m.content === 'string' ? m.content : m.content?.text || '';
+        if (text.trim()) transcript += `${speaker}: ${text}\n`;
       });
 
       const summaryFocus = feedbackCriteria
         ? `Pay particular attention to: ${feedbackCriteria}`
         : '';
 
-      const prompt = `You are analysing ${sessionCount > 1 ? `${sessionCount} thought partner conversations` : 'a thought partner conversation'} about the following topic: "${userInstructions || 'a topic'}".
+      const prompt = `You are creating a thinking map summary of a thought partner conversation about: "${userInstructions || 'a topic'}".
 
 ${summaryFocus}
 
-Here is the conversation transcript:
+Conversation transcript:
 ${transcript}
 
-Create a structured thinking map covering all conversations. Return valid JSON in exactly this format:
+IMPORTANT RULES:
+- Only include items that are directly evidenced by what the Learner said in the transcript above.
+- Do NOT invent, extrapolate, or pad. If the conversation was brief, return fewer items — empty arrays are fine.
+- Do NOT include anything that wasn't explicitly discussed.
+
+Return valid JSON in exactly this format:
 {
-  "keyThemes": ["theme 1", "theme 2", "theme 3"],
-  "insights": ["insight 1", "insight 2", "insight 3"],
-  "openQuestions": ["question still to explore 1", "question 2"],
-  "nextSteps": ["suggested next step 1", "suggested next step 2", "suggested next step 3"]
+  "keyThemes": [],
+  "insights": [],
+  "openQuestions": [],
+  "nextSteps": []
 }
 
-Guidelines:
-- keyThemes: the main concepts and areas explored across all conversations (3-5 items)
-- insights: concrete realisations or positions the learner reached (2-4 items)
-- openQuestions: threads that came up but weren't fully resolved (2-3 items)
-- nextSteps: practical actions or further thinking the learner could do (2-4 items)
+Field guidance (only populate if genuinely present in the conversation):
+- keyThemes: concepts and areas the Learner actually explored
+- insights: concrete positions or realisations the Learner reached
+- openQuestions: threads that came up but weren't resolved
+- nextSteps: actions or further thinking the Learner themselves suggested or that follow naturally from what they said
+
 Return only the JSON object, no other text.`;
 
       const response = await openai.chat.completions.create({
@@ -1331,7 +1337,7 @@ Return only the JSON object, no other text.`;
         }
       }
 
-      res.json({ ...summary, sessionCount });
+      res.json(summary);
     } catch (error: any) {
       console.error("Error generating thought partner summary:", error);
       res.status(500).json({ error: error.message });
@@ -2984,9 +2990,29 @@ Score: [1-10 based on overall coverage and quality of explanation]
       const configs = await db.query.chatConfigs.findMany({
         where: and(eq(chatConfigs.sessionId, session.id), eq(chatConfigs.deleted, false)),
         orderBy: [chatConfigs.sessionOrder],
+        with: {
+          conversations: true,
+          uploads: true,
+          quizResponses: true,
+          dualConversations: true,
+        }
       });
 
-      res.json({ ...session, configs });
+      const configsWithCount = configs.map(config => {
+        let conversationCount;
+        if (config.type === 'upload') {
+          conversationCount = config.uploads.length;
+        } else if (config.type === 'quiz') {
+          conversationCount = config.quizResponses.length;
+        } else if (config.type === 'two-way-conversation') {
+          conversationCount = config.dualConversations?.length || 0;
+        } else {
+          conversationCount = config.conversations.length;
+        }
+        return { ...config, conversationCount, conversations: undefined, uploads: undefined, quizResponses: undefined, dualConversations: undefined };
+      });
+
+      res.json({ ...session, configs: configsWithCount });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -3283,6 +3309,7 @@ Score: [1-10 based on overall coverage and quality of explanation]
       res.json({
         id: session.id,
         shareToken: session.shareToken,
+        title: session.title,
         configs: configs.map(c => ({
           id: c.id,
           title: c.title,

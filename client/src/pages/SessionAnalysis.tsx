@@ -21,6 +21,7 @@ type SessionConfig = {
 type SessionData = {
   id: number;
   shareToken: string;
+  title?: string;
   configs: SessionConfig[];
 };
 
@@ -136,6 +137,12 @@ export default function SessionAnalysis() {
         <span className="font-semibold text-green-700">Womble</span>
         <span className="text-gray-300 mx-1">·</span>
         <span className="text-sm text-gray-500">Session Feedback</span>
+        {sessionData?.title && (
+          <>
+            <span className="text-gray-300 mx-1">–</span>
+            <span className="text-sm font-bold text-gray-800">{sessionData.title}</span>
+          </>
+        )}
       </div>
 
       <div className="flex-1 flex overflow-hidden">

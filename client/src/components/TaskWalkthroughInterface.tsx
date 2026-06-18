@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Mic, Monitor, Square, ClipboardList } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +17,12 @@ interface Props {
 
 type ConnectionState = 'idle' | 'connecting' | 'active' | 'ended';
 type ActivityState = 'idle' | 'listening' | 'speaking';
+
+interface AttemptData {
+  attemptNumber: number;
+  chatMode: string | null;
+  feedback: { bullets: string[]; score?: number | null; summary?: string | null } | null;
+}
 
 function resampleBuffer(buffer: Float32Array, inputRate: number, outputRate: number): Float32Array {
   if (inputRate === outputRate) return buffer;
@@ -77,9 +84,32 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
   const frameIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const transcriptRef = useRef<Message[]>([]);
   const nextPlayTimeRef = useRef(0);
+  const scheduledSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const autoFeedbackFiredRef = useRef(false);
 
   const { toast } = useToast();
+
+  const queryClient = useQueryClient();
+  const queryKey = [`/api/conversations/${config.id}/session/${sessionId}`];
+
+  const { data: existingAttempts = [] } = useQuery<AttemptData[]>({
+    queryKey,
+    staleTime: Infinity,
+  });
+
+  const persistedFeedback = (existingAttempts[0]?.feedback as { bullets: string[]; score?: number | null; summary?: string } | undefined) ?? null;
+  const hasInitialized = useRef(false);
+
+  useEffect(() => {
+    if (hasInitialized.current || !persistedFeedback) return;
+    hasInitialized.current = true;
+    setConnectionState('ended');
+    setFeedbackData({
+      bullets: persistedFeedback.bullets ?? [],
+      score: persistedFeedback.score ?? undefined,
+      summary: persistedFeedback.summary ?? undefined,
+    });
+  }, [persistedFeedback]);
 
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
 
@@ -95,6 +125,13 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
     }]);
   }, [sessionId]);
 
+  const stopAllAudio = useCallback(() => {
+    scheduledSourcesRef.current.forEach(src => { try { src.stop(); } catch {} });
+    scheduledSourcesRef.current = [];
+    if (audioCtxRef.current) nextPlayTimeRef.current = audioCtxRef.current.currentTime;
+    setActivityState('idle');
+  }, []);
+
   const playAudioChunk = useCallback((float32: Float32Array) => {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
@@ -106,10 +143,18 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
     const startTime = Math.max(ctx.currentTime, nextPlayTimeRef.current);
     source.start(startTime);
     nextPlayTimeRef.current = startTime + buffer.duration;
+    scheduledSourcesRef.current.push(source);
+    source.onended = () => {
+      scheduledSourcesRef.current = scheduledSourcesRef.current.filter(s => s !== source);
+    };
   }, []);
 
   const handleGeminiMessage = useCallback((msg: any) => {
     try {
+      if (msg.serverContent?.interrupted) {
+        stopAllAudio();
+        return;
+      }
       if (msg.serverContent?.modelTurn?.parts) {
         for (const part of msg.serverContent.modelTurn.parts) {
           if (part.inlineData?.mimeType?.startsWith('audio/') && part.inlineData.data) {
@@ -136,7 +181,7 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
         if (text) addMessage('user', text);
       }
     } catch {}
-  }, [addMessage, playAudioChunk, sessionId]);
+  }, [addMessage, playAudioChunk, stopAllAudio, sessionId]);
 
   const startSession = async () => {
     setConnectionState('connecting');
@@ -310,7 +355,12 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
         }),
       });
       if (!res.ok) throw new Error(await res.text());
-      setFeedbackData(await res.json());
+      const data = await res.json();
+      setFeedbackData(data);
+      queryClient.setQueryData<AttemptData[]>(queryKey, (old = []) => {
+        const updated: AttemptData = { attemptNumber: 1, chatMode: 'spoken', feedback: data };
+        return [updated, ...old.filter(a => a.attemptNumber !== 1)];
+      });
     } catch (err: any) {
       toast({ variant: 'destructive', title: 'Error', description: err.message });
     } finally {
@@ -395,12 +445,12 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
               </p>
             </div>
 
-            {config.referenceContent && (
+            {config.userInstructions && (
               <div className="text-left bg-blue-50 rounded-lg p-4 border border-blue-100">
                 <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2 flex items-center gap-1">
-                  <ClipboardList className="h-3.5 w-3.5" /> The Task
+                  <ClipboardList className="h-3.5 w-3.5" /> Instructions
                 </p>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{config.referenceContent}</p>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{config.userInstructions}</p>
               </div>
             )}
 
@@ -425,10 +475,10 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
 
         {connectionState === 'active' && (
           <div className="w-full max-w-4xl flex flex-col gap-6 min-h-0 flex-1">
-            {config.referenceContent && (
+            {config.userInstructions && (
               <div className="bg-white rounded-lg border border-gray-200 px-4 py-3">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">The Task</p>
-                <p className="text-sm text-gray-600 line-clamp-3">{config.referenceContent}</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Instructions</p>
+                <p className="text-sm text-gray-600 line-clamp-3">{config.userInstructions}</p>
               </div>
             )}
             <div className="flex flex-col items-center gap-3">
@@ -483,7 +533,13 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
             <div className="flex flex-col items-center gap-3">
               <Button
                 variant="outline"
-                onClick={() => { setConnectionState('idle'); setTranscript([]); setFeedbackData(null); autoFeedbackFiredRef.current = false; }}
+                onClick={() => {
+                  queryClient.setQueryData(queryKey, []);
+                  setConnectionState('idle');
+                  setTranscript([]);
+                  setFeedbackData(null);
+                  autoFeedbackFiredRef.current = false;
+                }}
               >
                 Start New Walkthrough
               </Button>
