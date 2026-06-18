@@ -494,6 +494,7 @@ export default function Home() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [wizardPrefill, setWizardPrefill] = useState<AdminConfig | undefined>(undefined);
   const [wizardStartType, setWizardStartType] = useState<string | undefined>(undefined);
+  const [wizardFromAddDialog, setWizardFromAddDialog] = useState(false);
   const [isAddAgentOpen, setIsAddAgentOpen] = useState(false);
   const [isPreviewingTemplate, setIsPreviewingTemplate] = useState(false); // kept for wizard flow
   const [editingConfig, setEditingConfig] = useState<ChatConfig | null>(null);
@@ -1055,6 +1056,7 @@ export default function Home() {
         maxTokens: 1000,
         questions: fullConfig.questions || [],
       });
+      setWizardFromAddDialog(true);
       setIsAddAgentOpen(false);
       setIsCreateOpen(true);
     } catch {
@@ -1067,6 +1069,7 @@ export default function Home() {
     if (!open) {
       setWizardPrefill(undefined);
       setWizardStartType(undefined);
+      setWizardFromAddDialog(false);
       if (isPreviewingTemplate) {
         setIsPreviewingTemplate(false);
         setIsAddAgentOpen(true);
@@ -1486,6 +1489,7 @@ export default function Home() {
             onTypeSelected={(type) => {
               setWizardPrefill(undefined);
               setWizardStartType(type);
+              setWizardFromAddDialog(true);
               setIsAddAgentOpen(false);
               setIsCreateOpen(true);
             }}
@@ -1507,7 +1511,7 @@ export default function Home() {
                 isSaving={saveConfig.isPending}
                 prefill={wizardPrefill}
                 startType={wizardPrefill ? undefined : (wizardStartType as any)}
-                onBack={wizardStartType && !wizardPrefill ? () => { setIsCreateOpen(false); setIsAddAgentOpen(true); } : undefined}
+                onBack={wizardFromAddDialog ? () => { setIsCreateOpen(false); setIsAddAgentOpen(true); } : undefined}
               />
             </div>
           </ScrollArea>

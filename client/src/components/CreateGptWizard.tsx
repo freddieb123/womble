@@ -144,7 +144,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill, startType, 
   const [isDictating, setIsDictating] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
 
-  const backToTypeSelect = () => startType && onBack ? onBack() : setStep(1);
+  const backToTypeSelect = () => onBack ? onBack() : setStep(1);
 
   useEffect(() => {
     return () => { recognitionRef.current?.stop(); };
