@@ -1,14 +1,19 @@
 # Womble Project Guidelines
 
-## Before pushing to GitHub
+## Branching and deployment
 
-Always verify the app works locally before pushing. Specifically:
+There are two branches:
+- `staging` — default target for all pushes. Deploys to the staging Railway environment.
+- `main` — production. Only merge here when the user explicitly says "merge to production" or similar.
 
-1. Run `npm run dev` and confirm the server starts without errors
-2. Open `http://localhost:5000` in a browser and check the app loads
-3. If database changes are involved, confirm migrations run cleanly
+When the user says "push to GitHub" (or similar):
+1. Ask the user to confirm the app is working locally first
+2. Commit changes and push to `staging` (not `main`)
+3. Never push directly to `main`
 
-Never push directly to `main` without completing these checks. Ask the user to confirm the app is working locally first.
+When the user says "merge to production":
+1. Run: `git checkout main && git merge staging && git push && git checkout staging`
+2. Confirm the merge is done and remind them Railway will auto-deploy to production
 
 ## Environment
 
