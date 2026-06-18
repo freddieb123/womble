@@ -486,8 +486,8 @@ export async function generateFeedback(req: Request, res: Response) {
       }).join('\n');
 
       const roleContext = participant1Role && participant2Role
-        ? `The conversation involves two roles: "${participant1Role}" (${participant1Name}) and "${participant2Role}" (${participant2Name}). Infer who is playing which role from the content before giving feedback.`
-        : `The participants are ${participant1Name} and ${participant2Name}.`;
+        ? `The conversation involves two roles: "${participant1Role}" and "${participant2Role}". The transcript has no speaker labels, so infer which participant played which role from the content of what was said. You may refer to them by role (e.g. "${participant1Role}" / "${participant2Role}") if you are confident from context — otherwise say "one participant" or "a participant".`
+        : `The transcript has no speaker labels — it is not possible to tell who said what. Do NOT refer to participants by name. Instead use "one participant", "a participant", or "both participants".`;
 
       // Prepare the system prompt with instructions
       const systemPrompt = `
@@ -495,13 +495,15 @@ You are an expert in analyzing conversations. Evaluate the transcribed conversat
 
 ${roleContext}
 
+IMPORTANT: Never invent speaker attribution. If you are not certain who said something, use "one participant" or "a participant" rather than a name.
+
 Evaluation criteria:
 ${feedbackCriteria}
 
 Respond with ONLY this JSON structure — no other keys:
 {
   "overall": {
-    "bullets": [exactly 3-4 specific, actionable feedback points. Use the participants' actual names (${participant1Name} and ${participant2Name}) where relevant],
+    "bullets": [exactly 3-4 specific, actionable feedback points],
     "score": [integer from 1-10],
     "summary": [1-2 sentence summary of the conversation quality]
   }
