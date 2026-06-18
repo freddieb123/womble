@@ -511,11 +511,11 @@ export default function DualConversationRecorder({
               >
                 {isProcessing ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing…
                   </>
                 ) : (
                   <>
-                    <Save className="mr-2 h-4 w-4" /> Process
+                    <Save className="mr-2 h-4 w-4" /> Transcribe & Get Feedback
                   </>
                 )}
               </Button>

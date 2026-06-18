@@ -1167,6 +1167,7 @@ Write detailed, specific configuration for this activity.`,
           session: {
             type: "realtime",
             model: "gpt-realtime-1.5",
+            input_audio_transcription: { model: "whisper-1" },
           },
         }),
       });
@@ -1275,10 +1276,11 @@ ${summaryFocus}
 Conversation transcript:
 ${transcript}
 
-IMPORTANT RULES:
-- Only include items that are directly evidenced by what the Learner said in the transcript above.
-- Do NOT invent, extrapolate, or pad. If the conversation was brief, return fewer items — empty arrays are fine.
-- Do NOT include anything that wasn't explicitly discussed.
+RULES:
+- Base every item on what the Learner actually said — do not fabricate content.
+- You MAY make reasonable inferences from what was discussed (e.g. if they mentioned X, it's fine to note that X was a theme).
+- For a substantive conversation (more than a few exchanges), aim for at least 1-2 items per relevant section. Do not leave everything empty just because the conversation was imperfect.
+- Only leave a section as an empty array if the Learner genuinely said nothing relevant to it.
 
 Return valid JSON in exactly this format:
 {
@@ -1288,11 +1290,11 @@ Return valid JSON in exactly this format:
   "nextSteps": []
 }
 
-Field guidance (only populate if genuinely present in the conversation):
-- keyThemes: concepts and areas the Learner actually explored
-- insights: concrete positions or realisations the Learner reached
-- openQuestions: threads that came up but weren't resolved
-- nextSteps: actions or further thinking the Learner themselves suggested or that follow naturally from what they said
+Field guidance:
+- keyThemes: topics, concepts, or areas the Learner mentioned or explored
+- insights: positions, conclusions, or realisations the Learner expressed
+- openQuestions: things the Learner seemed uncertain about or left unresolved
+- nextSteps: actions or further thinking that naturally follow from what they said
 
 Return only the JSON object, no other text.`;
 

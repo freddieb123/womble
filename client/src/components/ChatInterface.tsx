@@ -554,6 +554,9 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
                   {displayThinkingMap.nextSteps?.length > 0 && (
                     <InlineMapSection color="green" title="Suggested Next Steps" items={displayThinkingMap.nextSteps} />
                   )}
+                  {!displayThinkingMap.keyThemes?.length && !displayThinkingMap.insights?.length && !displayThinkingMap.openQuestions?.length && !displayThinkingMap.nextSteps?.length && (
+                    <p className="text-sm text-gray-400 italic">The conversation was too brief to generate a thinking map. Try having a longer discussion next time.</p>
+                  )}
                   {displayFeedback && displayFeedback.bullets.length > 0 && (
                     <div className="pt-2 border-t space-y-2">
                       <div className="flex items-center justify-between">

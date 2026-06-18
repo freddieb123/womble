@@ -374,7 +374,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, attemp
         } catch {}
       };
 
-      // chat activities use a higher VAD threshold + longer silence to reduce false interruptions
+      // kept for reference — no longer used to branch VAD settings
       const isChatType = (config.type as string) === 'chat' || (config.type as string) === 'two-way-conversation';
 
       // Data channel for events
@@ -387,7 +387,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, attemp
         // Enable user speech transcription (try gpt-4o-transcribe for gpt-realtime-2 compatibility)
         dc.send(JSON.stringify({
           type: 'session.update',
-          session: { input_audio_transcription: { model: 'gpt-4o-transcribe' } },
+          session: { input_audio_transcription: { model: 'whisper-1' } },
         }));
         // VAD only — instructions already set via the calls session config
         dc.send(JSON.stringify({
@@ -395,8 +395,9 @@ export default function VoiceChatInterface({ config, sessionId, userName, attemp
           session: {
             turn_detection: {
               type: 'server_vad',
-              threshold: isChatType ? 0.95 : 0.9,
-              silence_duration_ms: isChatType ? 1500 : 1000,
+              threshold: 0.95,
+              silence_duration_ms: 1500,
+              prefix_padding_ms: 500,
             },
           },
         }));
@@ -793,6 +794,9 @@ export default function VoiceChatInterface({ config, sessionId, userName, attemp
               {displayThinkingMap.insights?.length > 0 && <VoiceMapSection color="yellow" title="Insights Reached" items={displayThinkingMap.insights} />}
               {displayThinkingMap.openQuestions?.length > 0 && <VoiceMapSection color="purple" title="Open Questions" items={displayThinkingMap.openQuestions} />}
               {displayThinkingMap.nextSteps?.length > 0 && <VoiceMapSection color="green" title="Suggested Next Steps" items={displayThinkingMap.nextSteps} />}
+              {!displayThinkingMap.keyThemes?.length && !displayThinkingMap.insights?.length && !displayThinkingMap.openQuestions?.length && !displayThinkingMap.nextSteps?.length && (
+                <p className="text-sm text-gray-400 italic">The conversation was too brief to generate a thinking map. Try having a longer discussion next time.</p>
+              )}
               {displayFeedback && displayFeedback.bullets.length > 0 && (
                 <div className="pt-2 border-t space-y-2">
                   <div className="flex items-center justify-between">

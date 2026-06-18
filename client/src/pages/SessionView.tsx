@@ -572,14 +572,14 @@ function TwoWayConversationInSession({
     setAutoStart(true);
   };
 
-  const generateFeedback = async () => {
-    if (transcript.length === 0) return;
+  const generateFeedback = async (transcriptToUse: any[]) => {
+    if (transcriptToUse.length === 0) return;
     setIsGeneratingFeedback(true);
     try {
       const res = await fetch(`/api/dual-conversation/feedback?configId=${configId}&sessionId=${sessionId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript, participant1Name, participant2Name }),
+        body: JSON.stringify({ transcript: transcriptToUse, participant1Name, participant2Name }),
       });
       if (!res.ok) throw new Error('Failed to generate feedback');
       setFeedback(await res.json());
@@ -589,6 +589,11 @@ function TwoWayConversationInSession({
     } finally {
       setIsGeneratingFeedback(false);
     }
+  };
+
+  const handleTranscriptReady = (t: any[]) => {
+    setTranscript(t);
+    generateFeedback(t);
   };
 
   return (
@@ -618,16 +623,18 @@ function TwoWayConversationInSession({
         sessionId={sessionId}
         participant1Name={participant1Name}
         participant2Name={participant2Name}
-        onTranscriptReady={setTranscript}
+        onTranscriptReady={handleTranscriptReady}
         autoStart={autoStart}
       />
-      {transcript.length > 0 && (
-        <Button
-          onClick={feedback ? () => setShowFeedbackModal(true) : generateFeedback}
-          disabled={isGeneratingFeedback}
-          className="w-full"
-        >
-          {isGeneratingFeedback ? 'Generating Feedback...' : feedback ? 'View Feedback' : 'Generate Feedback'}
+      {isGeneratingFeedback && (
+        <Button disabled className="w-full">
+          <span className="mr-2 h-4 w-4 animate-spin inline-block border-2 border-white border-t-transparent rounded-full" />
+          Generating Feedback…
+        </Button>
+      )}
+      {!isGeneratingFeedback && feedback && (
+        <Button onClick={() => setShowFeedbackModal(true)} className="w-full">
+          View Feedback
         </Button>
       )}
     </div>

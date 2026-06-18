@@ -61,6 +61,7 @@ export default function DualConversationPage({}: DualConversationPageProps) {
 
   const handleTranscriptReady = (newTranscript: any[]) => {
     setTranscript(newTranscript);
+    generateFeedbackWith(newTranscript);
   };
   
   const handleNameSubmit = (names: { participant1Name: string; participant2Name: string }) => {
@@ -81,60 +82,23 @@ export default function DualConversationPage({}: DualConversationPageProps) {
     setAutoStartRecording(true);
   };
 
-  const generateFeedback = async () => {
-    if (!parsedConfigId || !sessionId || transcript.length === 0) {
-      toast({
-        title: "Cannot generate feedback",
-        description: "Ensure a conversation has been recorded and transcribed first.",
-        variant: "destructive"
-      });
-      return;
-    }
+  const generateFeedbackWith = async (transcriptToUse: any[]) => {
+    if (!parsedConfigId || !sessionId || transcriptToUse.length === 0) return;
 
     setIsGeneratingFeedback(true);
-    
     try {
-      // Get the participant names from the transcript UI
-      const participant1Name = config?.participant1Name || 'Participant 1';
-      const participant2Name = config?.participant2Name || 'Participant 2';
-      
-      // Send the entire transcript to the backend
+      const p1 = config?.participant1Name || participant1Name || 'Participant 1';
+      const p2 = config?.participant2Name || participant2Name || 'Participant 2';
       const response = await fetch(`/api/dual-conversation/feedback?configId=${parsedConfigId}&sessionId=${sessionId}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          transcript,
-          participant1Name,
-          participant2Name
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: transcriptToUse, participant1Name: p1, participant2Name: p2 })
       });
-      
-      if (!response.ok) {
-        throw new Error("Failed to generate feedback");
-      }
-      
+      if (!response.ok) throw new Error("Failed to generate feedback");
       const feedbackData = await response.json();
       setFeedback(feedbackData);
-      
-      // Show the feedback modal
       setShowFeedbackModal(true);
-      
-      // Check if we received a note indicating mock data
-      if (feedbackData.note) {
-        toast({
-          title: "Sample Data Notice",
-          description: feedbackData.note
-        });
-      } else {
-        toast({
-          title: "Feedback Generated",
-          description: "Conversation feedback is now available.",
-        });
-      }
     } catch (error) {
-      console.error("Error generating feedback:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to generate feedback",
@@ -227,15 +191,18 @@ export default function DualConversationPage({}: DualConversationPageProps) {
               autoStart={autoStartRecording}
             />
             
-            {transcript.length > 0 && (
+            {isGeneratingFeedback && (
               <div className="mt-6">
-                <Button 
-                  onClick={feedback ? () => setShowFeedbackModal(true) : generateFeedback}
-                  disabled={isGeneratingFeedback}
-                  className="w-full py-6 text-lg"
-                >
-                  {isGeneratingFeedback ? 'Generating Feedback...' : 
-                   feedback ? 'View Feedback' : 'Generate Feedback'}
+                <Button disabled className="w-full py-6 text-lg">
+                  <span className="mr-2 h-4 w-4 animate-spin inline-block border-2 border-white border-t-transparent rounded-full" />
+                  Generating Feedback…
+                </Button>
+              </div>
+            )}
+            {!isGeneratingFeedback && feedback && (
+              <div className="mt-6">
+                <Button onClick={() => setShowFeedbackModal(true)} className="w-full py-6 text-lg">
+                  View Feedback
                 </Button>
               </div>
             )}
