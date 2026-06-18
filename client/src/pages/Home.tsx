@@ -1499,8 +1499,8 @@ export default function Home() {
       }}>
         <DialogContent className="max-w-2xl h-[85vh] flex flex-col">
           <DialogHeader><DialogTitle>Create New Activity</DialogTitle></DialogHeader>
-          <ScrollArea className="flex-1 -mx-6 px-6">
-            <div className="py-4">
+          <ScrollArea className="flex-1 -mx-6 pl-6 pr-4">
+            <div className="py-4 pr-2">
               <CreateGptWizard
                 key={isCreateOpen ? 'open' : 'closed'}
                 onSave={(finalConfig) => saveConfig.mutate(finalConfig)}
