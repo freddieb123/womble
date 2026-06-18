@@ -33,3 +33,4 @@ When the user says "merge to production":
 - Do not commit `.env`, `old_data/`, `uploads/`, or `scripts/` (all in `.gitignore`)
 - Do not hardcode port 5000 — always use `process.env.PORT || "5000"`
 - Do not use `process.env.REPL_ID` or other Replit-specific variables
+- Do not change any AI model identifier in the code (e.g. `whisper-1`, `gpt-4o`, `gpt-realtime-1.5`, `gemini-3.1-flash-live-preview`, etc.) without the user explicitly asking for it. Changing a model name can silently break features. If a task seems to require a model change, check with the user first.
