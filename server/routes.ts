@@ -1167,7 +1167,6 @@ Write detailed, specific configuration for this activity.`,
           session: {
             type: "realtime",
             model: "gpt-realtime-1.5",
-            input_audio_transcription: { model: "whisper-1" },
           },
         }),
       });
