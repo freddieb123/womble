@@ -15,6 +15,7 @@ interface Props {
   isSaving: boolean;
   prefill?: AdminConfig;
   startType?: WizardType;
+  onBack?: () => void;
 }
 
 type WizardType = 'chat' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz' | 'group-board' | 'user-tester' | 'doc-critique' | 'task-walkthrough';
@@ -114,7 +115,7 @@ function normaliseCriteria(raw: string): string {
   return raw;
 }
 
-export default function CreateGptWizard({ onSave, isSaving, prefill, startType }: Props) {
+export default function CreateGptWizard({ onSave, isSaving, prefill, startType, onBack }: Props) {
   const initialStep: 1 | 2 | 3 = prefill ? 3 : startType ? 2 : 1;
   const [step, setStep] = useState<1 | 2 | 3>(initialStep);
   const [selectedType, setSelectedType] = useState<WizardType | null>(
@@ -142,6 +143,8 @@ export default function CreateGptWizard({ onSave, isSaving, prefill, startType }
   const recognitionRef = useRef<any>(null);
   const [isDictating, setIsDictating] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
+
+  const backToTypeSelect = () => startType && onBack ? onBack() : setStep(1);
 
   useEffect(() => {
     return () => { recognitionRef.current?.stop(); };
@@ -376,7 +379,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill, startType }
           {generateError && <p className="text-xs text-red-600">{generateError}</p>}
         </div>
         <div className="flex justify-between pt-2">
-          <Button variant="ghost" onClick={() => setStep(1)}>
+          <Button variant="ghost" onClick={backToTypeSelect}>
             <ArrowLeft className="h-4 w-4 mr-2" /> Back
           </Button>
           <div className="flex gap-2">
@@ -460,7 +463,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill, startType }
           </label>
         </div>
         <div className="flex justify-between pt-2">
-          <Button variant="ghost" onClick={() => setStep(1)}>
+          <Button variant="ghost" onClick={backToTypeSelect}>
             <ArrowLeft className="h-4 w-4 mr-2" /> Back
           </Button>
           <Button onClick={() => onSave(config)} disabled={isSaving || !config.title.trim()}>
@@ -477,7 +480,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill, startType }
         <StepIndicator current={3} />
         <QuickFireQuizEditor config={config} onConfigChange={setConfig} />
         <div className="flex justify-between pt-4 border-t">
-          <Button variant="ghost" onClick={() => setStep(1)}>
+          <Button variant="ghost" onClick={backToTypeSelect}>
             <ArrowLeft className="h-4 w-4 mr-2" /> Back
           </Button>
           <Button
@@ -542,7 +545,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill, startType }
           />
         </div>
         <div className="flex justify-between pt-2">
-          <Button variant="ghost" onClick={() => setStep(1)}>
+          <Button variant="ghost" onClick={backToTypeSelect}>
             <ArrowLeft className="h-4 w-4 mr-2" /> Back
           </Button>
           <Button onClick={() => onSave(config)} disabled={isSaving || !config.title.trim()}>

@@ -1507,6 +1507,7 @@ export default function Home() {
                 isSaving={saveConfig.isPending}
                 prefill={wizardPrefill}
                 startType={wizardPrefill ? undefined : (wizardStartType as any)}
+                onBack={wizardStartType && !wizardPrefill ? () => { setIsCreateOpen(false); setIsAddAgentOpen(true); } : undefined}
               />
             </div>
           </ScrollArea>
