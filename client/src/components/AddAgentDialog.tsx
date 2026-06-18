@@ -1,13 +1,18 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { Search, Copy } from "lucide-react";
+import {
+  Search, Copy,
+  MessageSquare, Users, GraduationCap, Brain, Zap, LayoutGrid, Monitor, FileText, ClipboardList,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 type Tab = 'scratch' | 'duplicate';
+
+export type WizardType = 'chat' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' |
+  'quick-fire-quiz' | 'group-board' | 'user-tester' | 'doc-critique' | 'task-walkthrough';
 
 type AgentItem = {
   id: number;
@@ -20,22 +25,20 @@ type AgentItem = {
 interface Props {
   onSelectTemplate: (template: any) => void;
   onDuplicate: (agent: AgentItem) => void;
-  onStartFromScratch: () => void;
+  onTypeSelected: (type: WizardType) => void;
 }
 
-const TYPE_LABEL: Record<string, string> = {
-  chat: 'Conversation',
-  'teach-ai': 'Teach an AI',
-  'thought-partner': 'Thought Partner',
-  'two-way-conversation': 'Two-way',
-  quiz: 'Quiz',
-  upload: 'Document Review',
-  'quick-fire-quiz': 'Quick Fire Quiz',
-  'group-board': 'Group Board',
-  'user-tester': 'User Tester',
-  'doc-critique': 'Doc Critique',
-  'task-walkthrough': 'Task Walkthrough',
-};
+const ACTIVITY_TYPES: { type: WizardType; label: string; subtitle: string; icon: React.ElementType; color: string }[] = [
+  { type: 'chat',                icon: MessageSquare,  label: 'Conversation with AI',  subtitle: 'Learners chat with an AI playing a role',              color: 'text-green-600' },
+  { type: 'two-way-conversation',icon: Users,           label: 'Two-way Conversation',  subtitle: 'Two people practise a real conversation together',      color: 'text-orange-500' },
+  { type: 'teach-ai',            icon: GraduationCap,  label: 'Teach an AI',           subtitle: 'Learners explain a topic to an AI learner',             color: 'text-blue-600' },
+  { type: 'thought-partner',     icon: Brain,           label: 'Thought Partner',       subtitle: 'Helps learners think through how an idea applies',      color: 'text-teal-600' },
+  { type: 'quick-fire-quiz',     icon: Zap,             label: 'Quick Fire Quiz',       subtitle: 'Kahoot-style live quiz with speed bonuses',             color: 'text-amber-500' },
+  { type: 'group-board',         icon: LayoutGrid,      label: 'Group Board',           subtitle: 'Collaborative canvas — groups add post-its in real time',color: 'text-emerald-600' },
+  { type: 'user-tester',         icon: Monitor,         label: 'User Tester',           subtitle: 'AI watches a demo and gives spoken feedback',           color: 'text-violet-600' },
+  { type: 'doc-critique',        icon: FileText,        label: 'Critique a Document',   subtitle: 'Apprentices read a doc — AI coaches what to notice',    color: 'text-purple-600' },
+  { type: 'task-walkthrough',    icon: ClipboardList,   label: 'Task Walkthrough',      subtitle: 'Talk through a task — AI coaches to completion',        color: 'text-cyan-600' },
+];
 
 const TYPE_CLASSES: Record<string, string> = {
   chat: 'bg-green-50 text-green-700 border-green-200',
@@ -51,7 +54,14 @@ const TYPE_CLASSES: Record<string, string> = {
   'task-walkthrough': 'bg-cyan-50 text-cyan-700 border-cyan-200',
 };
 
-export default function AddAgentDialog({ onDuplicate, onStartFromScratch }: Props) {
+const TYPE_LABEL: Record<string, string> = {
+  chat: 'Conversation', 'teach-ai': 'Teach an AI', 'thought-partner': 'Thought Partner',
+  'two-way-conversation': 'Two-way', quiz: 'Quiz', upload: 'Document Review',
+  'quick-fire-quiz': 'Quick Fire Quiz', 'group-board': 'Group Board',
+  'user-tester': 'User Tester', 'doc-critique': 'Doc Critique', 'task-walkthrough': 'Task Walkthrough',
+};
+
+export default function AddAgentDialog({ onDuplicate, onTypeSelected }: Props) {
   const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('scratch');
   const [search, setSearch] = useState('');
@@ -66,13 +76,6 @@ export default function AddAgentDialog({ onDuplicate, onStartFromScratch }: Prop
     enabled: !!user?.id,
   });
 
-  // If no agents, go straight to wizard
-  useEffect(() => {
-    if (!isLoading && agents.length === 0) {
-      onStartFromScratch();
-    }
-  }, [isLoading, agents.length]);
-
   const filteredAgents = agents.filter(a =>
     a.title.toLowerCase().includes(search.toLowerCase())
   );
@@ -82,47 +85,52 @@ export default function AddAgentDialog({ onDuplicate, onStartFromScratch }: Prop
   return (
     <div className="flex flex-col h-full -mt-6">
       {/* Green header */}
-      <div className="bg-green-700 text-white px-6 pt-6 pb-5 -mx-6 mb-5 rounded-t-lg">
+      <div className="bg-green-700 text-white px-6 pt-6 pb-5 -mx-6 mb-4 rounded-t-lg flex-shrink-0">
         <h2 className="text-xl font-bold mb-1">Add Activity</h2>
         <p className="text-green-200 text-sm mb-4">Build a new activity from scratch or duplicate an existing one</p>
 
-        {/* Toggle — only shown when agents exist */}
-        {hasAgents && (
-          <div className="flex gap-1 bg-green-800/60 rounded-lg p-1 w-fit">
-            <button
-              onClick={() => { setTab('scratch'); setSearch(''); }}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                tab === 'scratch' ? 'bg-white text-green-800 shadow-sm' : 'text-green-100 hover:text-white'
-              }`}
-            >
-              Build from scratch
-            </button>
-            <button
-              onClick={() => setTab('duplicate')}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                tab === 'duplicate' ? 'bg-white text-green-800 shadow-sm' : 'text-green-100 hover:text-white'
-              }`}
-            >
-              Duplicate existing
-            </button>
-          </div>
-        )}
+        <div className="flex gap-1 bg-green-800/60 rounded-lg p-1 w-fit">
+          <button
+            onClick={() => { setTab('scratch'); setSearch(''); }}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              tab === 'scratch' ? 'bg-white text-green-800 shadow-sm' : 'text-green-100 hover:text-white'
+            }`}
+          >
+            Build from scratch
+          </button>
+          <button
+            onClick={() => setTab('duplicate')}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              tab === 'duplicate' ? 'bg-white text-green-800 shadow-sm' : 'text-green-100 hover:text-white'
+            }`}
+          >
+            Duplicate existing
+          </button>
+        </div>
       </div>
 
       {tab === 'scratch' && (
-        <div className="flex flex-col items-center justify-center flex-1 gap-4 py-8">
-          <p className="text-sm text-gray-500 text-center max-w-xs">
-            Configure a new activity from scratch — choose the type, write a prompt, and set feedback criteria.
-          </p>
-          <Button className="bg-green-600 hover:bg-green-700" onClick={onStartFromScratch}>
-            Start building
-          </Button>
+        <div className="flex-1 overflow-hidden">
+          <div className="grid grid-cols-3 gap-2 h-full pb-2">
+            {ACTIVITY_TYPES.map(({ type, label, subtitle, icon: Icon, color }) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => onTypeSelected(type)}
+                className="flex flex-col items-center justify-center gap-1.5 rounded-lg border border-gray-200 p-3 text-center transition-colors hover:border-green-400 hover:bg-green-50/50 group"
+              >
+                <Icon className={`h-6 w-6 ${color} group-hover:scale-110 transition-transform`} />
+                <div className="font-medium text-gray-900 text-xs leading-tight">{label}</div>
+                <div className="text-gray-400 text-[10px] leading-tight">{subtitle}</div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
       {tab === 'duplicate' && (
         <>
-          <div className="relative mb-4">
+          <div className="relative mb-4 flex-shrink-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search your activities…"
@@ -132,31 +140,37 @@ export default function AddAgentDialog({ onDuplicate, onStartFromScratch }: Prop
             />
           </div>
 
-          <ScrollArea className="flex-1 -mx-6 px-6">
-            <div className="space-y-2 pb-4">
-              {filteredAgents.map((agent) => (
-                <div
-                  key={agent.id}
-                  onClick={() => onDuplicate(agent)}
-                  className="flex items-center gap-3 border border-gray-200 rounded-lg px-4 py-3 cursor-pointer hover:border-green-400 hover:bg-green-50/40 transition-colors group"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{agent.title}</p>
-                    {agent.userInstructions && (
-                      <p className="text-xs text-gray-500 truncate mt-0.5">{agent.userInstructions}</p>
-                    )}
-                  </div>
-                  <Badge variant="outline" className={`text-xs flex-shrink-0 ${TYPE_CLASSES[agent.type] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                    {TYPE_LABEL[agent.type] ?? agent.type}
-                  </Badge>
-                  <Copy className="h-4 w-4 text-gray-400 group-hover:text-green-600 flex-shrink-0 transition-colors" />
-                </div>
-              ))}
-              {filteredAgents.length === 0 && (
-                <div className="text-center py-10 text-gray-400 text-sm">No activities match your search.</div>
-              )}
+          {!hasAgents && !isLoading ? (
+            <div className="flex-1 flex items-center justify-center text-center text-gray-400 text-sm">
+              <p>No activities yet. Use &ldquo;Build from scratch&rdquo; to create your first one.</p>
             </div>
-          </ScrollArea>
+          ) : (
+            <ScrollArea className="flex-1 -mx-6 px-6">
+              <div className="space-y-2 pb-4">
+                {filteredAgents.map((agent) => (
+                  <div
+                    key={agent.id}
+                    onClick={() => onDuplicate(agent)}
+                    className="flex items-center gap-3 border border-gray-200 rounded-lg px-4 py-3 cursor-pointer hover:border-green-400 hover:bg-green-50/40 transition-colors group"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{agent.title}</p>
+                      {agent.userInstructions && (
+                        <p className="text-xs text-gray-500 truncate mt-0.5">{agent.userInstructions}</p>
+                      )}
+                    </div>
+                    <Badge variant="outline" className={`text-xs flex-shrink-0 ${TYPE_CLASSES[agent.type] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                      {TYPE_LABEL[agent.type] ?? agent.type}
+                    </Badge>
+                    <Copy className="h-4 w-4 text-gray-400 group-hover:text-green-600 flex-shrink-0 transition-colors" />
+                  </div>
+                ))}
+                {filteredAgents.length === 0 && (
+                  <div className="text-center py-10 text-gray-400 text-sm">No activities match your search.</div>
+                )}
+              </div>
+            </ScrollArea>
+          )}
         </>
       )}
     </div>

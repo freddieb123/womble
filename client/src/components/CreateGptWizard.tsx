@@ -14,6 +14,7 @@ interface Props {
   onSave: (config: AdminConfig) => void;
   isSaving: boolean;
   prefill?: AdminConfig;
+  startType?: WizardType;
 }
 
 type WizardType = 'chat' | 'two-way-conversation' | 'teach-ai' | 'thought-partner' | 'quick-fire-quiz' | 'group-board' | 'user-tester' | 'doc-critique' | 'task-walkthrough';
@@ -113,17 +114,18 @@ function normaliseCriteria(raw: string): string {
   return raw;
 }
 
-export default function CreateGptWizard({ onSave, isSaving, prefill }: Props) {
-  const [step, setStep] = useState<1 | 2 | 3>(prefill ? 3 : 1);
+export default function CreateGptWizard({ onSave, isSaving, prefill, startType }: Props) {
+  const initialStep: 1 | 2 | 3 = prefill ? 3 : startType ? 2 : 1;
+  const [step, setStep] = useState<1 | 2 | 3>(initialStep);
   const [selectedType, setSelectedType] = useState<WizardType | null>(
-    prefill ? (prefill.type as WizardType) : null
+    prefill ? (prefill.type as WizardType) : startType ?? null
   );
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateError, setGenerateError] = useState('');
   const [config, setConfig] = useState<AdminConfig>(prefill ?? {
     title: '',
-    type: 'chat',
+    type: startType ?? 'chat',
     systemPrompt: '',
     userInstructions: '',
     feedbackCriteria: '',
