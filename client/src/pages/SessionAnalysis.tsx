@@ -81,6 +81,8 @@ export default function SessionAnalysis() {
   });
 
   const activeConfigId = selectedConfigId ?? sessionData?.configs[0]?.id ?? null;
+  const selectedConfig = sessionData?.configs.find(c => c.id === activeConfigId);
+  const isTwoWayConversation = selectedConfig?.type === 'two-way-conversation';
 
   const { data: submissions, isLoading: loadingSubmissions } = useQuery<Submission[]>({
     queryKey: [`/api/conversations/${activeConfigId}`],
@@ -90,13 +92,34 @@ export default function SessionAnalysis() {
       const data = await res.json();
       return Array.isArray(data) ? data : [];
     },
-    enabled: !!activeConfigId,
+    enabled: !!activeConfigId && !isTwoWayConversation,
     refetchInterval: 30_000,
   });
 
-  const selectedConfig = sessionData?.configs.find(c => c.id === activeConfigId);
+  const { data: dualSubmissions, isLoading: loadingDualSubmissions } = useQuery<Submission[]>({
+    queryKey: [`/api/dual-conversations/${activeConfigId}`],
+    queryFn: async () => {
+      const res = await fetch(`/api/dual-conversations/${activeConfigId}`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (!Array.isArray(data)) return [];
+      return data.map((d: any) => ({
+        sessionId: d.sessionId,
+        userName: [d.participant1Name, d.participant2Name].filter(Boolean).join(' & ') || 'Participants',
+        chatMode: null,
+        feedback: d.feedback?.overall ?? null,
+        messages: d.transcript,
+      }));
+    },
+    enabled: !!activeConfigId && isTwoWayConversation,
+    refetchInterval: 30_000,
+  });
+
+  const activeSubmissions: Submission[] = isTwoWayConversation ? (dualSubmissions ?? []) : (submissions ?? []);
+  const loadingActiveSubmissions = isTwoWayConversation ? loadingDualSubmissions : loadingSubmissions;
+
   const isThoughtPartner = selectedConfig?.type === 'thought-partner';
-  const allBullets = (submissions ?? []).flatMap(s => s.feedback?.bullets ?? []).filter(Boolean);
+  const allBullets = activeSubmissions.flatMap(s => s.feedback?.bullets ?? []).filter(Boolean);
 
   const { data: themes } = useQuery<{ positive: string; constructive: string }>({
     queryKey: ['/api/analyze-themes', activeConfigId, allBullets.length],
@@ -104,7 +127,7 @@ export default function SessionAnalysis() {
       const res = await fetch('/api/analyze-themes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ feedbacks: (submissions ?? []).map(s => s.feedback).filter(Boolean) }),
+        body: JSON.stringify({ feedbacks: activeSubmissions.map(s => s.feedback).filter(Boolean) }),
       });
       if (!res.ok) return { positive: '', constructive: '' };
       return res.json();
@@ -118,15 +141,15 @@ export default function SessionAnalysis() {
   if (!sessionData) return <ErrorScreen message="Session not found." />;
 
   const withFeedback = isThoughtPartner
-    ? (submissions ?? []).filter(s => s.feedback?.thinkingMap != null)
-    : (submissions ?? []).filter(s => s.feedback && s.feedback.score !== null);
+    ? activeSubmissions.filter(s => s.feedback?.thinkingMap != null)
+    : activeSubmissions.filter(s => s.feedback && s.feedback.score !== null);
   const avgScore = !isThoughtPartner && withFeedback.length > 0
     ? withFeedback.reduce((sum, s) => sum + (s.feedback!.score ?? 0), 0) / withFeedback.length
     : null;
 
   // Collect key themes from thought-partner thinking maps
   const tpKeyThemes = isThoughtPartner
-    ? [...new Set((submissions ?? []).flatMap(s => s.feedback?.thinkingMap?.keyThemes ?? []))]
+    ? [...new Set(activeSubmissions.flatMap(s => s.feedback?.thinkingMap?.keyThemes ?? []))]
     : [];
 
   return (
@@ -202,7 +225,7 @@ export default function SessionAnalysis() {
                 )}
                 {selectedConfig.type !== 'quick-fire-quiz' && (
                   <span className={`text-sm text-gray-400 ${isThoughtPartner || avgScore === null ? 'ml-auto' : ''}`}>
-                    {(submissions ?? []).length} submission{(submissions ?? []).length !== 1 ? 's' : ''}
+                    {activeSubmissions.length} submission{activeSubmissions.length !== 1 ? 's' : ''}
                   </span>
                 )}
               </div>
@@ -211,14 +234,14 @@ export default function SessionAnalysis() {
                 <div className="max-w-lg mx-auto">
                   <QuickFireQuizAnalysis configId={activeConfigId!} />
                 </div>
-              ) : loadingSubmissions ? (
+              ) : loadingActiveSubmissions ? (
                 <div className="text-gray-400 text-sm">Loading submissions...</div>
-              ) : (submissions ?? []).length === 0 ? (
+              ) : activeSubmissions.length === 0 ? (
                 <div className="text-center py-16 text-gray-400 text-sm">No submissions yet for this activity.</div>
               ) : (
                 <div className="space-y-4">
                   {/* Analysis Summary */}
-                  {(submissions ?? []).some(s => s.feedback) && (
+                  {activeSubmissions.some(s => s.feedback) && (
                     <Card className="bg-white">
                       <Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>
                         <CollapsibleTrigger asChild>
@@ -237,7 +260,7 @@ export default function SessionAnalysis() {
                             <div className={`grid ${!isThoughtPartner && avgScore !== null ? 'grid-cols-2' : 'grid-cols-1'} gap-6 pb-4`}>
                               <div>
                                 <p className="text-xs font-medium text-gray-500 mb-1">{isThoughtPartner ? 'Completion Coverage' : 'Feedback Coverage'}</p>
-                                <p className="text-2xl font-bold text-blue-900">{withFeedback.length}/{(submissions ?? []).length}</p>
+                                <p className="text-2xl font-bold text-blue-900">{withFeedback.length}/{activeSubmissions.length}</p>
                                 <p className="text-xs text-gray-500">{isThoughtPartner ? 'summaries generated' : 'submissions with feedback'}</p>
                               </div>
                               {!isThoughtPartner && avgScore !== null && (
@@ -284,7 +307,7 @@ export default function SessionAnalysis() {
                   )}
 
                   {/* Individual submissions */}
-                  {(submissions ?? []).map((s) => (
+                  {activeSubmissions.map((s) => (
                     isThoughtPartner ? (
                       <ThoughtPartnerSubmissionCard key={s.sessionId} submission={s} />
                     ) : (

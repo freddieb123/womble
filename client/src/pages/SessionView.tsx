@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle } from "lucide-react";
 import WombleHeader from "@/components/WombleHeader";
 import WombleFooter from "@/components/WombleFooter";
@@ -546,6 +546,15 @@ function ActivityTimerDisplay({ configId }: { configId: number }) {
   );
 }
 
+type DualConvRecord = {
+  sessionId: string;
+  participant1Name: string;
+  participant2Name: string;
+  transcript: any[];
+  feedback: any;
+  createdAt: string;
+};
+
 function TwoWayConversationInSession({
   configId,
   sessionId,
@@ -555,15 +564,39 @@ function TwoWayConversationInSession({
   sessionId: string;
   config: AdminConfig;
 }) {
-  const [showNamesModal, setShowNamesModal] = useState(true);
+  const queryClient = useQueryClient();
+  const queryKey = [`/api/dual-conversations/${configId}`, sessionId];
+
+  const { data: existingRecords = [] } = useQuery<DualConvRecord[]>({
+    queryKey,
+    queryFn: async () => {
+      const res = await fetch(`/api/dual-conversations/${configId}?sessionId=${sessionId}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: Infinity,
+  });
+
+  const persistedRecord = existingRecords[0] ?? null;
+  const persistedFeedback = persistedRecord?.feedback ?? null;
+
+  const [showNamesModal, setShowNamesModal] = useState(!persistedFeedback);
   const [participant1Name, setParticipant1Name] = useState('');
   const [participant2Name, setParticipant2Name] = useState('');
   const [autoStart, setAutoStart] = useState(false);
   const [transcript, setTranscript] = useState<any[]>([]);
-  const [feedback, setFeedback] = useState<any>(null);
+  const [feedback, setFeedback] = useState<any>(persistedFeedback);
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const hasInitialized = useRef(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (hasInitialized.current || !persistedFeedback) return;
+    hasInitialized.current = true;
+    setFeedback(persistedFeedback);
+    setShowNamesModal(false);
+  }, [persistedFeedback]);
 
   const handleNameSubmit = (names: { participant1Name: string; participant2Name: string }) => {
     setParticipant1Name(names.participant1Name);
@@ -582,8 +615,19 @@ function TwoWayConversationInSession({
         body: JSON.stringify({ transcript: transcriptToUse, participant1Name, participant2Name }),
       });
       if (!res.ok) throw new Error('Failed to generate feedback');
-      setFeedback(await res.json());
+      const feedbackData = await res.json();
+      setFeedback(feedbackData);
       setShowFeedbackModal(true);
+      queryClient.setQueryData<DualConvRecord[]>(queryKey, [
+        {
+          sessionId,
+          participant1Name,
+          participant2Name,
+          transcript: transcriptToUse,
+          feedback: feedbackData,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
     } catch (err: any) {
       toast({ variant: 'destructive', title: 'Error', description: err.message });
     } finally {
@@ -596,6 +640,17 @@ function TwoWayConversationInSession({
     generateFeedback(t);
   };
 
+  const handleRecordAgain = () => {
+    queryClient.setQueryData(queryKey, []);
+    setFeedback(null);
+    setTranscript([]);
+    setParticipant1Name('');
+    setParticipant2Name('');
+    setAutoStart(false);
+    setShowNamesModal(true);
+    hasInitialized.current = false;
+  };
+
   return (
     <div className="flex flex-col h-full p-6 gap-4 overflow-y-auto">
       {/* Title + instructions header */}
@@ -606,36 +661,51 @@ function TwoWayConversationInSession({
         )}
       </div>
 
-      <ParticipantsNameModal
-        open={showNamesModal}
-        onSubmit={handleNameSubmit}
-        participant1Role={config.participant1Role ?? undefined}
-        participant2Role={config.participant2Role ?? undefined}
-      />
-      <FeedbackModal
-        open={showFeedbackModal}
-        onOpenChange={setShowFeedbackModal}
-        feedback={feedback}
-        transcript={transcript}
-      />
-      <DualConversationRecorder
-        configId={configId}
-        sessionId={sessionId}
-        participant1Name={participant1Name}
-        participant2Name={participant2Name}
-        onTranscriptReady={handleTranscriptReady}
-        autoStart={autoStart}
-      />
-      {isGeneratingFeedback && (
-        <Button disabled className="w-full">
-          <span className="mr-2 h-4 w-4 animate-spin inline-block border-2 border-white border-t-transparent rounded-full" />
-          Generating Feedback…
-        </Button>
-      )}
-      {!isGeneratingFeedback && feedback && (
-        <Button onClick={() => setShowFeedbackModal(true)} className="w-full">
-          View Feedback
-        </Button>
+      {/* Show existing feedback directly if available and no new recording in progress */}
+      {feedback && !isGeneratingFeedback ? (
+        <div className="flex flex-col gap-3">
+          <FeedbackModal
+            open={showFeedbackModal}
+            onOpenChange={setShowFeedbackModal}
+            feedback={feedback}
+            transcript={transcript}
+          />
+          <Button onClick={() => setShowFeedbackModal(true)} className="w-full">
+            View Feedback
+          </Button>
+          <Button variant="outline" onClick={handleRecordAgain} className="w-full">
+            Record Again
+          </Button>
+        </div>
+      ) : (
+        <>
+          <ParticipantsNameModal
+            open={showNamesModal}
+            onSubmit={handleNameSubmit}
+            participant1Role={config.participant1Role ?? undefined}
+            participant2Role={config.participant2Role ?? undefined}
+          />
+          <FeedbackModal
+            open={showFeedbackModal}
+            onOpenChange={setShowFeedbackModal}
+            feedback={feedback}
+            transcript={transcript}
+          />
+          <DualConversationRecorder
+            configId={configId}
+            sessionId={sessionId}
+            participant1Name={participant1Name}
+            participant2Name={participant2Name}
+            onTranscriptReady={handleTranscriptReady}
+            autoStart={autoStart}
+          />
+          {isGeneratingFeedback && (
+            <Button disabled className="w-full">
+              <span className="mr-2 h-4 w-4 animate-spin inline-block border-2 border-white border-t-transparent rounded-full" />
+              Generating Feedback…
+            </Button>
+          )}
+        </>
       )}
     </div>
   );
