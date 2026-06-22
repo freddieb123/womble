@@ -48,9 +48,10 @@ interface Props {
   configId: number;
   open: boolean;
   onClose: () => void;
+  shareToken?: string;
 }
 
-export default function QuickFireQuizAdminControl({ configId, open, onClose }: Props) {
+export default function QuickFireQuizAdminControl({ configId, open, onClose, shareToken }: Props) {
   const queryClient = useQueryClient();
 
   const { data: state } = useQuery<QuizState>({
@@ -232,7 +233,16 @@ export default function QuickFireQuizAdminControl({ configId, open, onClose }: P
                 {nextLabel}
               </Button>
             )}
-            {phase === "finished" && <span />}
+            {phase === "finished" && shareToken && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(`${window.location.origin}/session-analysis?token=${shareToken}&configId=${configId}`, '_blank')}
+              >
+                View participant answers ↗
+              </Button>
+            )}
+            {phase === "finished" && !shareToken && <span />}
 
             <Button
               variant="outline"

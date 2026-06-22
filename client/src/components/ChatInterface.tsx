@@ -92,7 +92,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
 
   const isThoughtPartner = (config.type as string) === 'thought-partner';
   const [confirmSwitchMode, setConfirmSwitchMode] = useState(false);
-  const [instructionsOpen, setInstructionsOpen] = useState(true);
+  const [instructionsOpen, setInstructionsOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -471,7 +471,15 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
                 <AlertDescription>
                   <div className="font-semibold text-lg">{config.title}</div>
                 </AlertDescription>
-                <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
+                  {onSwitchMode && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setConfirmSwitchMode(true); }}
+                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-full px-2.5 py-1 hover:bg-gray-50 transition-colors"
+                    >
+                      <Mic className="h-3 w-3" />Switch to Voice
+                    </button>
+                  )}
                   <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform ${instructionsOpen ? 'transform rotate-180' : ''}`} />
                 </div>
               </Alert>
@@ -483,6 +491,16 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
             </div>
           </CollapsibleContent>
         </Collapsible>
+      )}
+      {onSwitchMode && !isViewOnly && !config.userInstructions && (
+        <div className="flex justify-end px-2 pb-2">
+          <button
+            onClick={() => setConfirmSwitchMode(true)}
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-full px-2.5 py-1 hover:bg-gray-50 transition-colors"
+          >
+            <Mic className="h-3 w-3" />Switch to Voice
+          </button>
+        </div>
       )}
       {isViewOnly && userName && (
         <div className="p-4 border-b bg-blue-50">
@@ -501,7 +519,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
           }}
         />
       )}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <ScrollArea className="flex-1 min-h-0 p-4" ref={scrollRef}>
         <div className="space-y-4">
           {chatState.messages.map((message: Message) => (
             <MessageBubble key={message.id} message={message} />
@@ -629,27 +647,27 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
                   </Button>
                 </form>
               </div>
-              <div className="px-4 pb-4 space-y-2">
+              <div className="px-4 pb-2 space-y-2">
                 {isThoughtPartner ? (() => {
                   const userMsgCount = chatState.messages?.filter((m: any) => m.role === 'user').length ?? 0;
                   const hasEnough = userMsgCount >= 5;
                   return (
-                    <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Button onClick={handleGetFeedback} variant="outline" disabled={isGettingFeedback} className="flex-1">
+                        {isGettingFeedback ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating...</> : "End & Get Summary"}
+                      </Button>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span className="w-full block">
+                            <span className="flex-1">
                               <Button onClick={handleGetSummary} disabled={isGettingSummary || !hasEnough} className="w-full bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed">
-                                {isGettingSummary ? "Building summary..." : "Get Summary"}
+                                {isGettingSummary ? "Building..." : "Get Summary"}
                               </Button>
                             </span>
                           </TooltipTrigger>
                           {!hasEnough && <TooltipContent><p>We need at least 5 messages from you before we can create this</p></TooltipContent>}
                         </Tooltip>
                       </TooltipProvider>
-                      <Button onClick={handleGetFeedback} variant="outline" disabled={isGettingFeedback} className="w-full">
-                        {isGettingFeedback ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating summary...</> : "End & Get Summary"}
-                      </Button>
                     </div>
                   );
                 })() : (
@@ -672,14 +690,6 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                )}
-                {onSwitchMode && (
-                  <button
-                    onClick={() => setConfirmSwitchMode(true)}
-                    className="w-full text-xs text-gray-400 hover:text-gray-600 py-1 transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <Mic className="h-3 w-3" />Switch to Voice
-                  </button>
                 )}
               </div>
             </>
@@ -787,7 +797,7 @@ export default function ChatInterface({ config, sessionId, userName, isViewOnly,
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="mt-auto py-2 text-center text-xs text-gray-400">
+      <div className="mt-auto pt-1 pb-1 text-center text-xs text-gray-400">
         Your trainer has access to the transcript and feedback.
       </div>
     </div>

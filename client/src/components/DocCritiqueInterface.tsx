@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { FileText, Mic, MicOff, Send } from "lucide-react";
+import { FileText, Mic, MicOff, Send, Expand } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import UserNameModal from "@/components/UserNameModal";
 import type { AdminConfig } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
@@ -18,6 +19,7 @@ type Phase = 'observe' | 'submitting' | 'done';
 
 export default function DocCritiqueInterface({ config, sessionId, userName, onUserNameSubmit }: Props) {
   const [pdfSrc, setPdfSrc] = useState<string | null>(null);
+  const [pdfExpanded, setPdfExpanded] = useState(false);
   const [observation, setObservation] = useState('');
   const [phase, setPhase] = useState<Phase>('observe');
   const [feedbackData, setFeedbackData] = useState<{ bullets: string[]; score?: number; summary?: string } | null>(null);
@@ -117,13 +119,24 @@ export default function DocCritiqueInterface({ config, sessionId, userName, onUs
 
       {/* ── Left: Document viewer ── */}
       <div className="w-1/2 flex-shrink-0 border-r border-gray-200 flex flex-col bg-gray-50">
-        <div className="px-4 py-3 border-b border-gray-200 bg-white flex items-center gap-2">
-          <FileText className="h-4 w-4 text-blue-600" />
-          <span className="text-sm font-medium text-gray-700">Document</span>
+        <div className="px-4 py-3 border-b border-gray-200 bg-white flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-medium text-gray-700">Document</span>
+          </div>
+          {(pdfSrc || config.referenceContent) && (
+            <button
+              onClick={() => setPdfExpanded(true)}
+              className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+              title="Expand document"
+            >
+              <Expand className="h-4 w-4" />
+            </button>
+          )}
         </div>
         <div className="flex-1 min-h-0">
           {pdfSrc ? (
-            <iframe src={pdfSrc} className="w-full h-full border-0" title="Reference document" />
+            <iframe src={`${pdfSrc}#toolbar=0`} className="w-full h-full border-0" title="Reference document" />
           ) : config.referenceContent ? (
             <div className="p-4 overflow-y-auto h-full">
               <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">
@@ -137,6 +150,27 @@ export default function DocCritiqueInterface({ config, sessionId, userName, onUs
           )}
         </div>
       </div>
+
+      {/* ── Expanded document modal ── */}
+      <Dialog open={pdfExpanded} onOpenChange={setPdfExpanded}>
+        <DialogContent className="max-w-[90vw] w-[90vw] h-[90vh] p-0 flex flex-col">
+          <div className="px-4 py-3 border-b flex items-center gap-2 flex-shrink-0">
+            <FileText className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-medium text-gray-700">Document</span>
+          </div>
+          <div className="flex-1 min-h-0">
+            {pdfSrc ? (
+              <iframe src={`${pdfSrc}#toolbar=0`} className="w-full h-full border-0" title="Reference document" />
+            ) : (
+              <div className="p-6 overflow-y-auto h-full">
+                <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">
+                  {config.referenceContent}
+                </pre>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Right: Observation & feedback ── */}
       <div className="flex-1 flex flex-col min-h-0 p-6 gap-4 overflow-y-auto">

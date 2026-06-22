@@ -59,7 +59,7 @@ const TYPE_CONFIG: Record<WizardType, {
   'quick-fire-quiz': {
     icon: Zap,
     label: 'Quick Fire Quiz',
-    subtitle: 'Kahoot-style live quiz — everyone answers simultaneously, speed earns bonus points',
+    subtitle: 'Competitive live quiz — everyone answers simultaneously, speed earns bonus points',
     placeholder: '',
     badge: 'Quick Fire Quiz',
   },
@@ -116,7 +116,8 @@ function normaliseCriteria(raw: string): string {
 }
 
 export default function CreateGptWizard({ onSave, isSaving, prefill, startType, onBack }: Props) {
-  const initialStep: 1 | 2 | 3 = prefill ? 3 : startType ? 2 : 1;
+  const skipDescribeTypes: WizardType[] = ['quick-fire-quiz', 'group-board'];
+  const initialStep: 1 | 2 | 3 = prefill ? 3 : (startType && skipDescribeTypes.includes(startType)) ? 3 : startType ? 2 : 1;
   const [step, setStep] = useState<1 | 2 | 3>(initialStep);
   const [selectedType, setSelectedType] = useState<WizardType | null>(
     prefill ? (prefill.type as WizardType) : startType ?? null
@@ -257,22 +258,25 @@ export default function CreateGptWizard({ onSave, isSaving, prefill, startType, 
     }));
   };
 
-  const StepIndicator = ({ current }: { current: number }) => (
-    <div className="flex items-center gap-2 mb-6">
-      {[1, 2, 3].map((n) => (
-        <div key={n} className="flex items-center gap-2">
-          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold
-            ${n === current ? 'bg-green-600 text-white' : n < current ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
-            {n}
+  const StepIndicator = ({ current, steps = 3 }: { current: number; steps?: number }) => {
+    const labels: Record<string, string> = steps === 2
+      ? { '1': 'Choose type', '2': 'Create questions' }
+      : { '1': 'Choose type', '2': 'Describe', '3': 'Review & save' };
+    return (
+      <div className="flex items-center gap-2 mb-6">
+        {Array.from({ length: steps }, (_, i) => i + 1).map((n) => (
+          <div key={n} className="flex items-center gap-2">
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold
+              ${n === current ? 'bg-green-600 text-white' : n < current ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+              {n}
+            </div>
+            {n < steps && <div className={`h-px w-8 ${n < current ? 'bg-green-300' : 'bg-gray-200'}`} />}
           </div>
-          {n < 3 && <div className={`h-px w-8 ${n < current ? 'bg-green-300' : 'bg-gray-200'}`} />}
-        </div>
-      ))}
-      <span className="ml-2 text-xs text-muted-foreground">
-        {current === 1 ? 'Choose type' : current === 2 ? 'Describe' : 'Review & save'}
-      </span>
-    </div>
-  );
+        ))}
+        <span className="ml-2 text-xs text-muted-foreground">{labels[String(current)]}</span>
+      </div>
+    );
+  };
 
   // ── Step 1: Choose type ──────────────────────────────────────────────────
   if (step === 1) {
@@ -477,7 +481,7 @@ export default function CreateGptWizard({ onSave, isSaving, prefill, startType, 
   if (isQuickFireQuiz) {
     return (
       <div className="space-y-5">
-        <StepIndicator current={3} />
+        <StepIndicator current={2} steps={2} />
         <QuickFireQuizEditor config={config} onConfigChange={setConfig} />
         <div className="flex justify-between pt-4 border-t">
           <Button variant="ghost" onClick={backToTypeSelect}>

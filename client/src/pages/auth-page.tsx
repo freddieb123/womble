@@ -28,7 +28,7 @@ const ACTIVITY_TYPES = [
   { icon: Users,         label: "Two-way Conversation",   subtitle: "Practise real conversations" },
   { icon: GraduationCap, label: "Teach an AI",            subtitle: "Explain topics to an AI learner" },
   { icon: Brain,         label: "Thought Partner",        subtitle: "Think through ideas together" },
-  { icon: Zap,           label: "Quick Fire Quiz",         subtitle: "Kahoot-style live quiz" },
+  { icon: Zap,           label: "Quick Fire Quiz",         subtitle: "Competitive live quiz" },
   { icon: LayoutGrid,    label: "Group Board",             subtitle: "Collaborative real-time canvas" },
   { icon: Monitor,       label: "User Tester",             subtitle: "AI reviews a prototype demo" },
   { icon: FileText,      label: "Critique a Document",    subtitle: "Coach learners on what to notice" },

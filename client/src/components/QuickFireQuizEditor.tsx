@@ -55,25 +55,27 @@ export default function QuickFireQuizEditor({ config, onConfigChange }: Props) {
     updateQuestion(qIdx, { options });
   };
 
-  const generateOptions = async (idx: number) => {
+  const distractorIndices = (q: QuickFireQuestion) =>
+    ([0, 1, 2, 3] as const).filter(i => i !== q.correctIndex);
+
+  const generateDistractors = async (idx: number) => {
     const q = questions[idx];
-    if (!q.question.trim()) return;
+    const correctAnswer = q.options[q.correctIndex];
+    if (!q.question.trim() || !correctAnswer.trim()) return;
     setGeneratingIdx(idx);
     try {
       const res = await fetch("/api/configs/generate-quick-fire-options", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q.question }),
+        body: JSON.stringify({ question: q.question, correctAnswer }),
       });
       if (!res.ok) throw new Error("Generation failed");
-      const { correct, distractors } = await res.json();
-      const shuffled: string[] = [...distractors];
-      const correctPos = Math.floor(Math.random() * 4);
-      shuffled.splice(correctPos, 0, correct);
-      updateQuestion(idx, {
-        options: shuffled as [string, string, string, string],
-        correctIndex: correctPos as 0 | 1 | 2 | 3,
+      const { distractors } = await res.json();
+      const options = [...q.options] as [string, string, string, string];
+      distractorIndices(q).forEach((optIdx, i) => {
+        options[optIdx] = distractors[i] ?? '';
       });
+      updateQuestion(idx, { options });
     } catch {
       // leave options as-is; user can retry
     } finally {
@@ -141,44 +143,46 @@ export default function QuickFireQuizEditor({ config, onConfigChange }: Props) {
               className="resize-none"
             />
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => generateOptions(qIdx)}
-              disabled={!q.question.trim() || generatingIdx === qIdx}
-            >
-              {generatingIdx === qIdx ? (
-                <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Generating…</>
-              ) : (
-                <><Sparkles className="h-3.5 w-3.5 mr-1.5" />Generate options</>
-              )}
-            </Button>
+            {/* Correct answer */}
+            <div className="space-y-1">
+              <Label className="text-xs font-medium text-green-700">Correct answer</Label>
+              <Input
+                value={q.options[q.correctIndex]}
+                onChange={(e) => updateOption(qIdx, q.correctIndex, e.target.value)}
+                placeholder="Type the correct answer…"
+                className="border-green-500 ring-1 ring-green-400"
+              />
+            </div>
 
-            {/* Options */}
+            {/* Incorrect answers */}
             <div className="space-y-2">
-              {OPTION_COLOURS.map((col, optIdx) => (
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-medium text-gray-500">Incorrect answers</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => generateDistractors(qIdx)}
+                  disabled={!q.question.trim() || !q.options[q.correctIndex].trim() || generatingIdx === qIdx}
+                >
+                  {generatingIdx === qIdx ? (
+                    <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Generating…</>
+                  ) : (
+                    <><Sparkles className="h-3.5 w-3.5 mr-1.5" />Generate incorrect answers</>
+                  )}
+                </Button>
+              </div>
+              {distractorIndices(q).map((optIdx, distIdx) => (
                 <div key={optIdx} className="flex items-center gap-2">
-                  <span className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold flex-shrink-0 ${col.bg} ${col.text}`}>
-                    {col.label}
+                  <span className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold flex-shrink-0 ${OPTION_COLOURS[distIdx].bg} ${OPTION_COLOURS[distIdx].text}`}>
+                    {OPTION_COLOURS[distIdx].label}
                   </span>
                   <Input
                     value={q.options[optIdx]}
                     onChange={(e) => updateOption(qIdx, optIdx, e.target.value)}
-                    placeholder={`Option ${col.label}`}
-                    className={`flex-1 ${q.correctIndex === optIdx ? 'border-green-500 ring-1 ring-green-400' : ''}`}
+                    placeholder={`Incorrect answer ${distIdx + 1}…`}
+                    className="flex-1"
                   />
-                  <button
-                    type="button"
-                    onClick={() => updateQuestion(qIdx, { correctIndex: optIdx as 0 | 1 | 2 | 3 })}
-                    className={`flex-shrink-0 text-xs px-2 py-1 rounded transition-colors ${
-                      q.correctIndex === optIdx
-                        ? 'bg-green-100 text-green-700 font-medium'
-                        : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
-                    }`}
-                  >
-                    {q.correctIndex === optIdx ? "✓ Correct" : "Correct?"}
-                  </button>
                 </div>
               ))}
             </div>

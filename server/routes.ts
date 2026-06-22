@@ -2013,6 +2013,65 @@ ${conversation || '(no conversation yet)'}`;
     }
   });
 
+  // Per-question participant responses for trainer review
+  app.get("/api/quick-fire-quiz/:configId/participant-responses", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const configId = parseInt(req.params.configId);
+      if (isNaN(configId)) return res.status(400).json({ error: "Invalid configId" });
+
+      const result = await pool.query<{
+        question_id: number;
+        question_text: string;
+        options: string;
+        correct_index: number;
+        order_index: number;
+        user_name: string | null;
+        selected_index: number;
+        points: number;
+      }>(
+        `SELECT q.id AS question_id, q.question AS question_text, q.options, q.correct_index, q.order_index,
+                r.user_name, r.selected_index, r.points
+         FROM quick_fire_quiz_questions q
+         LEFT JOIN quick_fire_quiz_responses r ON r.question_id = q.id AND r.config_id = $1
+         WHERE q.config_id = $1
+         ORDER BY q.order_index, r.user_name`,
+        [configId]
+      );
+
+      // Group by question
+      const questionsMap = new Map<number, {
+        questionId: number; question: string; options: string[]; correctIndex: number; orderIndex: number;
+        participants: { userName: string; selectedIndex: number; correct: boolean }[];
+      }>();
+
+      for (const row of result.rows) {
+        if (!questionsMap.has(row.question_id)) {
+          let opts: string[] = [];
+          try { opts = typeof row.options === 'string' ? JSON.parse(row.options) : row.options; } catch {}
+          questionsMap.set(row.question_id, {
+            questionId: row.question_id,
+            question: row.question_text,
+            options: opts,
+            correctIndex: row.correct_index,
+            orderIndex: row.order_index,
+            participants: [],
+          });
+        }
+        if (row.user_name !== null && row.selected_index !== null) {
+          questionsMap.get(row.question_id)!.participants.push({
+            userName: row.user_name || 'Anonymous',
+            selectedIndex: row.selected_index,
+            correct: row.points > 0,
+          });
+        }
+      }
+
+      res.json({ questions: [...questionsMap.values()].sort((a, b) => a.orderIndex - b.orderIndex) });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/quick-fire-quiz/:configId/start", requireAuth, async (req: Request, res: Response) => {
     try {
       const configId = parseInt(req.params.configId);
@@ -2140,10 +2199,37 @@ ${conversation || '(no conversation yet)'}`;
 
   app.post("/api/configs/generate-quick-fire-options", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { question } = req.body;
+      const { question, correctAnswer } = req.body;
       if (!question?.trim()) return res.status(400).json({ error: "Question required" });
 
       const openai = new OpenAI();
+
+      if (correctAnswer?.trim()) {
+        // Generate only distractors, using the provided correct answer as context
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: `You generate plausible but incorrect multiple choice options for quiz questions. Return a JSON object with:
+- "distractors": an array of exactly 3 wrong answers
+
+Rules:
+- Every distractor MUST belong to the exact same domain, subject area, and terminology as the question and correct answer. Never introduce concepts from unrelated fields.
+- Distractors should sound like real alternatives someone might confuse with the correct answer — not random terms from a different topic.
+- Match the phrasing style and length of the correct answer (e.g. if the correct answer is "Research stage", distractors should also be "[Noun] stage" or similar).
+- Return only valid JSON, no markdown.`
+            },
+            { role: "user", content: `Question: ${question}\nCorrect answer: ${correctAnswer}` }
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.8,
+        });
+        const raw = JSON.parse(completion.choices[0].message.content!);
+        return res.json({ distractors: raw.distractors });
+      }
+
+      // Fallback: generate all options (backward compat)
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
@@ -2160,7 +2246,6 @@ Rules: all four options must be similar in length and style. Distractors should 
         response_format: { type: "json_object" },
         temperature: 0.8,
       });
-
       const raw = JSON.parse(completion.choices[0].message.content!);
       res.json({ correct: raw.correct, distractors: raw.distractors });
     } catch (error: any) {

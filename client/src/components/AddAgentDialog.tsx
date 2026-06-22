@@ -33,7 +33,7 @@ const ACTIVITY_TYPES: { type: WizardType; label: string; subtitle: string; icon:
   { type: 'two-way-conversation',icon: Users,           label: 'Two-way Conversation',  subtitle: 'Two people practise a real conversation together',      color: 'text-orange-500' },
   { type: 'teach-ai',            icon: GraduationCap,  label: 'Teach an AI',           subtitle: 'Learners explain a topic to an AI learner',             color: 'text-blue-600' },
   { type: 'thought-partner',     icon: Brain,           label: 'Thought Partner',       subtitle: 'Helps learners think through how an idea applies',      color: 'text-teal-600' },
-  { type: 'quick-fire-quiz',     icon: Zap,             label: 'Quick Fire Quiz',       subtitle: 'Kahoot-style live quiz with speed bonuses',             color: 'text-amber-500' },
+  { type: 'quick-fire-quiz',     icon: Zap,             label: 'Quick Fire Quiz',       subtitle: 'Competitive live quiz with speed bonuses',             color: 'text-amber-500' },
   { type: 'group-board',         icon: LayoutGrid,      label: 'Group Board',           subtitle: 'Collaborative canvas — groups add post-its in real time',color: 'text-emerald-600' },
   { type: 'user-tester',         icon: Monitor,         label: 'User Tester',           subtitle: 'AI watches a demo and gives spoken feedback',           color: 'text-violet-600' },
   { type: 'doc-critique',        icon: FileText,        label: 'Critique a Document',   subtitle: 'Apprentices read a doc — AI coaches what to notice',    color: 'text-purple-600' },

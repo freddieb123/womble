@@ -165,7 +165,7 @@ export default function SessionView() {
     const rememberedMode = chatModes[config.id] ?? getStoredChatMode(token, config.id);
     // Only show mode picker when switching to a subsequent activity (name already known)
     // For the first activity, the activity's own UserNameModal handles name + mode together
-    if (userName && config.interactionMode === 'both' && !rememberedMode && !['group-board', 'user-tester', 'doc-critique', 'task-walkthrough', 'two-way-conversation'].includes(config.type)) {
+    if (userName && config.interactionMode === 'both' && !rememberedMode && !['group-board', 'user-tester', 'doc-critique', 'task-walkthrough', 'two-way-conversation', 'quick-fire-quiz'].includes(config.type)) {
       setPendingConfigId(config.id);
       setShowModeModal(true);
     } else {

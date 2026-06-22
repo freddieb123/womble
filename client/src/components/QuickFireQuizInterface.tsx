@@ -46,6 +46,7 @@ interface Props {
 export default function QuickFireQuizInterface({ configId, userName }: Props) {
   const participantId = useRef<string>(crypto.randomUUID());
   const answeredQuestions = useRef<Set<number>>(new Set());
+  const userAnswers = useRef<Map<number, number>>(new Map());
   const queryClient = useQueryClient();
 
   const [localName, setLocalName] = useState(userName ?? "");
@@ -137,6 +138,7 @@ export default function QuickFireQuizInterface({ configId, userName }: Props) {
 
     setSelectedIndex(optIdx);
     answeredQuestions.current.add(qId);
+    userAnswers.current.set(qId, optIdx);
 
     try {
       const res = await fetch(`/api/quick-fire-quiz/${configId}/answer`, {
@@ -428,31 +430,48 @@ export default function QuickFireQuizInterface({ configId, userName }: Props) {
 
           {finishedTab === 'review' && state.allQuestions && state.allQuestions.length > 0 && (
             <div className="space-y-3 pb-4">
-              {state.allQuestions.map((q, qi) => (
-                <div key={q.id} className="border border-gray-100 rounded-lg p-3 space-y-2">
-                  <p className="text-sm font-semibold text-gray-800">Q{qi + 1}. {q.question}</p>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {q.options.map((opt, oi) => {
-                      const isCorrect = oi === q.correctIndex;
-                      const style = OPTION_STYLES[oi];
-                      return (
-                        <div
-                          key={oi}
-                          className={`flex items-center gap-2 rounded px-2.5 py-1.5 text-xs ${
-                            isCorrect ? "bg-green-50 border border-green-300 text-green-800 font-medium" : "bg-gray-50 text-gray-500"
-                          }`}
-                        >
-                          <span className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${isCorrect ? "bg-green-600 text-white" : style.badge + " text-white opacity-60"}`}>
-                            {style.label}
-                          </span>
-                          <span>{opt}</span>
-                          {isCorrect && <span className="ml-auto text-green-600">✓</span>}
-                        </div>
-                      );
-                    })}
+              {state.allQuestions.map((q, qi) => {
+                const userPick = userAnswers.current.get(q.id);
+                const gotItRight = userPick !== undefined && userPick === q.correctIndex;
+                const gotItWrong = userPick !== undefined && userPick !== q.correctIndex;
+                return (
+                  <div key={q.id} className="border border-gray-100 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-gray-800">Q{qi + 1}. {q.question}</p>
+                      {gotItRight && <span className="text-xs font-medium text-green-600 flex-shrink-0 ml-2">✓ Correct</span>}
+                      {gotItWrong && <span className="text-xs font-medium text-red-500 flex-shrink-0 ml-2">✗ Incorrect</span>}
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {q.options.map((opt, oi) => {
+                        const isCorrect = oi === q.correctIndex;
+                        const wasMyWrongPick = gotItWrong && oi === userPick;
+                        const style = OPTION_STYLES[oi];
+                        return (
+                          <div
+                            key={oi}
+                            className={`flex items-center gap-2 rounded px-2.5 py-1.5 text-xs ${
+                              isCorrect
+                                ? "bg-green-50 border border-green-300 text-green-800 font-medium"
+                                : wasMyWrongPick
+                                ? "bg-red-50 border border-red-300 text-red-700 font-medium"
+                                : "bg-gray-50 text-gray-400"
+                            }`}
+                          >
+                            <span className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                              isCorrect ? "bg-green-600 text-white" : wasMyWrongPick ? "bg-red-400 text-white" : style.badge + " text-white opacity-50"
+                            }`}>
+                              {style.label}
+                            </span>
+                            <span className="flex-1">{opt}</span>
+                            {isCorrect && <span className="ml-auto text-green-600 flex-shrink-0">✓</span>}
+                            {wasMyWrongPick && <span className="ml-auto text-red-500 flex-shrink-0">✗ Your answer</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

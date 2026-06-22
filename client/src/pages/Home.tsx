@@ -1591,6 +1591,7 @@ export default function Home() {
       {controllingQuizId !== null && (
         <QuickFireQuizAdminControl
           configId={controllingQuizId}
+          shareToken={selectedSession?.shareToken}
           open={true}
           onClose={() => setControllingQuizId(null)}
         />
