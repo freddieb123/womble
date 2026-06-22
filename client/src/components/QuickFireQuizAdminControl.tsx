@@ -214,7 +214,16 @@ export default function QuickFireQuizAdminControl({ configId, open, onClose, sha
           )}
 
           {/* Action buttons */}
-          <div className="flex items-center justify-between pt-2 border-t">
+          <div className="pt-2 border-t space-y-2">
+            {phase === "finished" && shareToken && (
+              <Button
+                className="w-full bg-green-600 hover:bg-green-700"
+                onClick={() => window.open(`${window.location.origin}/session-analysis?token=${shareToken}&configId=${configId}`, '_blank')}
+              >
+                View participant answers ↗
+              </Button>
+            )}
+            <div className="flex items-center justify-between">
             {phase === "waiting" && (
               <Button
                 onClick={() => startMutation.mutate()}
@@ -233,26 +242,16 @@ export default function QuickFireQuizAdminControl({ configId, open, onClose, sha
                 {nextLabel}
               </Button>
             )}
-            {phase === "finished" && shareToken && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.open(`${window.location.origin}/session-analysis?token=${shareToken}&configId=${configId}`, '_blank')}
-              >
-                View participant answers ↗
-              </Button>
-            )}
-            {phase === "finished" && !shareToken && <span />}
+            {phase === "finished" && <span />}
 
-            <Button
-              variant="outline"
-              size="sm"
+            <button
               onClick={() => resetMutation.mutate()}
               disabled={resetMutation.isPending}
-              className="text-red-600 border-red-200 hover:bg-red-50 ml-auto"
+              className="text-xs text-gray-400 hover:text-red-500 transition-colors ml-auto"
             >
               Reset
-            </Button>
+            </button>
+            </div>
           </div>
         </div>
       </DialogContent>
