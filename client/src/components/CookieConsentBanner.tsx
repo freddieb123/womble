@@ -39,9 +39,9 @@ export default function CookieConsentBanner() {
     <div
       role="dialog"
       aria-label="Cookie consent"
-      className="fixed inset-x-0 bottom-0 z-[100] p-3 sm:p-4"
+      className="fixed inset-x-0 bottom-0 z-[100] p-3 sm:p-4 pointer-events-none"
     >
-      <div className="mx-auto max-w-3xl bg-white border border-gray-200 shadow-lg rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+      <div className="pointer-events-auto mx-auto max-w-3xl bg-white border border-gray-200 shadow-lg rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
         <p className="text-sm text-gray-600 leading-relaxed flex-1">
           We use essential cookies to run the site and, with your permission, analytics cookies
           (Mixpanel) to understand how it's used so we can improve it. You can accept or reject
