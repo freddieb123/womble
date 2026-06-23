@@ -405,15 +405,18 @@ export default function PrivacyPolicy() {
               run the Service securely. These cannot be switched off.
             </li>
             <li>
-              <strong>Analytics</strong> — we use Mixpanel to understand how the Service is used (for
-              example, which features are popular) so we can improve it. This data is used in an
-              aggregated and pseudonymised way wherever possible.
+              <strong>Analytics (consent-based)</strong> — we use Mixpanel to understand how the
+              Service is used (for example, which features are popular) so we can improve it. These
+              analytics do not run until you accept them via our cookie banner, and you can decline
+              without affecting your use of the Service. This data is used in an aggregated and
+              pseudonymised way wherever possible.
             </li>
           </ul>
           <p>
-            We do not use advertising or third-party marketing tracking cookies. You can control
-            cookies through your browser settings, though blocking essential cookies may stop parts of
-            the Service from working.
+            When you first visit, we ask for your choice through a cookie banner; analytics stay
+            switched off unless you accept. We do not use advertising or third-party marketing
+            tracking cookies. You can also control cookies through your browser settings, though
+            blocking essential cookies may stop parts of the Service from working.
           </p>
         </Section>
 

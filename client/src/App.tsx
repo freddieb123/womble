@@ -19,10 +19,12 @@ import { AuthProvider } from "./hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
 import { ProtectedRoute } from "./lib/protected-route";
+import CookieConsentBanner from "./components/CookieConsentBanner";
 
 function App() {
   return (
     <AuthProvider>
+      <CookieConsentBanner />
       <Switch>
         <Route path="/" component={LandingPage} />
         <Route path="/auth" component={AuthPage} />
