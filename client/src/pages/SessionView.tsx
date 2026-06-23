@@ -21,7 +21,7 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import {
   Keyboard, Mic, MessageSquare, Users, GraduationCap, Brain,
-  Zap, LayoutGrid, Monitor, FileText, ClipboardList, HelpCircle, Upload,
+  Zap, LayoutGrid, Monitor, FileText, ClipboardList, HelpCircle, Upload, Menu, X,
 } from "lucide-react";
 import type { AdminConfig } from "@/lib/types";
 import { ParticipantCount, LiveLeaderboard } from "@/components/LiveActivityPanel";
@@ -88,6 +88,7 @@ export default function SessionView() {
   const [pendingConfigId, setPendingConfigId] = useState<number | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const isDraggingRef = useRef(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // One stable sessionId per config
   const sessionIds = useRef<Record<number, string>>({});
@@ -173,6 +174,7 @@ export default function SessionView() {
         setChatModes(prev => ({ ...prev, [config.id]: rememberedMode }));
       }
       setSelectedConfigId(config.id);
+      setMobileSidebarOpen(false);
     }
   };
 
@@ -183,6 +185,7 @@ export default function SessionView() {
     setSelectedConfigId(pendingConfigId);
     setPendingConfigId(null);
     setShowModeModal(false);
+    setMobileSidebarOpen(false);
   };
 
   const handleSwitchMode = (configId: number, mode: ChatMode) => {
@@ -255,15 +258,40 @@ export default function SessionView() {
     <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       <WombleHeader />
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Mobile backdrop */}
+        {mobileSidebarOpen && (
+          <div
+            className="md:hidden fixed inset-0 bg-black/40 z-40"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+        )}
+
+        {/* Sidebar — static on desktop, slide-in overlay on mobile */}
         <div
-          className="flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-y-auto relative"
+          className={`flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-y-auto
+            fixed md:relative inset-y-0 left-0 z-50 md:z-auto
+            transition-transform duration-200 ease-in-out
+            ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          `}
           style={{ width: sidebarWidth }}
         >
-          {/* Drag handle */}
+          {/* Mobile close button */}
+          <div className="md:hidden flex items-center justify-between px-3 pt-4 pb-2">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Activities</p>
+            <button onClick={() => setMobileSidebarOpen(false)} className="p-1 rounded hover:bg-gray-100">
+              <X className="h-4 w-4 text-gray-400" />
+            </button>
+          </div>
+
+          {/* Desktop label */}
+          <div className="hidden md:block px-3 pt-4 pb-2">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Activities</p>
+          </div>
+
+          {/* Drag handle (desktop only) */}
           <div
-            className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-green-200 active:bg-green-300 transition-colors z-10"
+            className="hidden md:block absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-green-200 active:bg-green-300 transition-colors z-10"
             onMouseDown={(e) => {
               e.preventDefault();
               isDraggingRef.current = true;
@@ -283,9 +311,7 @@ export default function SessionView() {
               window.addEventListener('mouseup', onUp);
             }}
           />
-          <div className="px-3 pt-4 pb-2">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Activities</p>
-          </div>
+
           <nav className="flex-1 px-2 pb-4 space-y-1">
             {configs.map((cfg) => {
               const isSelected = cfg.id === selectedConfigId;
@@ -332,6 +358,23 @@ export default function SessionView() {
         </div>
 
         {/* Main content */}
+        <div className="flex-1 overflow-hidden flex flex-col min-w-0">
+          {/* Mobile top bar */}
+          <div className="md:hidden flex items-center gap-3 px-3 py-2 bg-white border-b border-gray-200 flex-shrink-0">
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="p-1.5 rounded-lg hover:bg-gray-100 flex-shrink-0"
+            >
+              <Menu className="h-5 w-5 text-gray-500" />
+            </button>
+            <span className="text-sm font-medium text-gray-800 truncate">
+              {selectedConfig?.title ?? 'Select an activity'}
+            </span>
+            {selectedConfig && (
+              <span className="ml-auto flex-shrink-0 w-2 h-2 rounded-full bg-green-500" />
+            )}
+          </div>
+
         <div className="flex-1 overflow-hidden p-4 flex gap-4">
           {/* Left panel: participant count */}
           <div className="hidden lg:flex lg:flex-col w-40 flex-shrink-0 pt-1">
@@ -441,6 +484,7 @@ export default function SessionView() {
             )}
           </div>
         </div>
+        </div>{/* end mobile flex-col wrapper */}
       </div>
 
       <WombleFooter />

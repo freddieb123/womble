@@ -14,6 +14,7 @@ import GroupBoardAdminPage from "./pages/GroupBoardAdminPage";
 import AuthPage from "./pages/auth-page";
 import ResetPasswordPage from "./pages/reset-password-page";
 import LandingPage from "./pages/LandingPage";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import { AuthProvider } from "./hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
@@ -25,6 +26,7 @@ function App() {
       <Switch>
         <Route path="/" component={LandingPage} />
         <Route path="/auth" component={AuthPage} />
+        <Route path="/privacypolicy" component={PrivacyPolicy} />
         <Route path="/reset-password" component={ResetPasswordPage} />
         <ProtectedRoute path="/dashboard" component={Home} />
         <Route path="/chat" component={UserView} />

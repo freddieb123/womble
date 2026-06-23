@@ -485,6 +485,7 @@ export default function LandingPage() {
               <h4>Company</h4>
               <ul>
                 <li><a href="mailto:womblefeedback@gmail.com">Contact us</a></li>
+                <li><a href="/privacypolicy">Privacy policy</a></li>
               </ul>
             </div>
           </div>
