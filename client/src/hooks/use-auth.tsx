@@ -69,6 +69,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user) => {
       localStorage.setItem('lastLoginMethod', 'email');
+      // Wipe any cached data from a previously logged-in account before showing
+      // this user's data, so one account can never see another's cached content.
+      queryClient.clear();
       identify(String(user.id), { email: user.email });
       queryClient.setQueryData(["/api/user"], user);
       setLocation("/dashboard");
@@ -93,6 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: () => {
       track(EventName.USER_LOGOUT, {});
       reset();
+      // Clear all cached account data on logout so nothing leaks to the next user.
+      queryClient.clear();
       queryClient.setQueryData(["/api/user"], null);
       setLocation("/auth");
     },
@@ -116,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return res.json();
     },
     onSuccess: (user) => {
+      queryClient.clear();
       identify(String(user.id), { email: user.email });
       queryClient.setQueryData(["/api/user"], user);
       toast({ description: "Registered successfully" });
@@ -147,6 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const user = await res.json();
       localStorage.setItem('lastLoginMethod', 'google');
+      queryClient.clear();
       identify(String(user.id), { email: user.email });
       queryClient.setQueryData(["/api/user"], user);
       setLocation("/dashboard");
@@ -184,6 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const user = await res.json();
       localStorage.setItem('lastLoginMethod', 'microsoft');
+      queryClient.clear();
       identify(String(user.id), { email: user.email });
       queryClient.setQueryData(["/api/user"], user);
       setLocation("/dashboard");
