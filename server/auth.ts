@@ -101,18 +101,25 @@ async function getUserByEmail(email: string) {
 }
 
 async function ensureLibrarySession(userId: number) {
-  const existing = await db.query.sessions.findFirst({
-    where: and(eq(sessions.userId, userId), eq(sessions.isLibrary, true)),
-  });
-  if (!existing) {
-    await db.insert(sessions).values({
-      userId,
-      shareToken: crypto.randomUUID(),
-      title: 'My Activities',
-      isLibrary: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+  // Creating the library session is a non-critical side effect of auth. It must
+  // never block sign-in — if it fails (e.g. the is_library column is missing on
+  // a database that hasn't been migrated), log it and carry on.
+  try {
+    const existing = await db.query.sessions.findFirst({
+      where: and(eq(sessions.userId, userId), eq(sessions.isLibrary, true)),
     });
+    if (!existing) {
+      await db.insert(sessions).values({
+        userId,
+        shareToken: crypto.randomUUID(),
+        title: 'My Activities',
+        isLibrary: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+  } catch (err) {
+    console.error("ensureLibrarySession failed (continuing without it):", err);
   }
 }
 

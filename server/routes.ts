@@ -3283,19 +3283,24 @@ Score: [1-10 based on overall coverage and quality of explanation]
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
       // Ensure every user has a library session (catch-all for accounts that
-      // pre-date the registration-time creation, or that slipped through).
-      const existingLibrary = await db.query.sessions.findFirst({
-        where: and(eq(sessions.userId, userId as number), eq(sessions.isLibrary, true)),
-      });
-      if (!existingLibrary) {
-        await db.insert(sessions).values({
-          userId: userId as number,
-          shareToken: crypto.randomUUID(),
-          title: 'My Activities',
-          isLibrary: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+      // pre-date the registration-time creation, or that slipped through). This
+      // is best-effort — a failure here must not break the sessions list.
+      try {
+        const existingLibrary = await db.query.sessions.findFirst({
+          where: and(eq(sessions.userId, userId as number), eq(sessions.isLibrary, true)),
         });
+        if (!existingLibrary) {
+          await db.insert(sessions).values({
+            userId: userId as number,
+            shareToken: crypto.randomUUID(),
+            title: 'My Activities',
+            isLibrary: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        }
+      } catch (err) {
+        console.error("library session backfill failed (continuing):", err);
       }
 
       const userSessions = await db.query.sessions.findMany({
