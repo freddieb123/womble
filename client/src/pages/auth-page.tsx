@@ -32,7 +32,7 @@ const ACTIVITY_TYPES = [
   { icon: LayoutGrid,    label: "Group Board",             subtitle: "Collaborative real-time canvas" },
   { icon: Monitor,       label: "User Tester",             subtitle: "AI reviews a prototype demo" },
   { icon: FileText,      label: "Critique a Document",    subtitle: "Coach learners on what to notice" },
-  { icon: ClipboardList, label: "Task Walkthrough",        subtitle: "Voice-guided task coaching" },
+  { icon: ClipboardList, label: "Task Walkthrough",        subtitle: "Walkthrough with an AI to get feedback" },
 ];
 
 export default function AuthPage() {
@@ -133,13 +133,6 @@ export default function AuthPage() {
               </form>
             </Form>
 
-            <p className="text-xs text-muted-foreground text-center">
-              By registering, you agree to our{" "}
-              <Link href="/terms" className="underline hover:text-foreground">Terms of Service</Link>{" "}
-              and{" "}
-              <Link href="/privacypolicy" className="underline hover:text-foreground">Privacy Policy</Link>
-            </p>
-
             <div className="relative my-1">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
@@ -169,6 +162,13 @@ export default function AuthPage() {
                 Sign up with Microsoft
               </Button>
             </div>
+
+            <p className="text-xs text-muted-foreground text-center">
+              By registering, you agree to our{" "}
+              <Link href="/terms" className="underline hover:text-foreground">Terms of Service</Link>{" "}
+              and{" "}
+              <Link href="/privacypolicy" className="underline hover:text-foreground">Privacy Policy</Link>
+            </p>
           </div>
 
           <button
