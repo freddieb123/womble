@@ -648,6 +648,9 @@ export default function Home() {
   });
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
+    // Library view shows activities from all sessions — reordering would corrupt
+    // session-specific ordering, so we disable it here.
+    if (isLibraryView) return;
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     const oldIndex = allSessionAgents.findIndex(c => c.id === active.id);
@@ -655,7 +658,7 @@ export default function Home() {
     const reordered = arrayMove(allSessionAgents, oldIndex, newIndex);
     setAgentOrderOverride(reordered);
     reorderAgents.mutate(reordered.map(c => c.id));
-  }, [allSessionAgents, reorderAgents]);
+  }, [allSessionAgents, reorderAgents, isLibraryView]);
 
   // ── Slide suggestions ─────────────────────────────────────────────────────
 

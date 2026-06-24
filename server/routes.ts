@@ -3073,9 +3073,18 @@ Score: [1-10 based on overall coverage and quality of explanation]
       });
       if (!session) return res.status(404).json({ error: "Session not found" });
 
+      // Library sessions show all activities the user has ever created, not just
+      // the ones assigned to this particular session.
+      const configsWhere = session.isLibrary
+        ? and(eq(chatConfigs.userId, userId as number), eq(chatConfigs.deleted, false))
+        : and(eq(chatConfigs.sessionId, session.id), eq(chatConfigs.deleted, false));
+      const configsOrder = session.isLibrary
+        ? [desc(chatConfigs.createdAt)]
+        : [chatConfigs.sessionOrder];
+
       const configs = await db.query.chatConfigs.findMany({
-        where: and(eq(chatConfigs.sessionId, session.id), eq(chatConfigs.deleted, false)),
-        orderBy: [chatConfigs.sessionOrder],
+        where: configsWhere,
+        orderBy: configsOrder,
         with: {
           conversations: true,
           uploads: true,
@@ -3273,20 +3282,46 @@ Score: [1-10 based on overall coverage and quality of explanation]
       const userId = req.user?.id;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
+      // Ensure every user has a library session (catch-all for accounts that
+      // pre-date the registration-time creation, or that slipped through).
+      const existingLibrary = await db.query.sessions.findFirst({
+        where: and(eq(sessions.userId, userId as number), eq(sessions.isLibrary, true)),
+      });
+      if (!existingLibrary) {
+        await db.insert(sessions).values({
+          userId: userId as number,
+          shareToken: crypto.randomUUID(),
+          title: 'My Activities',
+          isLibrary: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+
       const userSessions = await db.query.sessions.findMany({
         where: eq(sessions.userId, userId as number),
         orderBy: [desc(sessions.updatedAt)],
       });
 
-      // Get config counts per session
+      // Get config counts per session. For library sessions, count all user
+      // configs (since the library view shows everything they've ever created).
       const sessionIds = userSessions.map(s => s.id);
       const counts: Record<number, number> = {};
       if (sessionIds.length > 0) {
+        const totalAllConfigs = await db.query.chatConfigs.findMany({
+          where: and(eq(chatConfigs.userId, userId as number), eq(chatConfigs.deleted, false)),
+        });
+        const totalCount = totalAllConfigs.length;
         for (const sid of sessionIds) {
-          const configs = await db.query.chatConfigs.findMany({
-            where: and(eq(chatConfigs.sessionId, sid), eq(chatConfigs.deleted, false)),
-          });
-          counts[sid] = configs.length;
+          const session = userSessions.find(s => s.id === sid)!;
+          if (session.isLibrary) {
+            counts[sid] = totalCount;
+          } else {
+            const configs = await db.query.chatConfigs.findMany({
+              where: and(eq(chatConfigs.sessionId, sid), eq(chatConfigs.deleted, false)),
+            });
+            counts[sid] = configs.length;
+          }
         }
       }
 

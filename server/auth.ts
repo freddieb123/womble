@@ -3,11 +3,11 @@ import { Strategy as LocalStrategy } from "passport-local";
 import { Express } from "express";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import crypto, { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { users, insertUserSchema, type SelectUser } from "@db/schema";
+import { users, sessions, insertUserSchema, type SelectUser } from "@db/schema";
 import { db, pool } from "@db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { fromZodError } from "zod-validation-error";
 import { z } from "zod";
 import { sendEmail, generatePasswordResetEmail } from "./email";
@@ -100,6 +100,22 @@ async function getUserByEmail(email: string) {
   return db.select().from(users).where(eq(users.email, email)).limit(1);
 }
 
+async function ensureLibrarySession(userId: number) {
+  const existing = await db.query.sessions.findFirst({
+    where: and(eq(sessions.userId, userId), eq(sessions.isLibrary, true)),
+  });
+  if (!existing) {
+    await db.insert(sessions).values({
+      userId,
+      shareToken: crypto.randomUUID(),
+      title: 'My Activities',
+      isLibrary: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+}
+
 export function setupAuth(app: Express) {
   const store = new PostgresSessionStore({ pool, createTableIfMissing: true });
   const sessionSettings: session.SessionOptions = {
@@ -172,6 +188,8 @@ export function setupAuth(app: Express) {
         })
         .returning();
 
+      await ensureLibrarySession(user.id);
+
       req.login(user, (err) => {
         if (err) return next(err);
         res.status(201).json(user);
@@ -233,6 +251,7 @@ export function setupAuth(app: Express) {
             lastLoginMethod: 'google',
           })
           .returning();
+        await ensureLibrarySession(user.id);
       }
 
       req.login(user, (err) => {
@@ -278,6 +297,7 @@ export function setupAuth(app: Express) {
             lastLoginMethod: 'microsoft',
           })
           .returning();
+        await ensureLibrarySession(user.id);
       }
 
       req.login(user, (err) => {
