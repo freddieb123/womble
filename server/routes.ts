@@ -1031,6 +1031,9 @@ Keep the tone conversational and direct. Write in the same voice as the original
         return res.status(400).json({ error: 'Could not extract text from the provided content.' });
       }
 
+      console.log(`[suggest-activities] "${fileName || url || 'uploaded'}" — extracted ${slideText.length} chars` +
+        `${slideCount ? ` from ${slideCount} slides` : ''} (cap ${MAX_SLIDE_TEXT})${slideText.length >= MAX_SLIDE_TEXT ? ' — HIT CAP, text truncated' : ''}`);
+
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
@@ -1055,12 +1058,12 @@ Return ONLY a valid JSON array, no other text. Each item:
 {
   "type": one of the types above,
   "title": compelling activity title, max 8 words,
-  "description": 1-2 sentences — what participants do and what they get out of it,
+  "description": 1-2 sentences — what participants do and what they get out of it. NEVER reference "the slides", "the slide deck", "the deck" or "the presentation" here — participants never see your slides. Refer to the content directly instead (e.g. "the steps outlined", "the framework covered", "the key principles") or say "in the session",
   "slideReference": which slides this relates to (e.g. "Slides 4–6") — always include this,
   "slideStartIndex": the first slide number this activity relates to (integer, for ordering),
   "systemPrompt": detailed, specific system prompt for the AI in this activity — reference the actual content from the slides,
   "feedbackCriteria": specific criteria for evaluating the participant's response,
-  "userInstructions": brief friendly instructions shown to the participant (1-2 sentences)
+  "userInstructions": brief friendly instructions shown to the participant (1-2 sentences) — like "description", never reference "the slides"/"the deck"/"the presentation"; participants don't see them
 }
 
 For "quick-fire-quiz" items only, set "systemPrompt", "feedbackCriteria", and "userInstructions" to empty strings ("") — they are not used; the user builds the questions manually.
@@ -1119,7 +1122,7 @@ Return ONLY valid JSON with these fields:
 {
   "systemPrompt": "Detailed AI instructions (250-400 words). Be specific: reference exact concepts, frameworks, terminology and scenarios from the slide content. Include how the AI should behave, what it should probe for, what good looks like, and what common mistakes to address.",
   "feedbackCriteria": "Specific evaluation rubric (150-250 words). List 4-6 concrete things to look for with clear indicators of what good/adequate/missing looks like. Reference the specific content from the slides.",
-  "userInstructions": "Clear, friendly participant-facing instructions (2-4 sentences). Tell them exactly what to do and what to aim for. Make it feel achievable."
+  "userInstructions": "Clear, friendly participant-facing instructions (2-4 sentences). Tell them exactly what to do and what to aim for. Make it feel achievable. NEVER reference 'the slides', 'the slide deck', 'the deck' or 'the presentation' — participants never see them; refer to the content directly (e.g. 'the steps outlined') or say 'in the session'."
 }`,
           },
           {
