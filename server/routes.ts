@@ -1045,6 +1045,8 @@ QUANTITY RULE: Suggest roughly 3–5 activities per 10 slides. So a 10-slide dec
 
 ORDER RULE: Return activities in slide order — suggestions covering earlier slides come first.
 
+IGNORE RULE: Only suggest activities grounded in actual learning content — concepts, frameworks, skills, processes, or knowledge. NEVER suggest an activity based on administrative or housekeeping material such as the agenda, schedule, timetable, breaks, lunch, ground rules, introductions, icebreakers, logistics, title/cover slides, contents pages, "about us", thank-you/closing slides, or anything that isn't substantive teaching content. If a slide or section is purely logistical, skip it entirely rather than forcing an activity onto it.
+
 Available activity types:
 - "chat": Learner has a role-play conversation with an AI playing a character — great for practising interactions, applying principles in a scenario, handling objections, or difficult conversations
 - "teach-ai": Learner explains a concept, framework, or set of principles to an AI playing a naive learner — excellent for consolidating knowledge of content already covered in the slides
@@ -1134,7 +1136,7 @@ Description: ${suggestion.description}
 Slide reference: ${suggestion.slideReference || 'not specified'}
 
 Relevant slide content:
-${(slideContext || '').slice(0, 12000)}
+${(slideContext || '').slice(0, 30000)}
 
 Write detailed, specific configuration for this activity.`,
           },
