@@ -49,16 +49,18 @@ export default function AuthPage() {
     defaultValues: { email: "", password: "" },
   });
 
-  if (user) {
-    return <Redirect to="/dashboard" />;
-  }
-
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const mode = searchParams.get('mode');
     if (mode === 'register') setIsLogin(false);
     else if (mode === 'login') setIsLogin(true);
   }, []);
+
+  // All hooks must run before any conditional return, or React throws
+  // "Rendered fewer hooks than expected" when `user` flips between renders.
+  if (user) {
+    return <Redirect to="/dashboard" />;
+  }
 
   const onSubmit = (data: AuthForm) => {
     if (isLogin) {
