@@ -1043,7 +1043,9 @@ Keep the tone conversational and direct. Write in the same voice as the original
 
 QUANTITY RULE: Suggest roughly 3–5 activities per 10 slides. So a 10-slide deck → 3–5 suggestions; a 20-slide deck → 6–10; a 5-slide deck → 2–3. It is fine — and encouraged — to suggest more than one activity for the same group of slides when there are genuinely different good options (e.g. a role-play AND a quiz for the same content). The user will pick the best one.
 
-ORDER RULE: Return activities in slide order — suggestions covering earlier slides come first.
+PRIORITY RULE: Before anything else, scan the deck for slides that describe, set up, or reference an activity the trainer already intends participants to do — signalled by things like "Activity:", "Exercise:", "Task:", "Discussion", "Group work", "In pairs", "Role play", "Workshop", "Breakout", "Practise", "Scenario", "Case study", "Reflect on". For EVERY such described activity, create a suggestion that MIRRORS it as closely as possible — the same scenario, task and intent — mapped to the closest-fitting activity type. These are the highest priority: never miss one, and they come first. Mark each with "mirrorsExisting": true. ONLY AFTER mirroring every activity the deck already describes, suggest additional fresh activities for other substantive content, marked "mirrorsExisting": false.
+
+ORDER RULE: List all mirrored activities ("mirrorsExisting": true) first, then the additional ideas. Within each of those two groups, keep slide order — suggestions covering earlier slides come first.
 
 IGNORE RULE: Only suggest activities grounded in actual learning content — concepts, frameworks, skills, processes, or knowledge. NEVER suggest an activity based on administrative or housekeeping material such as the agenda, schedule, timetable, breaks, lunch, ground rules, introductions, icebreakers, logistics, title/cover slides, contents pages, "about us", thank-you/closing slides, or anything that isn't substantive teaching content. If a slide or section is purely logistical, skip it entirely rather than forcing an activity onto it.
 
@@ -1063,6 +1065,7 @@ Return ONLY a valid JSON array, no other text. Each item:
   "description": 1-2 sentences — what participants do and what they get out of it. NEVER reference "the slides", "the slide deck", "the deck" or "the presentation" here — participants never see your slides. Refer to the content directly instead (e.g. "the steps outlined", "the framework covered", "the key principles") or say "in the session",
   "slideReference": which slides this relates to (e.g. "Slides 4–6") — always include this,
   "slideStartIndex": the first slide number this activity relates to (integer, for ordering),
+  "mirrorsExisting": true if this mirrors an activity already described/set up in the slides, false if it is a fresh idea you are adding,
   "systemPrompt": detailed, specific system prompt for the AI in this activity — reference the actual content from the slides,
   "feedbackCriteria": specific criteria for evaluating the participant's response,
   "userInstructions": brief friendly instructions shown to the participant (1-2 sentences) — like "description", never reference "the slides"/"the deck"/"the presentation"; participants don't see them
@@ -1085,8 +1088,15 @@ Ground every activity specifically in the slide content — never generic.`,
       let suggestions: any[] = [];
       try { suggestions = JSON.parse(raw); } catch { suggestions = []; }
       suggestions = suggestions
-        .sort((a: any, b: any) => (a.slideStartIndex ?? 999) - (b.slideStartIndex ?? 999))
-        .map((s: any) => { const { slideStartIndex, ...rest } = s; return { ...rest, id: crypto.randomUUID() }; });
+        .sort((a: any, b: any) => {
+          // Activities the deck already describes come first, then fresh ideas;
+          // within each group, keep slide order.
+          const am = a.mirrorsExisting ? 0 : 1;
+          const bm = b.mirrorsExisting ? 0 : 1;
+          if (am !== bm) return am - bm;
+          return (a.slideStartIndex ?? 999) - (b.slideStartIndex ?? 999);
+        })
+        .map((s: any) => { const { slideStartIndex, mirrorsExisting, ...rest } = s; return { ...rest, id: crypto.randomUUID() }; });
 
       res.json({ suggestions, slideCount, slideContext: slideText });
     } catch (error: any) {
