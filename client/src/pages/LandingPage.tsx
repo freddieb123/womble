@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { Helmet } from "react-helmet";
 import { useAuth } from "@/hooks/use-auth";
@@ -8,10 +8,205 @@ import {
   ArrowRight, CheckCircle2, Layers, MessageCircle, Users,
   GraduationCap, Wand2, Sparkles, Copy, Trophy,
   BarChart3, Tag, Check, MessageCircleQuestion, Plus, Mail,
+  Zap, LayoutGrid, Monitor, FileText, ClipboardList, ChevronDown,
 } from "lucide-react";
 import "./LandingPage.css";
 
 const ROTATING_WORDS = ['workshop', 'lecture', 'lesson'];
+
+const ThoughtIcon = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 4 Q 4 4 4 6 L 4 14 Q 4 16 6 16 L 9 16 L 11 19 L 13 16 L 18 16 Q 20 16 20 14 L 20 6 Q 20 4 18 4 Z" />
+    <circle cx="9" cy="10" r="0.6" fill="currentColor" />
+    <circle cx="12" cy="10" r="0.6" fill="currentColor" />
+    <circle cx="15" cy="10" r="0.6" fill="currentColor" />
+  </svg>
+);
+
+type Activity = {
+  key: string;
+  tone: string;
+  icon: ReactNode;
+  title: string;
+  description: string;
+  preview: ReactNode;
+};
+
+const ACTIVITIES: Activity[] = [
+  {
+    key: "chat",
+    tone: "tone-chat",
+    icon: <MessageCircle size={18} />,
+    title: "Chat with AI",
+    description: "Participants have a typed or voice conversation with an AI playing a custom role you define. Sales practice, customer service, difficult conversations.",
+    preview: (
+      <div className="preview">
+        <span className="meta-tag">Roleplay · typed or voice</span>
+        <span className="speaker">AI · sceptical procurement manager</span>
+        <span className="bubble">"What's your best price on a 12-month deal?"</span>
+        <span className="bubble right">"Before we get to numbers, can I understand what's driving the timing?"</span>
+        <span className="bubble">"Mm. I've heard that one before."</span>
+      </div>
+    ),
+  },
+  {
+    key: "teach",
+    tone: "tone-teach",
+    icon: <GraduationCap size={18} />,
+    title: "Teach an AI",
+    description: "Participants explain a topic to an AI set at a specific knowledge level. The AI asks questions rather than giving answers. Your participants have to do the teaching.",
+    preview: (
+      <div className="preview">
+        <span className="meta-tag">Learn-by-teaching</span>
+        <span className="speaker">AI · curious beginner</span>
+        <span className="bubble">"So RICE stands for Reach, Impact, Confidence and Effort."</span>
+        <span className="bubble right">"Great and how would you suggest using it?"</span>
+        <span className="bubble">"Well let's think through a particular context..."</span>
+      </div>
+    ),
+  },
+  {
+    key: "conversation",
+    tone: "tone-conversation",
+    icon: <Users size={18} />,
+    title: "Two-way conversation",
+    description: "Two participants have a real conversation while Womble records it. AI analyses both sides and gives each person feedback.",
+    preview: (
+      <div className="preview">
+        <span className="meta-tag">Pair work · recorded</span>
+        <div className="row">
+          <span className="who">Sam:</span>
+          <span className="bubble">"How would you handle a missed deadline with this client?"</span>
+        </div>
+        <div className="row" style={{ justifyContent: "flex-end" }}>
+          <span className="bubble right">"I'd own it first — say what happened, what I'd change next time."</span>
+          <span className="who" style={{ textAlign: "right" }}>Alex:</span>
+        </div>
+        <div className="row">
+          <span className="who">Sam:</span>
+          <span className="bubble">"What would you say first, exactly?"</span>
+        </div>
+        <span className="rec">
+          <span className="rec-dot" /> Recording · Womble listening
+        </span>
+      </div>
+    ),
+  },
+  {
+    key: "thought",
+    tone: "tone-thought",
+    icon: ThoughtIcon,
+    title: "Thought Partner",
+    description: "An AI that helps participants think through how to apply a concept in their own context. It asks probing questions, surfaces blind spots — they find their own answer.",
+    preview: (
+      <div className="preview">
+        <span className="meta-tag">Apply · open-ended</span>
+        <span className="speaker">AI · thought partner</span>
+        <span className="bubble">"How would I apply active listening with my remote team?"</span>
+        <span className="bubble right">"Well let's talk it through. Give me a summary of the regular weekly meetings you have. We'll step through each one."</span>
+        <span className="bubble">"OK well we have a team meeting every Wednesday and I sometimes find it's a little one-way..."</span>
+      </div>
+    ),
+  },
+  {
+    key: "quiz",
+    tone: "tone-quiz",
+    icon: <Zap size={18} />,
+    title: "Quick Fire Quiz",
+    description: "A competitive live quiz with speed bonuses. Participants race to answer, a leaderboard updates in real time, and Womble shows which questions tripped the room up.",
+    preview: (
+      <div className="preview">
+        <span className="meta-tag">Live · speed bonus</span>
+        <span className="speaker">Live quiz · question 3 of 10 · 8s</span>
+        <span className="bubble">"Which lever moves activation the fastest?"</span>
+        <span className="bubble right">"The onboarding checklist ✓ +120 pts"</span>
+        <span className="bubble">⚡ Fastest correct — Priya takes the lead</span>
+      </div>
+    ),
+  },
+  {
+    key: "board",
+    tone: "tone-board",
+    icon: <LayoutGrid size={18} />,
+    title: "Group Board",
+    description: "A collaborative canvas where small groups add post-its in real time. Womble clusters the themes as they land and feeds the room a live summary you can react to.",
+    preview: (
+      <div className="preview">
+        <span className="meta-tag">Groups · live canvas</span>
+        <span className="speaker">Board · what makes feedback land?</span>
+        <span className="bubble">"Specific, not general"</span>
+        <span className="bubble right">"Tied to one real example"</span>
+        <span className="bubble">"Said soon after it happens"</span>
+      </div>
+    ),
+  },
+  {
+    key: "tester",
+    tone: "tone-tester",
+    icon: <Monitor size={18} />,
+    title: "User Tester",
+    description: "An AI watches a participant demo or screen-share and gives spoken, in-the-moment feedback — like a friendly usability tester thinking out loud as they go.",
+    preview: (
+      <div className="preview">
+        <span className="meta-tag">Demo · spoken feedback</span>
+        <span className="speaker">AI · watching your screen-share</span>
+        <span className="bubble">"I clicked 'Export' but nothing seemed to happen."</span>
+        <span className="bubble right">"Good catch — the spinner there is too subtle."</span>
+        <span className="bubble">"Where would you expect the confirmation?"</span>
+      </div>
+    ),
+  },
+  {
+    key: "doc",
+    tone: "tone-doc",
+    icon: <FileText size={18} />,
+    title: "Critique a Document",
+    description: "Participants read a document you provide while an AI coaches what to notice — gaps, assumptions, weak claims — without ever handing them the answer.",
+    preview: (
+      <div className="preview">
+        <span className="meta-tag">Read · coached</span>
+        <span className="speaker">AI · coaching your read-through</span>
+        <span className="bubble">"The proposal promises delivery by Q3."</span>
+        <span className="bubble right">"What's missing for that to be credible?"</span>
+        <span className="bubble">"There's no resourcing plan behind it."</span>
+      </div>
+    ),
+  },
+  {
+    key: "task",
+    tone: "tone-task",
+    icon: <ClipboardList size={18} />,
+    title: "Task Walkthrough",
+    description: "Participants talk through a task step by step while an AI coaches them to completion — checking their reasoning and nudging when they skip a step.",
+    preview: (
+      <div className="preview">
+        <span className="meta-tag">Step-by-step · coached</span>
+        <span className="speaker">AI · walking through the handover</span>
+        <span className="bubble">"First I'd confirm the customer's account ID."</span>
+        <span className="bubble right">"Good. What do you check before raising the ticket?"</span>
+        <span className="bubble">"Whether there's already an open case."</span>
+      </div>
+    ),
+  },
+];
+
+function ActivityCard({ activity }: { activity: Activity }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className={`activity-card ${activity.tone} ${open ? "is-open" : ""}`}>
+      <button type="button" className="info" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <div className="head">
+          <div className="icon-chip">{activity.icon}</div>
+          <h3>{activity.title}</h3>
+          <ChevronDown size={18} className="chev" />
+        </div>
+        <p>{activity.description}</p>
+      </button>
+      {open && activity.preview}
+    </div>
+  );
+}
 
 export default function LandingPage() {
   const { user } = useAuth();
@@ -56,7 +251,7 @@ export default function LandingPage() {
     "@type": "SoftwareApplication",
     name: "Womble",
     applicationCategory: "EducationalApplication",
-    offers: { "@type": "Offer", price: "8.00", priceCurrency: "GBP" },
+    offers: { "@type": "Offer", price: "20.00", priceCurrency: "GBP" },
     description: "Womble provides bespoke formative feedback for education and training through AI-powered activities.",
     operatingSystem: "Web",
   };
@@ -139,100 +334,14 @@ export default function LandingPage() {
         <div className="container">
           <div className="section-head">
             <span className="eyebrow"><Layers size={14} style={{ display: "inline" }} /> The core product</span>
-            <h2>Four ways to run AI-powered practice</h2>
-            <p className="sub">Pick the shape that fits the moment. Every activity gives every participant their own bespoke feedback.</p>
+            <h2>Nine ways to practise — everyone gets feedback</h2>
+            <p className="sub">Pick the shape that fits the moment. Every activity gives every participant their own bespoke response.</p>
           </div>
 
           <div className="activity-grid">
-            {/* Chat with AI */}
-            <div className="activity-card tone-chat">
-              <div className="preview">
-                <span className="meta-tag">Roleplay · typed or voice</span>
-                <span className="speaker">AI · sceptical procurement manager</span>
-                <span className="bubble">"What's your best price on a 12-month deal?"</span>
-                <span className="bubble right">"Before we get to numbers, can I understand what's driving the timing?"</span>
-                <span className="bubble">"Mm. I've heard that one before."</span>
-              </div>
-              <div className="info">
-                <div className="head">
-                  <div className="icon-chip"><MessageCircle size={18} /></div>
-                  <h3>Chat with AI</h3>
-                </div>
-                <p>Participants have a typed or voice conversation with an AI playing a custom role you define. Sales practice, customer service, difficult conversations.</p>
-              </div>
-            </div>
-
-            {/* Two-way conversation */}
-            <div className="activity-card tone-conversation">
-              <div className="preview">
-                <span className="meta-tag">Pair work · recorded</span>
-                <div className="row">
-                  <span className="who">Sam:</span>
-                  <span className="bubble">"How would you handle a missed deadline with this client?"</span>
-                </div>
-                <div className="row" style={{ justifyContent: "flex-end" }}>
-                  <span className="bubble right">"I'd own it first — say what happened, what I'd change next time."</span>
-                  <span className="who" style={{ textAlign: "right" }}>Alex:</span>
-                </div>
-                <div className="row">
-                  <span className="who">Sam:</span>
-                  <span className="bubble">"What would you say first, exactly?"</span>
-                </div>
-                <span className="rec">
-                  <span className="rec-dot" /> Recording · Womble listening
-                </span>
-              </div>
-              <div className="info">
-                <div className="head">
-                  <div className="icon-chip"><Users size={18} /></div>
-                  <h3>Two-way conversation</h3>
-                </div>
-                <p>Two participants have a real conversation while Womble records it. AI analyses both sides and gives each person feedback.</p>
-              </div>
-            </div>
-
-            {/* Teach an AI */}
-            <div className="activity-card tone-teach">
-              <div className="preview">
-                <span className="meta-tag">Learn-by-teaching</span>
-                <span className="speaker">AI · curious beginner</span>
-                <span className="bubble">"So RICE stands for Reach, Impact, Confidence and Effort."</span>
-                <span className="bubble right">"Great and how would you suggest using it?"</span>
-                <span className="bubble">"Well let's think through a particular context..."</span>
-              </div>
-              <div className="info">
-                <div className="head">
-                  <div className="icon-chip"><GraduationCap size={18} /></div>
-                  <h3>Teach an AI</h3>
-                </div>
-                <p>Participants explain a topic to an AI set at a specific knowledge level. The AI asks questions rather than giving answers. Your participants have to do the teaching.</p>
-              </div>
-            </div>
-
-            {/* Thought Partner */}
-            <div className="activity-card tone-thought">
-              <div className="preview">
-                <span className="meta-tag">Apply · open-ended</span>
-                <span className="speaker">AI · thought partner</span>
-                <span className="bubble">"How would I apply active listening with my remote team?"</span>
-                <span className="bubble right">"Well let's talk it through. Give me a summary of the regular weekly meetings you have. We'll step through each one."</span>
-                <span className="bubble">"OK well we have a team meeting every Wednesday and I sometimes find it's a little one-way..."</span>
-              </div>
-              <div className="info">
-                <div className="head">
-                  <div className="icon-chip">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M6 4 Q 4 4 4 6 L 4 14 Q 4 16 6 16 L 9 16 L 11 19 L 13 16 L 18 16 Q 20 16 20 14 L 20 6 Q 20 4 18 4 Z" />
-                      <circle cx="9" cy="10" r="0.6" fill="currentColor" />
-                      <circle cx="12" cy="10" r="0.6" fill="currentColor" />
-                      <circle cx="15" cy="10" r="0.6" fill="currentColor" />
-                    </svg>
-                  </div>
-                  <h3>Thought Partner</h3>
-                </div>
-                <p>An AI that helps participants think through how to apply a concept in their own context. It asks probing questions, surfaces blind spots — they find their own answer.</p>
-              </div>
-            </div>
+            {ACTIVITIES.map((a) => (
+              <ActivityCard key={a.key} activity={a} />
+            ))}
           </div>
         </div>
       </section>
@@ -336,7 +445,7 @@ export default function LandingPage() {
                 <span className="per">forever</span>
               </div>
               <ul>
-                {["Up to 2 activities", "Unlimited responses", "Personalised feedback for participants", "Basic class summary"].map(f => (
+                {["Up to 3 sessions", "Unlimited responses", "Personalised feedback for participants", "Full class analytics"].map(f => (
                   <li key={f}><Check size={18} className="li-check" /><span>{f}</span></li>
                 ))}
               </ul>
@@ -351,13 +460,11 @@ export default function LandingPage() {
               <h3>Pro</h3>
               <div className="sub-tier">For active trainers</div>
               <div className="price-row">
-                <span className="price">£8</span>
+                <span className="price">£20</span>
                 <span className="per">/ month</span>
-                <span className="strike">£15</span>
               </div>
-              <div className="offer-line"><span className="badge">Limited time</span> save 47%</div>
               <ul>
-                {["Unlimited activities", "Full class analytics", "Custom feedback criteria", "Voice + typed modes", "Priority support"].map(f => (
+                {["Unlimited sessions", "Unlimited responses", "Premium activity types"].map(f => (
                   <li key={f}><Check size={18} className="li-check" /><span>{f}</span></li>
                 ))}
               </ul>
@@ -424,7 +531,7 @@ export default function LandingPage() {
                 },
                 {
                   q: "Can I share activities with my team?",
-                  a: "Yes on Pro (one-way shareable links to your activity templates) and on Enterprise (a proper shared library with permissions and a brand layer). On Free you can run as many sessions as you like — just two activity templates at a time.",
+                  a: "Yes on Pro (one-way shareable links to your activity templates) and on Enterprise (a proper shared library with permissions and a brand layer). On Free you can run up to three sessions, each with unlimited responses.",
                 },
               ].map(({ q, a, open }) => (
                 <details key={q} className="faq-item" open={open}>
@@ -476,9 +583,14 @@ export default function LandingPage() {
               <h4>Activity types</h4>
               <ul>
                 <li><a href="#activities">Chat with AI</a></li>
-                <li><a href="#activities">Two-way conversation</a></li>
                 <li><a href="#activities">Teach an AI</a></li>
+                <li><a href="#activities">Two-way conversation</a></li>
                 <li><a href="#activities">Thought Partner</a></li>
+                <li><a href="#activities">Quick Fire Quiz</a></li>
+                <li><a href="#activities">Group Board</a></li>
+                <li><a href="#activities">User Tester</a></li>
+                <li><a href="#activities">Critique a Document</a></li>
+                <li><a href="#activities">Task Walkthrough</a></li>
               </ul>
             </div>
             <div>

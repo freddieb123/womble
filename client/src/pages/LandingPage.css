@@ -193,8 +193,8 @@
 @media (max-width: 768px) { .lp .section-head h2 { font-size: 32px; } }
 
 /* ── Activity cards ────────────────────────────────────────── */
-.lp .activity-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
-@media (max-width: 768px) { .lp .activity-grid { grid-template-columns: 1fr; } }
+/* Single column so each card reveals in sequence on scroll. */
+.lp .activity-grid { display: flex; flex-direction: column; gap: 18px; max-width: 760px; margin: 0 auto; }
 
 .lp .activity-card {
   background: #fff;
@@ -204,12 +204,25 @@
   transition: box-shadow 200ms ease, transform 200ms ease;
   display: flex; flex-direction: column;
 }
-.lp .activity-card:hover { box-shadow: var(--lp-shadow-md); transform: translateY(-2px); }
+.lp .activity-card:hover { box-shadow: var(--lp-shadow-md); }
+
+/* Header — always visible, click to toggle */
+.lp .activity-card .info {
+  appearance: none; background: none; border: none; width: 100%;
+  text-align: left; cursor: pointer; font: inherit; color: inherit;
+  padding: 20px 22px; display: flex; flex-direction: column; gap: 8px;
+}
+.lp .activity-card .info .head { display: flex; align-items: center; gap: 10px; }
+.lp .activity-card .info .head .chev {
+  margin-left: auto; color: var(--lp-fg-muted); flex-shrink: 0;
+  transition: transform 300ms ease;
+}
+.lp .activity-card.is-open .info .head .chev { transform: rotate(180deg); }
 
 .lp .activity-card .preview {
   padding: 20px;
   background: linear-gradient(135deg, var(--tone-bg) 0%, #fff 200%);
-  border-bottom: 1px solid var(--lp-border-soft);
+  border-top: 1px solid var(--lp-border-soft);
   min-height: 200px;
   display: flex; flex-direction: column; gap: 8px; justify-content: center;
   position: relative;
@@ -237,8 +250,6 @@
   background: rgba(255,255,255,0.9); color: var(--tone-ink);
   border: 1px solid rgba(0,0,0,0.05);
 }
-.lp .activity-card .info { padding: 20px 22px 24px; display: flex; flex-direction: column; gap: 8px; }
-.lp .activity-card .info .head { display: flex; align-items: center; gap: 10px; }
 .lp .activity-card .info .icon-chip {
   width: 36px; height: 36px; border-radius: var(--lp-r-md);
   background: var(--tone-bg); color: var(--tone-ink);
@@ -252,6 +263,11 @@
 .lp .tone-conversation{ --tone-bg: var(--lp-type-conv-bg);    --tone-ink: var(--lp-type-conv-ink); }
 .lp .tone-teach       { --tone-bg: var(--lp-type-teach-bg);   --tone-ink: var(--lp-type-teach-ink); }
 .lp .tone-thought     { --tone-bg: var(--lp-type-thought-bg); --tone-ink: var(--lp-type-thought-ink); }
+.lp .tone-quiz        { --tone-bg: #FEF3C7; --tone-ink: #B45309; }
+.lp .tone-board       { --tone-bg: #D1FAE5; --tone-ink: #047857; }
+.lp .tone-tester      { --tone-bg: #EDE9FE; --tone-ink: #6D28D9; }
+.lp .tone-doc         { --tone-bg: #FAE8FF; --tone-ink: #A21CAF; }
+.lp .tone-task        { --tone-bg: #CFFAFE; --tone-ink: #0E7490; }
 
 /* two-way conversation dual-bubble layout */
 .lp .tone-conversation .preview { gap: 6px; }
