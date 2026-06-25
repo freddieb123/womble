@@ -1,4 +1,4 @@
-import sgMail from "@sendgrid/mail";
+import { Resend } from "resend";
 
 export interface EmailOptions {
   to: string;
@@ -6,45 +6,51 @@ export interface EmailOptions {
   html: string;
 }
 
-const FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || "womblefeedback@gmail.com";
-const FROM_NAME = process.env.SENDGRID_FROM_NAME || "Womble";
+// Resend requires the "from" to be on a domain you've verified in Resend. Free
+// webmail (e.g. gmail.com) is NOT allowed. Until a domain is verified you can use
+// "onboarding@resend.dev", which only delivers to your own Resend account email.
+// Set RESEND_FROM_EMAIL to e.g. "Womble <noreply@womblefeedback.com>" once the
+// domain is verified.
+const FROM = process.env.RESEND_FROM_EMAIL || "Womble <onboarding@resend.dev>";
 
-let configured = false;
-function configure(): boolean {
-  if (configured) return true;
-  const apiKey = process.env.SENDGRID_API_KEY;
-  if (!apiKey) return false;
-  sgMail.setApiKey(apiKey);
-  configured = true;
-  return true;
+let client: Resend | null = null;
+function getClient(): Resend | null {
+  if (client) return client;
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return null;
+  client = new Resend(apiKey);
+  return client;
 }
 
 /**
- * Sends an email via SendGrid. Returns true on success, false otherwise.
+ * Sends an email via Resend. Returns true on success, false otherwise.
  * Never throws — callers can treat email as best-effort so it never blocks the
  * request that triggered it (e.g. registration must still succeed if email fails).
  */
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
-  if (!configure()) {
+  const resend = getClient();
+  if (!resend) {
     console.warn(
-      `[email] SENDGRID_API_KEY not set — skipping email to ${options.to} ("${options.subject}")`,
+      `[email] RESEND_API_KEY not set — skipping email to ${options.to} ("${options.subject}")`,
     );
     return false;
   }
 
   try {
-    await sgMail.send({
+    const { data, error } = await resend.emails.send({
+      from: FROM,
       to: options.to,
-      from: { email: FROM_EMAIL, name: FROM_NAME },
       subject: options.subject,
       html: options.html,
     });
+    if (error) {
+      console.error("[email] Resend rejected the send:", error);
+      return false;
+    }
+    console.log(`[email] sent to ${options.to} (id: ${data?.id})`);
     return true;
   } catch (err: any) {
-    console.error(
-      "[email] Failed to send:",
-      err?.response?.body ?? (err instanceof Error ? err.message : err),
-    );
+    console.error("[email] Failed to send:", err instanceof Error ? err.message : err);
     return false;
   }
 }
