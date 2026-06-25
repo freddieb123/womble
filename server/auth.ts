@@ -123,6 +123,32 @@ async function ensureLibrarySession(userId: number) {
   }
 }
 
+// Matches the frontend's todayTitle() format ("Session - DD/MM/YY").
+function defaultSessionTitle() {
+  const now = new Date();
+  const d = String(now.getDate()).padStart(2, '0');
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const y = String(now.getFullYear()).slice(2);
+  return `Session - ${d}/${m}/${y}`;
+}
+
+// Give every new user a starter (non-library) session so the dashboard lands on
+// the "upload your deck" view rather than the empty library. Best-effort — must
+// never block sign-up.
+async function createDefaultSession(userId: number) {
+  try {
+    await db.insert(sessions).values({
+      userId,
+      shareToken: crypto.randomUUID(),
+      title: defaultSessionTitle(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  } catch (err) {
+    console.error("createDefaultSession failed (continuing):", err);
+  }
+}
+
 // Best-effort welcome email — must never block or fail sign-up.
 function sendWelcomeEmail(user: { email: string; firstName?: string | null }) {
   const { subject, html } = generateWelcomeEmail(user.firstName || "");
@@ -204,6 +230,7 @@ export function setupAuth(app: Express) {
         .returning();
 
       await ensureLibrarySession(user.id);
+      await createDefaultSession(user.id);
       sendWelcomeEmail(user);
 
       req.login(user, (err) => {
@@ -268,6 +295,7 @@ export function setupAuth(app: Express) {
           })
           .returning();
         await ensureLibrarySession(user.id);
+        await createDefaultSession(user.id);
         sendWelcomeEmail(user);
       }
 
@@ -315,6 +343,7 @@ export function setupAuth(app: Express) {
           })
           .returning();
         await ensureLibrarySession(user.id);
+        await createDefaultSession(user.id);
         sendWelcomeEmail(user);
       }
 
