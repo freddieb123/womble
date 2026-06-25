@@ -1049,6 +1049,7 @@ Available activity types:
 - "two-way-conversation": Two real people record a conversation (mock interview, role play with a partner) — AI transcribes and gives feedback
 - "doc-critique": Learner reads a SEPARATE external document (e.g. a case study, contract, report, or business plan that is not part of the slide deck) and shares observations — AI coaches on what they should have noticed. ONLY use this type when the slides explicitly reference an external document for participants to analyse. NEVER suggest it for principles, frameworks, theory, or content that is itself explained in the slides — use "chat" or "teach-ai" for those instead.
 - "task-walkthrough": Learner describes their progress on a task via voice — AI coaches them through completion
+- "quick-fire-quiz": A fast, competitive multiple-choice quiz that tests recall. ONLY suggest this when a set of slides contains significant factual knowledge worth memorising — definitions, processes, regulations, named steps, key figures, terminology. Do NOT suggest it for soft skills, open-ended discussion, or content better practised through conversation. You do NOT write the questions — just propose the quiz with a clear title and description; the user builds the questions themselves.
 
 Return ONLY a valid JSON array, no other text. Each item:
 {
@@ -1061,6 +1062,8 @@ Return ONLY a valid JSON array, no other text. Each item:
   "feedbackCriteria": specific criteria for evaluating the participant's response,
   "userInstructions": brief friendly instructions shown to the participant (1-2 sentences)
 }
+
+For "quick-fire-quiz" items only, set "systemPrompt", "feedbackCriteria", and "userInstructions" to empty strings ("") — they are not used; the user builds the questions manually.
 
 Ground every activity specifically in the slide content — never generic.`,
           },

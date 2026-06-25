@@ -737,6 +737,25 @@ export default function Home() {
   };
 
   const handleBuildSuggestion = async (suggestion: Suggestion) => {
+    // Quiz suggestions can't be auto-built — questions aren't generated. Drop the
+    // user straight into the quiz builder (wizard step 3) with the title prefilled
+    // so they create the questions themselves.
+    if (suggestion.type === 'quick-fire-quiz') {
+      buildingSuggestionIdRef.current = suggestion.id;
+      setWizardPrefill({
+        title: suggestion.title,
+        type: 'quick-fire-quiz',
+        systemPrompt: '',
+        userInstructions: '',
+        feedbackCriteria: '',
+        temperature: 0.7,
+        maxTokens: 1000,
+        quickFireQuestions: [],
+        interactionMode: 'both',
+      });
+      setIsCreateOpen(true);
+      return;
+    }
     setBuildingId(suggestion.id);
     try {
       const res = await fetch('/api/build-suggestion', {
