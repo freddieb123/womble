@@ -13,6 +13,10 @@ export interface EmailOptions {
 // domain is verified.
 const FROM = process.env.RESEND_FROM_EMAIL || "Womble <onboarding@resend.dev>";
 
+// Replies go here. Sending is done from the verified domain (FROM), but since
+// noreply@... isn't a real inbox, point replies at a monitored address.
+const REPLY_TO = process.env.RESEND_REPLY_TO || "womblefeedback@gmail.com";
+
 let client: Resend | null = null;
 function getClient(): Resend | null {
   if (client) return client;
@@ -40,6 +44,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     const { data, error } = await resend.emails.send({
       from: FROM,
       to: options.to,
+      replyTo: REPLY_TO,
       subject: options.subject,
       html: options.html,
     });
