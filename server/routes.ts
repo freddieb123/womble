@@ -936,6 +936,11 @@ Keep the tone conversational and direct. Write in the same voice as the original
   app.post("/api/suggest-activities", requireAuth, async (req: Request, res: Response) => {
     try {
       const { content, fileName, url } = req.body;
+      // Cap on how much extracted slide text we keep and send to the model. gpt-4o
+      // has a 128k-token window, so 50k chars (~12k tokens) is well within budget
+      // and covers ~100+ slides. Used for both extraction and the prompt so we
+      // never extract text we then silently drop.
+      const MAX_SLIDE_TEXT = 50000;
       let slideText = '';
       let slideCount: number | undefined;
 
@@ -960,7 +965,7 @@ Keep the tone conversational and direct. Write in the same voice as the original
                 }
               }
             }
-            slideText = textParts.join(' ').replace(/\s+/g, ' ').trim().slice(0, 20000);
+            slideText = textParts.join(' ').replace(/\s+/g, ' ').trim().slice(0, MAX_SLIDE_TEXT);
             slideCount = pageCount || undefined;
           } catch (e) {
             return res.status(400).json({ error: 'Could not parse PPTX file. Try exporting as PDF.' });
@@ -990,7 +995,7 @@ Keep the tone conversational and direct. Write in the same voice as the original
             }
           }
         }
-        slideText = textParts.join(' ').replace(/\s+/g,' ').trim().slice(0, 20000);
+        slideText = textParts.join(' ').replace(/\s+/g,' ').trim().slice(0, MAX_SLIDE_TEXT);
         slideCount = pageCount || undefined;
         } // end else (PDF)
       } else if (url) {
@@ -1009,7 +1014,7 @@ Keep the tone conversational and direct. Write in the same voice as the original
         }
         const contentType = resp.headers.get('content-type') || '';
         if (contentType.includes('text/plain')) {
-          slideText = (await resp.text()).slice(0, 20000);
+          slideText = (await resp.text()).slice(0, MAX_SLIDE_TEXT);
         } else {
           const html = await resp.text();
           slideText = html
@@ -1018,7 +1023,7 @@ Keep the tone conversational and direct. Write in the same voice as the original
             .replace(/<[^>]+>/g, ' ')
             .replace(/\s+/g, ' ')
             .trim()
-            .slice(0, 20000);
+            .slice(0, MAX_SLIDE_TEXT);
         }
       }
 
@@ -1061,7 +1066,7 @@ Ground every activity specifically in the slide content — never generic.`,
           },
           {
             role: 'user',
-            content: `Slide deck: "${fileName || url || 'uploaded presentation'}" (${slideCount ? `${slideCount} slides` : 'slide count unknown'})\n\nContent:\n${slideText.slice(0, 15000)}\n\nSuggest activities scaled to the deck length, in slide order.`,
+            content: `Slide deck: "${fileName || url || 'uploaded presentation'}" (${slideCount ? `${slideCount} slides` : 'slide count unknown'})\n\nContent:\n${slideText.slice(0, MAX_SLIDE_TEXT)}\n\nSuggest activities scaled to the deck length, in slide order.`,
           },
         ],
         temperature: 0.7,
