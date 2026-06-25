@@ -89,25 +89,17 @@ export function generatePasswordResetEmail(name: string, resetToken: string) {
 }
 
 /**
- * Welcome email sent to every new account.
- *
- * NOTE: The copy below is placeholder text. Replace the contents of `html`
- * (and `subject` if desired) with the final welcome copy when it's ready.
+ * Welcome email sent to every new account. A short personal note from Fred.
  */
-export function generateWelcomeEmail(name: string) {
-  const greeting = name ? `Hi ${name},` : "Hi,";
-
+export function generateWelcomeEmail(_name?: string) {
   return {
-    subject: "Welcome to Womble",
+    subject: "👋 Welcome to Womble",
     html: `
-      <div style="font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #1a1a1a;">
-        <h1 style="font-size: 20px;">Welcome to Womble</h1>
-        <p>${greeting}</p>
-        <p>Thanks for signing up. [Placeholder welcome copy — replace this with the final text.]</p>
-        <p style="margin: 24px 0;">
-          <a href="${appUrl()}/dashboard" style="background: #15803d; color: #ffffff; text-decoration: none; padding: 12px 20px; border-radius: 8px; font-weight: 600; display: inline-block;">Get started</a>
-        </p>
-        <p style="font-size: 13px; color: #999; margin-top: 32px;">— The Womble team</p>
+      <div style="font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #1a1a1a; line-height: 1.5;">
+        <p>Hi there,</p>
+        <p>Thanks so much for signing up to <a href="https://womblefeedback.com" style="color: #15803d;">Womble</a>. We're pretty new, so if you have any issues please let me know!</p>
+        <p><strong>HUGE FAVOUR:</strong> please send through any feedback you have so I can make it better. We'd love to hear from you.</p>
+        <p>Best,<br>Fred</p>
       </div>
     `,
   };
