@@ -808,7 +808,27 @@ export default function Home() {
         body: JSON.stringify({ title }),
       });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/sessions'] }),
+    // Update the title in the cache immediately so the sidebar and page header
+    // change on Enter, rather than after the server round-trip.
+    onMutate: async ({ id, title }) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/sessions'] });
+      await queryClient.cancelQueries({ queryKey: ['/api/sessions', id] });
+      const prevList = queryClient.getQueryData<SessionSummary[]>(['/api/sessions']);
+      const prevDetail = queryClient.getQueryData<SessionDetail | null>(['/api/sessions', id]);
+      queryClient.setQueryData<SessionSummary[]>(['/api/sessions'], (old) =>
+        old?.map(s => s.id === id ? { ...s, title } : s));
+      queryClient.setQueryData<SessionDetail | null>(['/api/sessions', id], (old) =>
+        old ? { ...old, title } : old);
+      return { prevList, prevDetail, id };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prevList !== undefined) queryClient.setQueryData(['/api/sessions'], ctx.prevList);
+      if (ctx?.prevDetail !== undefined) queryClient.setQueryData(['/api/sessions', ctx.id], ctx.prevDetail);
+    },
+    onSettled: (_data, _err, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions', vars.id] });
+    },
   });
 
   const duplicateSession = useMutation({
@@ -907,12 +927,22 @@ export default function Home() {
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       track(EventName.GPT_CONFIRM_CREATION, {
         type: config.type,
         hasQuestions: config.type === 'quiz' && (config.questions?.length ?? 0) > 0,
         interactionMode: config.interactionMode ?? 'both',
       });
+      // Optimistically add the new activity to the open session so it appears in
+      // the list straight away, instead of waiting for the background refetch.
+      if (data?.id && selectedSessionId) {
+        queryClient.setQueryData<SessionDetail | null>(['/api/sessions', selectedSessionId], (old) => {
+          if (!old) return old;
+          if (old.configs?.some(c => c.id === data.id)) return old;
+          const optimistic = { ...data, conversationCount: 0 } as ChatConfig;
+          return { ...old, configs: [...(old.configs ?? []), optimistic], configCount: (old.configCount ?? 0) + 1 };
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
       queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSessionId] });
       setAgentOrderOverride([]);
