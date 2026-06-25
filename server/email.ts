@@ -98,7 +98,7 @@ export function generateWelcomeEmail(_name?: string) {
       <div style="font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #1a1a1a; line-height: 1.5;">
         <p>Hi there,</p>
         <p>Thanks so much for signing up to <a href="https://womblefeedback.com" style="color: #15803d;">Womble</a>. We're pretty new, so if you have any issues please let me know!</p>
-        <p><strong>HUGE FAVOUR:</strong> please send through any feedback you have so I can make it better. We'd love to hear from you.</p>
+        <p><strong>HUGE FAVOUR:</strong> please send through any feedback you have so I can make it better. Just reply to this email and I'll personally respond. We'd love to hear from you.</p>
         <p>Best,<br>Fred</p>
       </div>
     `,
