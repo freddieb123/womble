@@ -7,10 +7,10 @@ import crypto, { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { users, sessions, insertUserSchema, type SelectUser } from "@db/schema";
 import { db, pool } from "@db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gt } from "drizzle-orm";
 import { fromZodError } from "zod-validation-error";
 import { z } from "zod";
-import { sendEmail, generatePasswordResetEmail } from "./email";
+import { sendEmail, generatePasswordResetEmail, generateWelcomeEmail } from "./email";
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 
@@ -123,6 +123,14 @@ async function ensureLibrarySession(userId: number) {
   }
 }
 
+// Best-effort welcome email — must never block or fail sign-up.
+function sendWelcomeEmail(user: { email: string; firstName?: string | null }) {
+  const { subject, html } = generateWelcomeEmail(user.firstName || "");
+  void sendEmail({ to: user.email, subject, html }).catch((err) => {
+    console.error("welcome email failed (continuing):", err);
+  });
+}
+
 export function setupAuth(app: Express) {
   const store = new PostgresSessionStore({ pool, createTableIfMissing: true });
   const sessionSettings: session.SessionOptions = {
@@ -196,6 +204,7 @@ export function setupAuth(app: Express) {
         .returning();
 
       await ensureLibrarySession(user.id);
+      sendWelcomeEmail(user);
 
       req.login(user, (err) => {
         if (err) return next(err);
@@ -259,6 +268,7 @@ export function setupAuth(app: Express) {
           })
           .returning();
         await ensureLibrarySession(user.id);
+        sendWelcomeEmail(user);
       }
 
       req.login(user, (err) => {
@@ -305,6 +315,7 @@ export function setupAuth(app: Express) {
           })
           .returning();
         await ensureLibrarySession(user.id);
+        sendWelcomeEmail(user);
       }
 
       req.login(user, (err) => {
@@ -327,6 +338,78 @@ export function setupAuth(app: Express) {
       res.status(200).json(updated);
     } catch {
       res.status(200).json(req.user);
+    }
+  });
+
+  // Request a password reset. Always responds 200 with a generic message so we
+  // never reveal whether an email is registered (avoids account enumeration).
+  app.post("/api/forgot-password", async (req, res) => {
+    const genericResponse = {
+      message: "If an account exists for that email, a reset link has been sent.",
+    };
+    try {
+      const email = String(req.body?.email || "").trim().toLowerCase();
+      if (!email) return res.status(400).json({ error: "Email is required" });
+
+      const [user] = await getUserByEmail(email);
+      if (user) {
+        // Email a raw token; store only its hash so a DB leak can't reset passwords.
+        const rawToken = randomBytes(32).toString("hex");
+        const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+        const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+        await db
+          .update(users)
+          .set({ resetToken: tokenHash, resetTokenExpiry: expiry })
+          .where(eq(users.id, user.id));
+
+        const { subject, html } = generatePasswordResetEmail(user.firstName || "", rawToken);
+        await sendEmail({ to: user.email, subject, html });
+      }
+
+      return res.status(200).json(genericResponse);
+    } catch (error) {
+      console.error("forgot-password error:", error);
+      // Still return the generic message to avoid leaking information.
+      return res.status(200).json(genericResponse);
+    }
+  });
+
+  // Complete a password reset using the token from the email.
+  app.post("/api/reset-password", async (req, res) => {
+    try {
+      const token = String(req.body?.token || "");
+      const password = String(req.body?.password || "");
+
+      if (!token) return res.status(400).json({ error: "Reset token is required" });
+      if (password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+
+      const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.resetToken, tokenHash), gt(users.resetTokenExpiry, new Date())))
+        .limit(1);
+
+      if (!user) {
+        return res.status(400).json({ error: "This reset link is invalid or has expired." });
+      }
+
+      await db
+        .update(users)
+        .set({
+          password: await hashPassword(password),
+          resetToken: null,
+          resetTokenExpiry: null,
+        })
+        .where(eq(users.id, user.id));
+
+      return res.status(200).json({ message: "Password reset successfully." });
+    } catch (error) {
+      console.error("reset-password error:", error);
+      return res.status(500).json({ error: "Failed to reset password" });
     }
   });
 

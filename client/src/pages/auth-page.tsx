@@ -253,6 +253,11 @@ export default function AuthPage() {
                     </FormItem>
                   )}
                 />
+                <div className="text-right -mt-2">
+                  <Link href="/reset-password" className="text-sm text-muted-foreground hover:text-foreground underline">
+                    Forgot password?
+                  </Link>
+                </div>
                 <div className="space-y-2">
                   <Button
                     type="submit"

@@ -10,7 +10,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 
 const forgotPasswordSchema = z.object({
-  username: z.string().min(1, "Username is required"),
+  email: z.string().email("Enter a valid email address"),
 });
 
 const resetPasswordSchema = z.object({
@@ -31,7 +31,7 @@ export default function ResetPasswordPage() {
   const forgotPasswordForm = useForm<z.infer<typeof forgotPasswordSchema>>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
-      username: "",
+      email: "",
     },
   });
 
@@ -157,19 +157,19 @@ export default function ResetPasswordPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Forgot Password</CardTitle>
-          <CardDescription>Enter your username to receive a password reset link</CardDescription>
+          <CardDescription>Enter your email to receive a password reset link</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...forgotPasswordForm}>
             <form onSubmit={forgotPasswordForm.handleSubmit(onForgotPasswordSubmit)} className="space-y-4">
               <FormField
                 control={forgotPasswordForm.control}
-                name="username"
+                name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Username</FormLabel>
+                    <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter your username" {...field} />
+                      <Input type="email" placeholder="you@example.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

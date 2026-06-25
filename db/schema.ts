@@ -10,6 +10,8 @@ export const users = pgTable("users", {
   lastName: text("last_name"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   lastLoginMethod: text("last_login_method"),
+  resetToken: text("reset_token"),
+  resetTokenExpiry: timestamp("reset_token_expiry"),
 });
 
 export const sessions = pgTable("sessions", {
