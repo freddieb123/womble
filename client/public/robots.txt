@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+Disallow: /auth
+Disallow: /dashboard
+Disallow: /reset-password
+Disallow: /analysis
+Disallow: /dual-analysis
+Disallow: /session-analysis
+Disallow: /present
+Disallow: /presentations
+Disallow: /group-board
+Disallow: /dual-conversation
+Disallow: /session
+Disallow: /chat
+Disallow: /conversation
+Disallow: /transcript
+
+Sitemap: https://womblefeedback.com/sitemap.xml

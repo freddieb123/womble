@@ -208,6 +208,34 @@ function ActivityCard({ activity }: { activity: Activity }) {
   );
 }
 
+const FAQS: { q: string; a: string; open?: boolean }[] = [
+  {
+    q: "Do my participants need to sign up or download anything?",
+    a: "No. You share a link, they click it, they're in. Works on any phone or laptop, in the browser. No accounts, no installs, no friction. They can pick a name and go.",
+    open: true,
+  },
+  {
+    q: "How long does it take to build an activity?",
+    a: "Most trainers have a first activity running in under 90 seconds. Type a sentence describing what you want and the AI drafts the role, the brief and the feedback criteria. You tweak whatever doesn't sound like you, then share the link.",
+  },
+  {
+    q: "Is the feedback actually any good?",
+    a: "It's grounded in the criteria you set. You can paste in your own marking rubric or edit what the AI suggests. Womble grades against that, not against a generic notion of 'good'. Most trainers iterate on the criteria once or twice in the first week and then trust it.",
+  },
+  {
+    q: "What happens to my participants' data?",
+    a: "Conversations are stored in your account so you can review them later. Participants see their own; you see your class. We don't train on your data, and we don't share it apart from data through the Open AI API but nothing identifiable apart from the name they choose to share. Full deletion on request.",
+  },
+  {
+    q: "How well does voice mode actually work?",
+    a: "Low-latency, natural. Honestly, the new Open AI Realtime API is excellent. Give it a go — it's free!",
+  },
+  {
+    q: "Can I share activities with my team?",
+    a: "Yes on Pro (one-way shareable links to your activity templates) and on Enterprise (a proper shared library with permissions and a brand layer). On Free you can run up to three sessions, each with unlimited responses.",
+  },
+];
+
 export default function LandingPage() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
@@ -256,11 +284,30 @@ export default function LandingPage() {
     operatingSystem: "Web",
   };
 
+  const faqStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: FAQS.map(({ q, a }) => ({
+      "@type": "Question",
+      name: q,
+      acceptedAnswer: { "@type": "Answer", text: a },
+    })),
+  };
+
+  const metaDescription =
+    "Womble lets trainers and educators run AI roleplay and conversation practice, then gives every participant their own instant, bespoke formative feedback. Build an activity in 90 seconds and share a link — no logins for participants.";
+
   return (
     <div className="lp">
       <Helmet>
-        <title>Womble — Every participant gets expert feedback. Instantly.</title>
+        <title>AI roleplay & practice with instant feedback | Womble</title>
+        <meta name="description" content={metaDescription} />
+        <meta property="og:title" content="AI roleplay & practice with instant feedback | Womble" />
+        <meta property="og:description" content={metaDescription} />
+        <meta property="twitter:title" content="AI roleplay & practice with instant feedback | Womble" />
+        <meta property="twitter:description" content={metaDescription} />
         <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
+        <script type="application/ld+json">{JSON.stringify(faqStructuredData)}</script>
       </Helmet>
 
       {/* ── Nav ─────────────────────────────────────────────── */}
@@ -507,33 +554,7 @@ export default function LandingPage() {
             </div>
 
             <div className="faq-list">
-              {[
-                {
-                  q: "Do my participants need to sign up or download anything?",
-                  a: "No. You share a link, they click it, they're in. Works on any phone or laptop, in the browser. No accounts, no installs, no friction. They can pick a name and go.",
-                  open: true,
-                },
-                {
-                  q: "How long does it take to build an activity?",
-                  a: "Most trainers have a first activity running in under 90 seconds. Type a sentence describing what you want and the AI drafts the role, the brief and the feedback criteria. You tweak whatever doesn't sound like you, then share the link.",
-                },
-                {
-                  q: "Is the feedback actually any good?",
-                  a: "It's grounded in the criteria you set. You can paste in your own marking rubric or edit what the AI suggests. Womble grades against that, not against a generic notion of 'good'. Most trainers iterate on the criteria once or twice in the first week and then trust it.",
-                },
-                {
-                  q: "What happens to my participants' data?",
-                  a: "Conversations are stored in your account so you can review them later. Participants see their own; you see your class. We don't train on your data, and we don't share it apart from data through the Open AI API but nothing identifiable apart from the name they choose to share. Full deletion on request.",
-                },
-                {
-                  q: "How well does voice mode actually work?",
-                  a: "Low-latency, natural. Honestly, the new Open AI Realtime API is excellent. Give it a go — it's free!",
-                },
-                {
-                  q: "Can I share activities with my team?",
-                  a: "Yes on Pro (one-way shareable links to your activity templates) and on Enterprise (a proper shared library with permissions and a brand layer). On Free you can run up to three sessions, each with unlimited responses.",
-                },
-              ].map(({ q, a, open }) => (
+              {FAQS.map(({ q, a, open }) => (
                 <details key={q} className="faq-item" open={open}>
                   <summary>
                     {q}
