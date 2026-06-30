@@ -579,9 +579,9 @@ export default function LandingPage() {
                 <li><a href="#pricing">Pricing</a></li>
               </ul>
             </div>
-            <div>
+            <div className="foot-activities">
               <h4>Activity types</h4>
-              <ul>
+              <ul className="cols-2">
                 <li><a href="#activities">Chat with AI</a></li>
                 <li><a href="#activities">Teach an AI</a></li>
                 <li><a href="#activities">Two-way conversation</a></li>

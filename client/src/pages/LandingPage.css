@@ -474,8 +474,12 @@
 
 /* ── Footer ────────────────────────────────────────────────── */
 .lp .lp-footer { background: var(--lp-footer-bg); color: #fff; padding: 56px 0 32px; }
-.lp .lp-footer .grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 36px; }
+.lp .lp-footer .grid { display: grid; grid-template-columns: 2fr 1fr 1.8fr 1fr; gap: 36px; }
 @media (max-width: 800px) { .lp .lp-footer .grid { grid-template-columns: 1fr 1fr; } }
+.lp .lp-footer ul.cols-2 {
+  display: grid; grid-template-columns: 1fr 1fr;
+  column-gap: 24px; row-gap: 10px;
+}
 .lp .lp-footer h4 { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 14px; }
 .lp .lp-footer .footer-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .lp .lp-footer .footer-logo img { height: 44px; width: auto; }
