@@ -1490,7 +1490,7 @@ export default function Home() {
                     ideas — until a deck/link upload or a manual activity. Hidden
                     once deck suggestions are showing. */}
                 {!isLibraryView && !(suggestions.length > 0 && suggestionsFile && suggestionsProgress === null) && (sessionAgents.length === 0 || (inspirationSessionId != null && inspirationSessionId === selectedSessionId) || suggestionsProgress !== null) && (
-                  <div>
+                  <div className={sessionAgents.length > 0 ? 'mt-6' : ''}>
                     <div className="border-2 border-dashed border-border rounded-lg p-8 bg-card/60">
                       {suggestionsProgress !== null ? (
                         <div className="text-center py-4">
