@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db, pool } from "@db";
-import { chatConfigs, conversations, uploads, quizQuestions, quizResponses, dualConversations, sessions, quickFireQuizQuestions, quickFireQuizState, quickFireQuizResponses, groupBoardPostIts, groupBoardComments, type Message, type ConversationFeedback, type UploadFeedback, type DualConversationFeedback } from "@db/schema";
+import { users, chatConfigs, conversations, uploads, quizQuestions, quizResponses, dualConversations, sessions, quickFireQuizQuestions, quickFireQuizState, quickFireQuizResponses, groupBoardPostIts, groupBoardComments, type Message, type ConversationFeedback, type UploadFeedback, type DualConversationFeedback } from "@db/schema";
 import { broadcastBoardState } from "./routes/group-board-ws";
 import { eq, and, or, desc, count, isNull } from "drizzle-orm";
 import { saveAudio, handleSaveAudio, transcribeAudio, generateFeedback } from "./routes/dual-conversation";
@@ -1034,6 +1034,13 @@ Keep the tone conversational and direct. Write in the same voice as the original
       console.log(`[suggest-activities] "${fileName || url || 'uploaded'}" — extracted ${slideText.length} chars` +
         `${slideCount ? ` from ${slideCount} slides` : ''} (cap ${MAX_SLIDE_TEXT})${slideText.length >= MAX_SLIDE_TEXT ? ' — HIT CAP, text truncated' : ''}`);
 
+      // Personalise suggestions with what we know about the trainer from onboarding.
+      const trainerSubject = (req.user as any)?.subject?.trim?.() || '';
+      const trainerContext = (req.user as any)?.context?.trim?.() || '';
+      const trainerCtx = (trainerSubject || trainerContext)
+        ? `About the trainer using these slides:${trainerSubject ? `\n- Subject they teach: ${trainerSubject}` : ''}${trainerContext ? `\n- What they want to use Womble for: ${trainerContext}` : ''}\nTailor the activities to this audience and purpose where it helps, while staying grounded in the slide content.\n\n`
+        : '';
+
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
@@ -1077,7 +1084,7 @@ Ground every activity specifically in the slide content — never generic.`,
           },
           {
             role: 'user',
-            content: `Slide deck: "${fileName || url || 'uploaded presentation'}" (${slideCount ? `${slideCount} slides` : 'slide count unknown'})\n\nContent:\n${slideText.slice(0, MAX_SLIDE_TEXT)}\n\nSuggest activities scaled to the deck length, in slide order.`,
+            content: `${trainerCtx}Slide deck: "${fileName || url || 'uploaded presentation'}" (${slideCount ? `${slideCount} slides` : 'slide count unknown'})\n\nContent:\n${slideText.slice(0, MAX_SLIDE_TEXT)}\n\nSuggest activities scaled to the deck length, in slide order.`,
           },
         ],
         temperature: 0.7,
@@ -1168,6 +1175,116 @@ Write detailed, specific configuration for this activity.`,
       });
     } catch (error: any) {
       console.error('Error building suggestion:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Save onboarding answers (subject + context) for the current user and mark
+  // onboarding complete. Always stamps onboardedAt so the flow never reappears,
+  // even when both fields are skipped.
+  app.patch("/api/user/onboarding", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { subject, context } = req.body ?? {};
+      const clean = (v: unknown) => {
+        if (typeof v !== 'string') return null;
+        const t = v.trim();
+        return t.length ? t : null;
+      };
+      const [updated] = await db.update(users)
+        .set({ subject: clean(subject), context: clean(context), onboardedAt: new Date() })
+        .where(eq(users.id, req.user!.id))
+        .returning();
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Error saving onboarding:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update profile fields (subject + context) from the settings page. Unlike the
+  // onboarding endpoint, this does not touch onboardedAt.
+  app.patch("/api/user/profile", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { subject, context } = req.body ?? {};
+      const clean = (v: unknown) => {
+        if (typeof v !== 'string') return null;
+        const t = v.trim();
+        return t.length ? t : null;
+      };
+      const [updated] = await db.update(users)
+        .set({ subject: clean(subject), context: clean(context) })
+        .where(eq(users.id, req.user!.id))
+        .returning();
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Error saving profile:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Generate 3–4 starter activity ideas from a free-text subject (no slide deck).
+  // Mirrors /api/suggest-activities' item schema and post-processing so the client
+  // renders and builds them with the existing machinery.
+  app.post("/api/suggest-activities/from-subject", requireAuth, async (req: Request, res: Response) => {
+    try {
+      // Prefer the trainer's saved onboarding answers; fall back to the body.
+      const subject = ((req.user as any)?.subject || req.body?.subject || '').toString().trim();
+      const context = ((req.user as any)?.context || req.body?.context || '').toString().trim();
+      if (!subject) return res.status(400).json({ error: 'subject is required' });
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert learning designer for apprenticeship and professional training programmes in the UK. A trainer has told you the subject they teach. Suggest a small set of strong starter learning activities for that subject so they have somewhere to begin.
+
+QUANTITY RULE: Suggest exactly 3 or 4 activities — a varied, complementary mix (e.g. a role-play, a knowledge-consolidation exercise, and a quiz), not several variations of the same thing.
+
+GROUNDING RULE: Make each activity specific and useful for the stated subject — reference realistic concepts, scenarios, frameworks or skills a learner of that subject would actually practise. Never generic filler that could apply to any subject.
+
+Available activity types:
+- "chat": Learner has a role-play conversation with an AI playing a character — great for practising interactions, applying principles in a scenario, handling objections, or difficult conversations
+- "teach-ai": Learner explains a concept, framework, or set of principles to an AI playing a naive learner — excellent for consolidating knowledge
+- "thought-partner": Open coaching conversation to help the learner apply an idea to their own work context
+- "two-way-conversation": Two real people record a conversation (mock interview, role play with a partner) — AI transcribes and gives feedback
+- "doc-critique": Learner reads a separate document (e.g. a case study, contract, report) and shares observations — AI coaches on what they should have noticed. Only use when a real external document for the subject makes sense
+- "task-walkthrough": Learner describes their progress on a task via voice — AI coaches them through completion
+- "quick-fire-quiz": A fast, competitive multiple-choice quiz that tests recall. Only suggest when the subject has significant factual knowledge worth memorising. You do NOT write the questions — just propose the quiz with a clear title and description; the user builds the questions themselves
+
+Return ONLY a valid JSON array, no other text. Each item:
+{
+  "type": one of the types above,
+  "title": compelling activity title, max 8 words,
+  "description": 1-2 sentences — what participants do and what they get out of it. Refer to the content directly; do not say "the slides" or "the deck",
+  "slideReference": "",
+  "systemPrompt": detailed, specific system prompt for the AI in this activity, grounded in the subject,
+  "feedbackCriteria": specific criteria for evaluating the participant's response,
+  "userInstructions": brief friendly instructions shown to the participant (1-2 sentences)
+}
+
+For "quick-fire-quiz" items only, set "systemPrompt", "feedbackCriteria", and "userInstructions" to empty strings ("") — they are not used; the user builds the questions manually.`,
+          },
+          {
+            role: 'user',
+            content: `Subject the trainer teaches: "${subject}"${context ? `\n\nWhat they want to use Womble for: "${context}"` : ''}\n\nSuggest 3–4 strong starter activities for this subject.`,
+          },
+        ],
+        temperature: 0.7,
+      });
+
+      const raw = (completion.choices[0].message.content || '[]')
+        .replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      let suggestions: any[] = [];
+      try { suggestions = JSON.parse(raw); } catch { suggestions = []; }
+      suggestions = suggestions.map((s: any) => {
+        const { slideStartIndex, mirrorsExisting, ...rest } = s;
+        return { ...rest, id: crypto.randomUUID() };
+      });
+
+      res.json({ suggestions, slideContext: '' });
+    } catch (error: any) {
+      console.error('Error suggesting activities from subject:', error);
       res.status(500).json({ error: error.message });
     }
   });

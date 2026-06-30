@@ -12,6 +12,8 @@ import PresentationView from "./pages/PresentationView";
 import PresentationEditor from "./pages/PresentationEditor";
 import GroupBoardAdminPage from "./pages/GroupBoardAdminPage";
 import AuthPage from "./pages/auth-page";
+import OnboardingPage from "./pages/OnboardingPage";
+import SettingsPage from "./pages/SettingsPage";
 import ResetPasswordPage from "./pages/reset-password-page";
 import LandingPage from "./pages/LandingPage";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -32,6 +34,8 @@ function App() {
         <Route path="/privacypolicy" component={PrivacyPolicy} />
         <Route path="/terms" component={TermsOfService} />
         <Route path="/reset-password" component={ResetPasswordPage} />
+        <ProtectedRoute path="/onboarding" component={OnboardingPage} />
+        <ProtectedRoute path="/settings" component={SettingsPage} />
         <ProtectedRoute path="/dashboard" component={Home} />
         <Route path="/chat" component={UserView} />
         <ProtectedRoute path="/group-board/:id" component={GroupBoardAdminPage} />

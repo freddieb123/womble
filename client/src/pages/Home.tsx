@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Plus, Pencil, Copy, MoreVertical, BarChart2, Trash2,
-  Share2, Keyboard, Mic, LogOut, GripVertical, Radio,
+  Share2, Keyboard, Mic, LogOut, Settings, GripVertical, Radio,
   Layers, FolderOpen, Library, Play, Users, MonitorPlay,
   MessageSquare, GraduationCap, Brain, Zap, LayoutGrid, Monitor,
   FileText, ClipboardList, HelpCircle, Upload, Sparkles, Link2, X,
@@ -64,6 +64,7 @@ import AgentTimer from "@/components/AgentTimer";
 import type { Template } from "@/lib/types";
 
 const LS_SESSION_KEY = 'womble_last_session_id';
+const LS_INSPIRATION_KEY = 'womble_inspiration_session_id';
 const MAX_SLIDE_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_SLIDE_UPLOAD_LABEL = '100MB';
 
@@ -360,6 +361,20 @@ function SortableAgentCard({
     upload: Upload,
   }[config.type] ?? MessageSquare;
 
+  const typeIconColor = {
+    chat: 'text-green-600',
+    'two-way-conversation': 'text-orange-500',
+    'teach-ai': 'text-blue-600',
+    'thought-partner': 'text-teal-600',
+    'quick-fire-quiz': 'text-amber-500',
+    'group-board': 'text-emerald-600',
+    'user-tester': 'text-violet-600',
+    'doc-critique': 'text-purple-600',
+    'task-walkthrough': 'text-cyan-600',
+    quiz: 'text-gray-600',
+    upload: 'text-purple-600',
+  }[config.type] ?? 'text-gray-400';
+
   return (
     <div ref={setNodeRef} style={style} className="flex items-center gap-3 bg-card border border-border rounded-lg px-4 py-4 shadow-sm">
       <button {...attributes} {...listeners} className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing flex-shrink-0">
@@ -367,7 +382,7 @@ function SortableAgentCard({
       </button>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <TypeIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          <TypeIcon className={`h-4 w-4 flex-shrink-0 ${typeIconColor}`} />
           <span className="text-sm font-medium text-foreground truncate">{config.title}</span>
           <Badge variant="outline" className={`text-xs flex-shrink-0 ${typeBadge.classes}`}>{typeBadge.label}</Badge>
           {config.type !== 'quick-fire-quiz' && config.type !== 'user-tester' && (() => {
@@ -509,6 +524,18 @@ export default function Home() {
   const [suggestionsProgress, setSuggestionsProgress] = useState<number | null>(null);
   const [showLinkInput, setShowLinkInput] = useState(false);
   const suggestionsInitializedForRef = useRef<number | null>(null);
+  const subjectIdeasTriedForRef = useRef<number | null>(null);
+  // The first-login session keeps the upload/paste widget visible while the user
+  // builds inspiration ideas, unlike normal sessions. Cleared once they upload a
+  // deck/link or create an activity manually. Persisted so a reload doesn't lose it.
+  const [inspirationSessionId, setInspirationSessionId] = useState<number | null>(() => {
+    const stored = localStorage.getItem(LS_INSPIRATION_KEY);
+    return stored ? parseInt(stored) : null;
+  });
+  useEffect(() => {
+    if (inspirationSessionId == null) localStorage.removeItem(LS_INSPIRATION_KEY);
+    else localStorage.setItem(LS_INSPIRATION_KEY, String(inspirationSessionId));
+  }, [inspirationSessionId]);
   const [linkInputValue, setLinkInputValue] = useState('');
   const slideFileInputRef = useRef<HTMLInputElement>(null);
   const buildingSuggestionIdRef = useRef<string | null>(null);
@@ -615,6 +642,55 @@ export default function Home() {
     return () => clearTimeout(handle);
   }, [selectedSessionId, suggestions, suggestionsFile, slideContext]);
 
+  // New users (no onboardedAt) are sent through the onboarding flow first.
+  // This is the single source of truth, so email + social sign-ups are both caught.
+  useEffect(() => {
+    if (user && user.onboardedAt == null) navigate('/onboarding');
+  }, [user, navigate]);
+
+  // A brand-new account: every session is still empty. We only show subject-based
+  // starter ideas on this very first visit, never on later empty sessions.
+  const isBrandNewAccount = !loadingSessions && sessionList.length > 0 && sessionList.every(s => s.configCount === 0);
+
+  // When a brand-new user lands on the empty dashboard and has given us a subject,
+  // generate a few starter activity ideas so they don't face a blank screen.
+  // Reuses the same suggestions state/persistence as the slide flow.
+  useEffect(() => {
+    if (!selectedSession) return;
+    // Only after suggestions have been initialised from the DB for this session.
+    if (suggestionsInitializedForRef.current !== selectedSession.id) return;
+    if (subjectIdeasTriedForRef.current === selectedSession.id) return;
+    if (selectedSession.isLibrary) return;
+    if (!isBrandNewAccount) return;
+    if ((selectedSession.configs?.length ?? 0) > 0) return;
+    if (suggestions.length > 0 || suggestionsProgress !== null) return;
+    if (!user?.subject) return;
+
+    subjectIdeasTriedForRef.current = selectedSession.id;
+    setInspirationSessionId(selectedSession.id); // first-session inspiration mode
+    const progressInterval = startProgressSimulation(setSuggestionsProgress);
+    (async () => {
+      try {
+        const res = await fetch('/api/suggest-activities/from-subject', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subject: user.subject, context: user.context }),
+        });
+        if (!res.ok) throw new Error(await readApiError(res, 'Failed to generate ideas.'));
+        const { suggestions: newSuggestions } = await res.json();
+        clearInterval(progressInterval);
+        setSuggestionsProgress(100);
+        setTimeout(() => setSuggestionsProgress(null), 600);
+        setSuggestions(newSuggestions ?? []);
+        // Leave suggestionsFile null — these are subject ideas, not from a deck.
+      } catch {
+        // Silent: just fall back to the normal blank upload panel.
+        clearInterval(progressInterval);
+        setSuggestionsProgress(null);
+      }
+    })();
+  }, [selectedSession, suggestions.length, suggestionsProgress, user, isBrandNewAccount]);
+
   // True during the brief gap between selecting a session and the query resolving
   const sessionLoading = loadingSession || (!!selectedSessionId && selectedSession?.id !== selectedSessionId);
 
@@ -675,6 +751,7 @@ export default function Home() {
       return;
     }
 
+    setInspirationSessionId(null); // a deck upload ends first-session inspiration mode
     setSuggestionsFile({ name: file.name });
     const progressInterval = startProgressSimulation(setSuggestionsProgress);
     try {
@@ -710,6 +787,7 @@ export default function Home() {
   const handleLinkSubmit = async () => {
     const trimmed = linkInputValue.trim();
     if (!trimmed) return;
+    setInspirationSessionId(null); // a pasted link ends first-session inspiration mode
     setSuggestionsFile({ name: trimmed });
     const progressInterval = startProgressSimulation(setSuggestionsProgress);
     try {
@@ -950,9 +1028,17 @@ export default function Home() {
       setIsPreviewingTemplate(false);
       setIsAddAgentOpen(false);
       setConfig({ title: '', type: 'chat', systemPrompt: 'Act as a...', userInstructions: '', feedbackCriteria: '', temperature: 0.7, maxTokens: 1000, questions: [] });
-      if (buildingSuggestionIdRef.current) {
-        setSuggestions(prev => prev.filter(s => s.id !== buildingSuggestionIdRef.current));
+      // Capture the id first: the setSuggestions updater runs asynchronously, so
+      // reading the ref inside it would see the null we set on the next line.
+      const builtId = buildingSuggestionIdRef.current;
+      if (builtId) {
+        // Built from an inspiration idea — drop it from the list, keep the
+        // upload widget (first-session inspiration mode stays active).
+        setSuggestions(prev => prev.filter(s => s.id !== builtId));
         buildingSuggestionIdRef.current = null;
+      } else {
+        // Created manually — first-session inspiration mode ends here.
+        setInspirationSessionId(null);
       }
       toast({ description: 'Activity saved successfully!' });
     },
@@ -1119,6 +1205,9 @@ export default function Home() {
   const handleCreateModalClose = (open: boolean) => {
     setIsCreateOpen(open);
     if (!open) {
+      // Cancelled without saving — forget any in-progress build so a later save
+      // doesn't wrongly treat itself as that build.
+      buildingSuggestionIdRef.current = null;
       setWizardPrefill(undefined);
       setWizardStartType(undefined);
       setWizardFromAddDialog(false);
@@ -1238,12 +1327,23 @@ export default function Home() {
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">
-                {user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user?.email}
-              </p>
-              {user?.firstName && (
-                <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="w-full text-left rounded p-1 -m-1 hover:bg-muted transition-colors">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user?.email}
+                    </p>
+                    {user?.firstName && (
+                      <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                    )}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="start" className="w-48">
+                  <DropdownMenuItem onClick={() => navigate('/settings')}>
+                    <Settings className="h-4 w-4 mr-2" /> Settings
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <button
               onClick={() => logoutMutation.mutate()}
@@ -1385,60 +1485,11 @@ export default function Home() {
                   </DndContext>
                 )}
 
-                {/* Suggestions section */}
-                {!isLibraryView && suggestions.length > 0 && (
-                  <div className={sessionAgents.length > 0 ? 'mt-6' : ''}>
-                    {suggestionsFile && (
-                      <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-2 mb-4 text-sm text-gray-600">
-                        <FileText className="h-4 w-4 flex-shrink-0 text-gray-400" />
-                        <span className="flex-1 truncate">{suggestionsFile.name}</span>
-                        {suggestionsFile.slideCount && (
-                          <span className="text-xs bg-white border border-gray-200 rounded-full px-2 py-0.5 flex-shrink-0">
-                            {suggestionsFile.slideCount} slides analysed
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm font-semibold text-gray-700">
-                        {suggestions.length} suggested {suggestions.length === 1 ? 'activity' : 'activities'}
-                      </p>
-                      <button
-                        onClick={() => { setSuggestions([]); setSuggestionsFile(null); }}
-                        className="text-xs text-gray-400 hover:text-gray-600"
-                      >
-                        Dismiss all
-                      </button>
-                    </div>
-                    <div className="space-y-3">
-                      {suggestions.map(s => (
-                        <SuggestionCard
-                          key={s.id}
-                          suggestion={s}
-                          isBuilding={buildingId === s.id}
-                          onBuild={() => handleBuildSuggestion(s)}
-                          onDismiss={() => setSuggestions(prev => prev.filter(x => x.id !== s.id))}
-                        />
-                      ))}
-                    </div>
-                    <div className="text-center mt-5">
-                      <span className="text-xs text-gray-400 block mb-2">or</span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          track(EventName.GPT_CREATE_CLICK, { location: 'after_suggestions' });
-                          setIsAddAgentOpen(true);
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-1.5" />Add activity manually
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Generate-from-slides panel (shown when no agents and no suggestions) */}
-                {!isLibraryView && sessionAgents.length === 0 && suggestions.length === 0 && (
+                {/* Upload/paste panel. Normally empty-dashboard only, but on the
+                    first-login session it persists through building inspiration
+                    ideas — until a deck/link upload or a manual activity. Hidden
+                    once deck suggestions are showing. */}
+                {!isLibraryView && !(suggestions.length > 0 && suggestionsFile && suggestionsProgress === null) && (sessionAgents.length === 0 || (inspirationSessionId != null && inspirationSessionId === selectedSessionId) || suggestionsProgress !== null) && (
                   <div>
                     <div className="border-2 border-dashed border-border rounded-lg p-8 bg-card/60">
                       {suggestionsProgress !== null ? (
@@ -1457,7 +1508,9 @@ export default function Home() {
                             </span>
                           </div>
                           <p className="text-sm text-gray-500">
-                            {suggestionsProgress < 20 ? 'Reading slides…' : suggestionsProgress < 75 ? 'Analysing content…' : 'Generating suggestions…'}
+                            {!suggestionsFile && user?.subject
+                              ? 'Confabulating ideas for activities…'
+                              : suggestionsProgress < 20 ? 'Reading slides…' : suggestionsProgress < 75 ? 'Analysing content…' : 'Generating suggestions…'}
                           </p>
                         </div>
                       ) : (
@@ -1507,13 +1560,73 @@ export default function Home() {
                         </>
                       )}
                     </div>
+                    {/* Manual-add only when there are no ideas below to offer it */}
+                    {suggestions.length === 0 && (
+                      <div className="text-center mt-5">
+                        <span className="text-xs text-gray-400 block mb-2">or</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            track(EventName.GPT_CREATE_CLICK, { location: 'empty_state' });
+                            setIsAddAgentOpen(true);
+                          }}
+                        >
+                          <Plus className="h-4 w-4 mr-1.5" />Add activity manually
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Suggestions — deck-based or subject-based starter ideas. Persist
+                    until dismissed or replaced by a fresh deck/link upload. Hidden
+                    while a deck is processing so only the spinner shows (the cards
+                    return untouched if that upload fails). */}
+                {!isLibraryView && suggestions.length > 0 && suggestionsProgress === null && (
+                  <div className="mt-6">
+                    {suggestionsFile && (
+                      <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-2 mb-4 text-sm text-gray-600">
+                        <FileText className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                        <span className="flex-1 truncate">{suggestionsFile.name}</span>
+                        {suggestionsFile.slideCount && (
+                          <span className="text-xs bg-white border border-gray-200 rounded-full px-2 py-0.5 flex-shrink-0">
+                            {suggestionsFile.slideCount} slides analysed
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-semibold text-gray-700">
+                        {suggestionsFile
+                          ? `${suggestions.length} suggested ${suggestions.length === 1 ? 'activity' : 'activities'}`
+                          : 'Get inspiration from these ideas'}
+                      </p>
+                      <button
+                        onClick={() => { setSuggestions([]); setSuggestionsFile(null); }}
+                        className="text-xs text-gray-400 hover:text-gray-600"
+                      >
+                        Dismiss all
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {suggestions.map(s => (
+                        <SuggestionCard
+                          key={s.id}
+                          suggestion={s}
+                          isBuilding={buildingId === s.id}
+                          onBuild={() => handleBuildSuggestion(s)}
+                          onDismiss={() => setSuggestions(prev => prev.filter(x => x.id !== s.id))}
+                        />
+                      ))}
+                    </div>
                     <div className="text-center mt-5">
                       <span className="text-xs text-gray-400 block mb-2">or</span>
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          track(EventName.GPT_CREATE_CLICK, { location: 'empty_state' });
+                          track(EventName.GPT_CREATE_CLICK, { location: 'after_suggestions' });
                           setIsAddAgentOpen(true);
                         }}
                       >

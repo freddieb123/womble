@@ -125,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       identify(String(user.id), { email: user.email });
       queryClient.setQueryData(["/api/user"], user);
       toast({ description: "Registered successfully" });
-      setLocation("/dashboard");
+      setLocation("/onboarding");
     },
     onError: (error: Error) => {
       toast({
