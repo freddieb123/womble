@@ -41,9 +41,9 @@ export default function SettingsPage() {
       const updated = await res.json();
       queryClient.setQueryData(["/api/user"], updated);
       toast({ description: "Settings saved" });
+      navigate("/dashboard");
     } catch (e: any) {
       toast({ title: "Couldn't save", description: e.message, variant: "destructive" });
-    } finally {
       setSaving(false);
     }
   };
