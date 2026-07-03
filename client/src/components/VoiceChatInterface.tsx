@@ -21,7 +21,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { v4 as uuidv4 } from "uuid";
 import { track, EventName } from "@/lib/mixpanel";
 import LeaderboardModal from "./LeaderboardModal";
@@ -90,8 +89,6 @@ export default function VoiceChatInterface({ config, sessionId, userName, attemp
   const [isGettingFeedback, setIsGettingFeedback] = useState(false);
   const [isConfirmingFeedback, setIsConfirmingFeedback] = useState(false);
   const [feedbackData, setFeedbackData] = useState<{ bullets: string[]; score?: number; summary?: string } | null>(null);
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [allAttempts, setAllAttempts] = useState<AttemptData[]>([]);
   const [instructionsOpen, setInstructionsOpen] = useState(true);
   const [isGettingSummary, setIsGettingSummary] = useState(false);
   const [summaryData, setSummaryData] = useState<any>(null);
@@ -597,11 +594,6 @@ export default function VoiceChatInterface({ config, sessionId, userName, attemp
         }
       );
 
-      // Fetch all attempts to display history
-      const attemptsRes = await fetch(`/api/conversations/${config.id}/session/${sessionId}`);
-      if (attemptsRes.ok) setAllAttempts(await attemptsRes.json());
-
-      setFeedbackOpen(true);
     } catch (err: any) {
       toast({ variant: 'destructive', title: 'Error', description: err.message });
     } finally {
@@ -838,63 +830,6 @@ export default function VoiceChatInterface({ config, sessionId, userName, attemp
       )}
 
       {/* Feedback display */}
-      <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Feedback</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            {[
-              allAttempts.find(attempt => attempt.attemptNumber === attemptNumber)
-                ?? allAttempts[0]
-                ?? (feedbackData ? { attemptNumber, chatMode: 'spoken', feedback: feedbackData } : null),
-            ].filter((attempt): attempt is AttemptData => attempt !== null).map((attempt, idx) => (
-              <Collapsible key={attempt.attemptNumber} defaultOpen={idx === 0}>
-                <CollapsibleTrigger className="w-full">
-                  <div className="flex items-center justify-between w-full px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">Feedback</span>
-                      {attempt.chatMode === 'spoken' ? (
-                        <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">Voice</span>
-                      ) : (
-                        <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Typed</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {attempt.feedback?.score != null && (
-                        <span className="text-sm font-bold text-blue-900">{attempt.feedback.score}/10</span>
-                      )}
-                      <ChevronDown className="h-4 w-4 text-gray-400 transition-transform [[data-state=open]_&]:rotate-180" />
-                    </div>
-                  </div>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="px-3 pt-2 pb-3 space-y-2">
-                    {attempt.feedback?.bullets?.map((b, i) => (
-                      <div key={i} className="flex gap-2 text-sm">
-                        <span className="text-green-500 mt-0.5">•</span><span>{b}</span>
-                      </div>
-                    ))}
-                    {attempt.feedback?.summary && (
-                      <p className="text-sm text-muted-foreground italic">{attempt.feedback.summary}</p>
-                    )}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            ))}
-          </div>
-          <div className="pt-2 border-t flex flex-col gap-2">
-            <Button
-              onClick={() => { fetchLeaderboard(); setShowLeaderboard(true); }}
-              variant="outline"
-              className="w-full"
-            >
-              <Trophy className="h-4 w-4 mr-2" />
-              View Leaderboard
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <LeaderboardModal
         open={showLeaderboard}
