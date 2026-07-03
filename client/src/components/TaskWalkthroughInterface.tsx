@@ -7,6 +7,7 @@ import type { AdminConfig, Message } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import { GoogleGenAI, Modality } from "@google/genai";
 import UserNameModal from "@/components/UserNameModal";
+import CriterionFeedbackList from "@/components/CriterionFeedbackList";
 
 interface Props {
   config: AdminConfig;
@@ -509,24 +510,21 @@ export default function TaskWalkthroughInterface({ config, sessionId, userName, 
             )}
 
             {feedbackData && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
-                {feedbackData.score !== undefined && (
-                  <div className="text-center">
-                    <span className="text-5xl font-bold text-blue-600">{feedbackData.score}</span>
-                    <span className="text-2xl text-gray-400">/10</span>
+              <div className="space-y-3">
+                {(feedbackData.score !== undefined || feedbackData.summary) && (
+                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-2">
+                    {feedbackData.score !== undefined && (
+                      <div className="text-center">
+                        <span className="text-5xl font-bold text-blue-600">{feedbackData.score}</span>
+                        <span className="text-2xl text-gray-400">/10</span>
+                      </div>
+                    )}
+                    {feedbackData.summary && (
+                      <p className="text-gray-600 text-center italic text-base">{feedbackData.summary}</p>
+                    )}
                   </div>
                 )}
-                {feedbackData.summary && (
-                  <p className="text-gray-600 text-center italic text-base">{feedbackData.summary}</p>
-                )}
-                <ul className="space-y-2">
-                  {feedbackData.bullets.map((b, i) => (
-                    <li key={i} className="flex gap-2 text-base">
-                      <span className="text-blue-500 mt-1 flex-shrink-0">•</span>
-                      <span>{b}</span>
-                    </li>
-                  ))}
-                </ul>
+                <CriterionFeedbackList bullets={feedbackData.bullets} />
               </div>
             )}
 

@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { FileText, Mic, MicOff, Send, Expand } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import UserNameModal from "@/components/UserNameModal";
+import CriterionFeedbackList from "@/components/CriterionFeedbackList";
 import type { AdminConfig } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 
@@ -27,6 +29,30 @@ export default function DocCritiqueInterface({ config, sessionId, userName, onUs
   const [showNameModal, setShowNameModal] = useState(!userName);
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
+
+  // Restore a completed submission (observation + feedback) when returning to
+  // this activity (e.g. after a refresh), instead of resetting to a blank form.
+  const { data: existingAttempts = [] } = useQuery<Array<{ messages?: any[]; feedback?: { bullets?: string[]; score?: number; summary?: string } | null }>>({
+    queryKey: [`/api/conversations/${config.id}/session/${sessionId}`],
+    staleTime: Infinity,
+    enabled: !!config.id && !!sessionId,
+  });
+  const hasRestoredRef = useRef(false);
+  useEffect(() => {
+    if (hasRestoredRef.current || phase !== 'observe') return;
+    const attempt = existingAttempts[0];
+    if (!attempt?.feedback) return;
+    hasRestoredRef.current = true;
+    const first = attempt.messages?.[0];
+    const obs = typeof first?.content === 'string' ? first.content : first?.content?.text;
+    if (obs) setObservation(obs);
+    setFeedbackData({
+      bullets: attempt.feedback.bullets ?? [],
+      score: attempt.feedback.score,
+      summary: attempt.feedback.summary,
+    });
+    setPhase('done');
+  }, [existingAttempts, phase]);
 
   // Convert stored PDF data URL to blob URL for reliable iframe rendering
   useEffect(() => {
@@ -230,25 +256,20 @@ export default function DocCritiqueInterface({ config, sessionId, userName, onUs
 
             {/* Feedback */}
             {feedbackData && (
-              <div className="bg-white rounded-xl border border-blue-100 shadow-sm p-5 space-y-4">
-                <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide">Feedback</p>
-                {feedbackData.score !== undefined && (
-                  <div className="text-center">
-                    <span className="text-4xl font-bold text-blue-600">{feedbackData.score}</span>
-                    <span className="text-xl text-gray-400">/10</span>
-                  </div>
-                )}
-                {feedbackData.summary && (
-                  <p className="text-gray-600 italic text-sm">{feedbackData.summary}</p>
-                )}
-                <ul className="space-y-2">
-                  {feedbackData.bullets.map((b, i) => (
-                    <li key={i} className="flex gap-2 text-sm">
-                      <span className="text-blue-500 flex-shrink-0 mt-0.5">•</span>
-                      <span>{b}</span>
-                    </li>
-                  ))}
-                </ul>
+              <div className="space-y-3">
+                <div className="bg-white rounded-xl border border-blue-100 shadow-sm p-5 space-y-2">
+                  <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide">Feedback</p>
+                  {feedbackData.score !== undefined && (
+                    <div className="text-center">
+                      <span className="text-4xl font-bold text-blue-600">{feedbackData.score}</span>
+                      <span className="text-xl text-gray-400">/10</span>
+                    </div>
+                  )}
+                  {feedbackData.summary && (
+                    <p className="text-gray-600 italic text-sm">{feedbackData.summary}</p>
+                  )}
+                </div>
+                <CriterionFeedbackList bullets={feedbackData.bullets} />
               </div>
             )}
           </>

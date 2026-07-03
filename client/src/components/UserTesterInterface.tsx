@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Monitor, MonitorOff, Mic, MicOff, Square } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -6,6 +7,7 @@ import type { AdminConfig, Message } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 import { GoogleGenAI, Modality } from "@google/genai";
 import UserNameModal from "@/components/UserNameModal";
+import CriterionFeedbackList from "@/components/CriterionFeedbackList";
 
 interface Props {
   config: AdminConfig;
@@ -101,6 +103,27 @@ export default function UserTesterInterface({ config, sessionId, userName, onUse
   const autoFeedbackFiredRef = useRef(false);
 
   const { toast } = useToast();
+
+  // Restore saved feedback when returning to a completed demo (e.g. after a
+  // refresh) instead of resetting to the "Ready to demo?" start screen. The
+  // "Start New Demo" button in the ended view still lets them redo it.
+  const { data: existingAttempts = [] } = useQuery<Array<{ feedback?: { bullets?: string[]; score?: number | null; summary?: string } | null }>>({
+    queryKey: [`/api/conversations/${config.id}/session/${sessionId}`],
+    staleTime: Infinity,
+    enabled: !!config.id && !!sessionId,
+  });
+  const persistedFeedback = existingAttempts[0]?.feedback ?? null;
+  const hasRestoredRef = useRef(false);
+  useEffect(() => {
+    if (hasRestoredRef.current || !persistedFeedback || connectionState !== 'idle') return;
+    hasRestoredRef.current = true;
+    setConnectionState('ended');
+    setFeedbackData({
+      bullets: persistedFeedback.bullets ?? [],
+      score: persistedFeedback.score ?? undefined,
+      summary: persistedFeedback.summary ?? undefined,
+    });
+  }, [persistedFeedback, connectionState]);
 
   // Keep transcript ref in sync for saving
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
@@ -534,13 +557,12 @@ export default function UserTesterInterface({ config, sessionId, userName, onUse
         )}
 
         {connectionState === 'ended' && (
-          <div className="w-full max-w-4xl space-y-6 my-auto">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Demo complete</h2>
-              <p className="text-gray-500">
-                {feedbackData ? 'Feedback is ready.' : isGettingFeedback ? 'Generating feedback…' : transcript.length < 2 ? 'Not enough transcript to generate feedback.' : 'Preparing feedback…'}
+          <div className="w-full max-w-4xl space-y-6 pt-2">
+            {!feedbackData && (
+              <p className="text-center text-gray-500">
+                {isGettingFeedback ? 'Generating feedback…' : transcript.length < 2 ? 'Not enough transcript to generate feedback.' : 'Preparing feedback…'}
               </p>
-            </div>
+            )}
 
             {!feedbackData && isGettingFeedback && (
               <div className="flex justify-center">
@@ -549,24 +571,21 @@ export default function UserTesterInterface({ config, sessionId, userName, onUse
             )}
 
             {feedbackData && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
-                {feedbackData.score !== undefined && (
-                  <div className="text-center">
-                    <span className="text-5xl font-bold text-violet-600">{feedbackData.score}</span>
-                    <span className="text-2xl text-gray-400">/10</span>
+              <div className="space-y-3">
+                {(feedbackData.score !== undefined || feedbackData.summary) && (
+                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-2">
+                    {feedbackData.score !== undefined && (
+                      <div className="text-center">
+                        <span className="text-5xl font-bold text-violet-600">{feedbackData.score}</span>
+                        <span className="text-2xl text-gray-400">/10</span>
+                      </div>
+                    )}
+                    {feedbackData.summary && (
+                      <p className="text-gray-600 text-center italic text-base">{feedbackData.summary}</p>
+                    )}
                   </div>
                 )}
-                {feedbackData.summary && (
-                  <p className="text-gray-600 text-center italic text-base">{feedbackData.summary}</p>
-                )}
-                <ul className="space-y-2">
-                  {feedbackData.bullets.map((b, i) => (
-                    <li key={i} className="flex gap-2 text-base">
-                      <span className="text-violet-500 mt-1 flex-shrink-0">•</span>
-                      <span>{b}</span>
-                    </li>
-                  ))}
-                </ul>
+                <CriterionFeedbackList bullets={feedbackData.bullets} />
               </div>
             )}
 
