@@ -839,6 +839,18 @@ IMPORTANT: This field must not be empty for this activity type.`;
         ? `"feedbackCriteria": Completion criteria — what the task looks like when fully and correctly completed. Each criterion should be a specific, observable outcome (e.g. "Pivot table shows total sales grouped by product category"). Return as plain text, one criterion per line starting with "- ". Do NOT use a JSON array. Include 4–6 criteria.`
         : `"feedbackCriteria": The criteria the AI uses when generating feedback. Return as plain text, one criterion per line starting with "- ". Do NOT use a JSON array. Include 4–6 criteria, each a single clear sentence.`;
 
+      // For user-tester, "userInstructions" is NOT participant-facing — it is
+      // injected into the AI evaluator's prompt as extra context. It must be
+      // written from the evaluator's angle (the learner demos the app; the AI
+      // watches and evaluates), never addressed to whoever is showcasing.
+      const userInstructionsInstruction = type === 'user-tester'
+        ? `"userInstructions": Additional context for the AI EVALUATOR — this text is inserted into the evaluator's prompt as background, so write it from the evaluator's point of view. The LEARNER (the presenter) will demo the app or prototype; the AI is watching and evaluating it. Describe what the app/prototype is, what the learner will show, and what the evaluator should pay attention to. NEVER address the reader as the person showcasing the app (do not write "you are showcasing…" or "you will demo…") — the AI is the evaluator, the learner is the one demoing. Keep it to 2–4 concise sentences. Return an empty string ("") if there is nothing useful to add.`
+        : `"userInstructions": Instructions shown to the participant before they start. Format using:
+- A short intro sentence
+- A bullet list of what they need to do / key points to cover
+- Any context they need about the scenario
+Keep it concise and actionable.`;
+
       const completion = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
@@ -852,11 +864,7 @@ Return a JSON object with exactly these four fields:
 
 ${systemPromptInstruction}
 
-"userInstructions": Instructions shown to the participant before they start. Format using:
-- A short intro sentence
-- A bullet list of what they need to do / key points to cover
-- Any context they need about the scenario
-Keep it concise and actionable.
+${userInstructionsInstruction}
 
 ${feedbackCriteriaInstruction}
 
