@@ -491,19 +491,26 @@ export async function generateFeedback(req: Request, res: Response) {
 
       // Prepare the system prompt with instructions
       const systemPrompt = `
-You are an expert in analyzing conversations. Evaluate the transcribed conversation below and provide concise, constructive feedback.
+You are an expert in analyzing conversations. Evaluate the transcribed conversation below against EACH evaluation criterion and give specific, per-criterion feedback.
 
 ${roleContext}
 
 IMPORTANT: Never invent speaker attribution. If you are not certain who said something, use "one participant" or "a participant" rather than a name.
 
-Evaluation criteria:
+Evaluation criteria — assess the conversation against EACH one:
 ${feedbackCriteria}
 
-Respond with ONLY this JSON structure — no other keys:
+For EVERY criterion above, choose a coloured circle — what each means here:
+🔴 = the conversation did not show this
+🟡 = partially there, or the basics without real depth
+🟢 = clearly and strongly demonstrated
+
+Be demanding with 🟢: simply meeting the basic requirement is 🟡. Only use 🟢 when the criterion is genuinely well met, going beyond the minimum.
+
+Respond with ONLY this JSON structure — no other keys. Produce exactly one bullet per criterion, each formatted as "Short label: 🟢 - brief comment" (a short label, the coloured circle, a hyphen, then a brief comment — do NOT write status words like "not met" or "well met"):
 {
   "overall": {
-    "bullets": [exactly 3-4 specific, actionable feedback points],
+    "bullets": [one string per criterion, in the format above],
     "score": [integer from 1-10],
     "summary": [1-2 sentence summary of the conversation quality]
   }

@@ -2444,6 +2444,9 @@ Rules: all four options must be similar in length and style. Distractors should 
 
       const isTeachAiFeedback = config.type === 'teach-ai';
       const isUserTesterFeedback = config.type === 'user-tester';
+      const isChatFeedback = config.type === 'chat';
+      const isDocCritiqueFeedback = config.type === 'doc-critique';
+      const isTaskWalkthroughFeedback = config.type === 'task-walkthrough';
 
       if (!isTeachAiFeedback && !config.feedbackCriteria) {
         return res.status(400).json({ error: "Feedback criteria not set for this configuration" });
@@ -2455,25 +2458,54 @@ Rules: all four options must be similar in length and style. Distractors should 
         });
       }
 
+      // One 🔴/🟡/🟢 bullet per criterion, plus an overall score and one-line
+      // summary. Shared by the criteria-based activity types below.
+      const perCriterionPrompt = (o: {
+        intro: string; criteria: string; itemNoun: string;
+        statuses: string; address: string; extraRules?: string;
+      }) => `${o.intro}
+
+Assess against EACH ${o.itemNoun} below:
+${o.criteria}
+
+For EVERY ${o.itemNoun}, choose a coloured circle — what each means here:
+${o.statuses}
+
+Be demanding with 🟢: simply meeting the basic requirement is 🟡. Only award 🟢 when the ${o.itemNoun} is genuinely well done — clear, thorough, and going beyond the minimum (for example, not just showing raw data but adding a clear visualisation, insight, or comparison that makes it genuinely useful).
+${o.extraRules ? `\n${o.extraRules}\n` : ''}
+${o.address}
+
+Format your response EXACTLY like this — one bullet per ${o.itemNoun}: a short label (a few words), a colon, the coloured circle (🔴/🟡/🟢), an em dash (—), then a brief comment. Do NOT write status words like "not met", "partially", or "well covered" — the circle conveys that.
+• [Short label]: 🔴 — <brief comment>
+• [Short label]: 🟡 — <brief comment>
+• [Short label]: 🟢 — <brief comment>
+
+Scoring standard: ${harshnessGuidance(config.feedbackHarshness)}
+
+Score: [1-10 based on overall coverage and quality]
+[One-line overall summary]`;
+
       const prompt = isUserTesterFeedback
         ? `You are evaluating a live product demo. The presenter walked you through their app or prototype via screen share and narration, and you are giving feedback on the PRODUCT against the evaluation criteria.
 
 Evaluation criteria — assess the product/prototype against EACH one:
 ${config.feedbackCriteria}
 
-For EVERY criterion above, assign one of:
-• 🔴 Not met — the demo did not show this, or it clearly falls short
-• 🟡 Partially met — add a brief comment on what worked and what was missing
-• 🟢 Well met — add a brief comment on what worked well
+For EVERY criterion above, choose a coloured circle — what each means here:
+🔴 = the demo didn't show this, or it clearly falls short
+🟡 = partially met, or the basics are there without depth or polish
+🟢 = met really well
+
+Be demanding with 🟢: simply meeting the basic requirement is 🟡. Only award 🟢 when the product clearly does this well and goes beyond the minimum (for example, not just showing raw data but adding a clear visualisation, insight, or comparison that makes it genuinely useful).
 
 Base your assessment ONLY on what was actually shown and said during the demo. If something wasn't demonstrated, mark it 🔴 or 🟡 rather than assuming it works.
 
 IMPORTANT: Address the presenter directly as 'you'. Never say 'the user', 'the presenter', or 'they'.
 
-Format your response EXACTLY like this — one bullet per criterion, starting with a short label (a few words) summarising the criterion:
-• [Short label]: 🔴 Not met — You didn't show how X works
-• [Short label]: 🟡 Partially met — You showed X but Y wasn't clear
-• [Short label]: 🟢 Well met — You demonstrated Z clearly
+Format your response EXACTLY like this — one bullet per criterion: a short label (a few words), a colon, the coloured circle (🔴/🟡/🟢), an em dash (—), then a brief comment. Do NOT write status words like "not met" or "well met" — the circle conveys that.
+• [Short label]: 🔴 — You didn't show how X works
+• [Short label]: 🟡 — You showed X but Y wasn't clear
+• [Short label]: 🟢 — You demonstrated Z clearly and added a helpful comparison
 
 Scoring standard: ${harshnessGuidance(config.feedbackHarshness)}
 
@@ -2485,22 +2517,49 @@ Score: [1-10 based on how well the product met the criteria overall]
 Topic and key points the learner was supposed to cover:
 ${config.userInstructions || 'No specific key points provided.'}
 
-${config.feedbackCriteria ? `Additional feedback criteria:\n${config.feedbackCriteria}\n\n` : ''}Evaluate the learner's explanation against EVERY key point listed in the topic/instructions above. For each key point, assign one of:
-• 🔴 Not covered — the learner did not address this point
-• 🟡 Partially covered — add a brief comment saying what they got right and what was missing
-• 🟢 Well covered — add a brief comment saying what they did well
+${config.feedbackCriteria ? `Additional feedback criteria:\n${config.feedbackCriteria}\n\n` : ''}Evaluate the learner's explanation against EVERY key point listed in the topic/instructions above. For each key point, choose a coloured circle — what each means here:
+🔴 = you didn't address this point
+🟡 = partially covered, or the basics without real depth
+🟢 = clearly and thoroughly explained
+
+Be demanding with 🟢: simply mentioning the point is 🟡. Only award 🟢 when you explain it clearly and go beyond the minimum — for example with a strong example, the reasoning behind it, or how it connects to other points.
 
 IMPORTANT: Address the learner directly as 'you'. Never say 'the user' or 'they'.
 
-Format your response EXACTLY like this (one bullet per key point):
-• [Key Point Name]: 🔴 Not covered
-• [Key Point Name]: 🟡 Partially covered — You touched on X but missed Y
-• [Key Point Name]: 🟢 Well covered — You clearly explained Z with a strong example
+Format your response EXACTLY like this — one bullet per key point: a short label, a colon, the coloured circle (🔴/🟡/🟢), an em dash (—), then a brief comment. Do NOT write status words like "not covered" or "well covered" — the circle conveys that.
+• [Key Point Name]: 🔴 — You didn't touch on this
+• [Key Point Name]: 🟡 — You touched on X but missed Y
+• [Key Point Name]: 🟢 — You clearly explained Z with a strong example
 
 Scoring standard: ${harshnessGuidance(config.feedbackHarshness)}
 
 Score: [1-10 based on overall coverage and quality of explanation]
 [One-line overall summary using 'you']`
+        : isChatFeedback
+        ? perCriterionPrompt({
+            intro: `You are grading a LEARNER's performance in a role-play conversation. Evaluate the LEARNER only — never the AI role-play character.\n\nRole-play scenario (background context only — do NOT evaluate the AI's behaviour):\n${config.systemPrompt}`,
+            criteria: config.feedbackCriteria || '',
+            itemNoun: 'criterion',
+            statuses: `🔴 = you didn't demonstrate this\n🟡 = partially demonstrated, or the basics without real depth\n🟢 = clearly and strongly demonstrated`,
+            address: `Address the learner directly as 'you'. Never say 'the user', 'the learner', or 'they'. Refer to the AI as 'me' or 'I'.`,
+            extraRules: `CRITICAL RULES:\n- Lines labelled "LEARNER:" are the person you are grading.\n- Lines labelled "AI:" are the role-play character — do NOT comment on, score, or treat them as evidence of the learner's performance. Only the LEARNER's messages matter.`,
+          })
+        : isDocCritiqueFeedback
+        ? perCriterionPrompt({
+            intro: `You are evaluating a document critique. The learner read a document and typed their observations. Assess which of the points below they identified.`,
+            criteria: config.feedbackCriteria || '',
+            itemNoun: 'point',
+            statuses: `🔴 = you didn't mention this\n🟡 = partially identified, or only a surface mention\n🟢 = clearly and insightfully identified`,
+            address: `Address the learner directly as 'you'. Never say 'the user', 'the learner', or 'they'.`,
+          })
+        : isTaskWalkthroughFeedback
+        ? perCriterionPrompt({
+            intro: `You are evaluating a task walkthrough. The apprentice described, by voice, how far they have got with a task. Assess their progress against each completion criterion below.`,
+            criteria: config.feedbackCriteria || '',
+            itemNoun: 'completion criterion',
+            statuses: `🔴 = this part of the task isn't done\n🟡 = partially done, or done only to a basic level\n🟢 = fully completed to a genuinely high standard`,
+            address: `Address the apprentice directly as 'you'. Never say 'the user', 'the apprentice', or 'they'.`,
+          })
         : `You are grading a LEARNER's performance in a role-play conversation. Your sole job is to evaluate the LEARNER — not the AI.\n\nRole-play scenario (background context only — do NOT evaluate the AI's behaviour):\n${config.systemPrompt}\n\nWhat to assess the LEARNER against:\n${config.feedbackCriteria}\n\nCRITICAL RULES:\n- Lines labelled "LEARNER:" are the person you are grading.\n- Lines labelled "AI:" are the role-play character. Do NOT comment on them, do NOT score them, do NOT use them as evidence of the learner's performance.\n- If the AI gave a good or bad answer, that is irrelevant — only the LEARNER's messages matter.\n- Address the learner directly as 'you'. Never say 'the user', 'the learner', or 'they'. Refer to the AI as 'me' or 'I'.\n\nScoring standard: ${harshnessGuidance(config.feedbackHarshness)}\n\nProvide your analysis in exactly this format:\n\n• [bullet 1: one sentence using 'you', evaluating a specific thing the LEARNER said or did]\n• [bullet 2: one sentence using 'you']\n• [bullet 3: one sentence using 'you']\n\nScore: [1-10]\n[Brief one-line overall summary using 'you']`;
 
 
