@@ -5,6 +5,7 @@ import { Mic, MicOff, Lightbulb, Trophy, ChevronDown, Info, Brain, PauseCircle, 
 import { useToast } from "@/hooks/use-toast";
 import { AdminConfig, Message } from "@/lib/types";
 import UserNameModal from "./UserNameModal";
+import CriterionFeedbackList from "@/components/CriterionFeedbackList";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -803,9 +804,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, attemp
                     <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Feedback</span>
                     {displayFeedback.score != null && <span className="text-sm font-bold text-blue-900">{displayFeedback.score}/10</span>}
                   </div>
-                  {displayFeedback.bullets.map((b, i) => (
-                    <div key={i} className="flex gap-2 text-sm text-gray-700"><span className="text-green-500 mt-0.5">•</span><span>{b}</span></div>
-                  ))}
+                  <CriterionFeedbackList bullets={displayFeedback.bullets} />
                   {displayFeedback.summary && <p className="text-sm text-muted-foreground italic">{displayFeedback.summary}</p>}
                 </div>
               )}
@@ -828,9 +827,7 @@ export default function VoiceChatInterface({ config, sessionId, userName, attemp
                   {copiedFeedback ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
                 </button>
               </div>
-              {displayFeedback.bullets.map((b, i) => (
-                <div key={i} className="flex gap-2 text-sm text-gray-700"><span className="text-green-500 mt-0.5">•</span><span>{b}</span></div>
-              ))}
+              <CriterionFeedbackList bullets={displayFeedback.bullets} />
               {displayFeedback.summary && <p className="text-sm text-muted-foreground italic">{displayFeedback.summary}</p>}
               <Button size="sm" variant="outline" className="w-full" onClick={() => { fetchLeaderboard(); setShowLeaderboard(true); }}>
                 <Trophy className="h-4 w-4 mr-2" />View Leaderboard
