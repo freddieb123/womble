@@ -464,10 +464,10 @@ export default function UserTesterInterface({ config, sessionId, userName, onUse
       </div>
 
       {/* ── Main content ───────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-8 px-8 py-10 min-h-0">
+      <div className="flex-1 flex flex-col items-center gap-8 px-8 py-10 min-h-0 overflow-y-auto">
 
         {connectionState === 'idle' && (
-          <div className="text-center space-y-6 max-w-lg">
+          <div className="text-center space-y-6 max-w-lg my-auto">
             <div className="w-20 h-20 rounded-full bg-violet-100 flex items-center justify-center mx-auto">
               <Monitor className="h-10 w-10 text-violet-600" />
             </div>
@@ -503,7 +503,7 @@ export default function UserTesterInterface({ config, sessionId, userName, onUse
         )}
 
         {connectionState === 'connecting' && (
-          <div className="text-center space-y-4">
+          <div className="text-center space-y-4 my-auto">
             <div className="h-10 w-10 rounded-full border-4 border-violet-400 border-t-transparent animate-spin mx-auto" />
             <p className="text-gray-500 text-lg">Connecting...</p>
           </div>
@@ -534,7 +534,7 @@ export default function UserTesterInterface({ config, sessionId, userName, onUse
         )}
 
         {connectionState === 'ended' && (
-          <div className="w-full max-w-4xl space-y-6">
+          <div className="w-full max-w-4xl space-y-6 my-auto">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Demo complete</h2>
               <p className="text-gray-500">
