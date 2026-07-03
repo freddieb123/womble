@@ -2443,6 +2443,7 @@ Rules: all four options must be similar in length and style. Distractors should 
       }
 
       const isTeachAiFeedback = config.type === 'teach-ai';
+      const isUserTesterFeedback = config.type === 'user-tester';
 
       if (!isTeachAiFeedback && !config.feedbackCriteria) {
         return res.status(400).json({ error: "Feedback criteria not set for this configuration" });
@@ -2454,7 +2455,31 @@ Rules: all four options must be similar in length and style. Distractors should 
         });
       }
 
-      const prompt = isTeachAiFeedback
+      const prompt = isUserTesterFeedback
+        ? `You are evaluating a live product demo. The presenter walked you through their app or prototype via screen share and narration, and you are giving feedback on the PRODUCT against the evaluation criteria.
+
+Evaluation criteria — assess the product/prototype against EACH one:
+${config.feedbackCriteria}
+
+For EVERY criterion above, assign one of:
+• 🔴 Not met — the demo did not show this, or it clearly falls short
+• 🟡 Partially met — add a brief comment on what worked and what was missing
+• 🟢 Well met — add a brief comment on what worked well
+
+Base your assessment ONLY on what was actually shown and said during the demo. If something wasn't demonstrated, mark it 🔴 or 🟡 rather than assuming it works.
+
+IMPORTANT: Address the presenter directly as 'you'. Never say 'the user', 'the presenter', or 'they'.
+
+Format your response EXACTLY like this — one bullet per criterion, starting with a short label (a few words) summarising the criterion:
+• [Short label]: 🔴 Not met — You didn't show how X works
+• [Short label]: 🟡 Partially met — You showed X but Y wasn't clear
+• [Short label]: 🟢 Well met — You demonstrated Z clearly
+
+Scoring standard: ${harshnessGuidance(config.feedbackHarshness)}
+
+Score: [1-10 based on how well the product met the criteria overall]
+[One-line overall summary using 'you']`
+        : isTeachAiFeedback
         ? `You are evaluating a "Teach the AI" session. The learner was asked to explain a topic to you (the AI playing the role of a learner).
 
 Topic and key points the learner was supposed to cover:
