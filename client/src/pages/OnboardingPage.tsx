@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, safeRedirectParam } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,13 +38,15 @@ export default function OnboardingPage() {
       toast({ title: "Couldn't save that", description: e.message, variant: "destructive" });
     } finally {
       setSaving(false);
-      navigate("/dashboard");
+      // Return to a carried redirect (e.g. a shared-session import link) if
+      // present, otherwise the dashboard.
+      navigate(safeRedirectParam() ?? "/dashboard");
     }
   };
 
   // If somehow reached when already onboarded, move along.
   useEffect(() => {
-    if (user?.onboardedAt) navigate("/dashboard");
+    if (user?.onboardedAt) navigate(safeRedirectParam() ?? "/dashboard");
   }, [user, navigate]);
 
   return (

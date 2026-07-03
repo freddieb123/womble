@@ -3292,6 +3292,69 @@ Score: [1-10 based on overall coverage and quality of explanation]
     }
   });
 
+  // Clone a session's structure (configs + quiz questions, but no learner
+  // responses/data) into a target user's account. Shared by "duplicate" and
+  // the trainer-to-trainer template import.
+  async function cloneSessionForUser(sourceSessionId: number, targetUserId: number, title: string) {
+    const [newSession] = await db.insert(sessions).values({
+      userId: targetUserId,
+      shareToken: crypto.randomUUID(),
+      title,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
+
+    const originalConfigs = await db.query.chatConfigs.findMany({
+      where: and(eq(chatConfigs.sessionId, sourceSessionId), eq(chatConfigs.deleted, false)),
+      orderBy: [chatConfigs.sessionOrder],
+    });
+
+    for (const cfg of originalConfigs) {
+      const [newCfg] = await db.insert(chatConfigs).values({
+        userId: targetUserId,
+        type: cfg.type,
+        title: cfg.title,
+        systemPrompt: cfg.systemPrompt,
+        userInstructions: cfg.userInstructions,
+        feedbackCriteria: cfg.feedbackCriteria,
+        participant1Role: cfg.participant1Role,
+        participant2Role: cfg.participant2Role,
+        knowledgeLevel: cfg.knowledgeLevel,
+        attitude: cfg.attitude,
+        coachingStyle: cfg.coachingStyle,
+        referenceContent: cfg.referenceContent,
+        referenceImages: cfg.referenceImages,
+        interactionMode: cfg.interactionMode,
+        groupBoardSettings: cfg.groupBoardSettings,
+        sessionId: newSession.id,
+        sessionOrder: cfg.sessionOrder,
+        isLive: false,
+        deleted: false,
+        createdAt: new Date(),
+      }).returning();
+
+      // Copy quiz questions if applicable
+      if (cfg.type === 'quiz') {
+        const questions = await db.query.quizQuestions.findMany({
+          where: and(eq(quizQuestions.configId, cfg.id), eq(quizQuestions.deleted, false)),
+          orderBy: [quizQuestions.orderIndex],
+        });
+        if (questions.length > 0) {
+          await db.insert(quizQuestions).values(questions.map(q => ({
+            configId: newCfg.id,
+            question: q.question,
+            expectedAnswer: q.expectedAnswer,
+            orderIndex: q.orderIndex,
+            createdAt: new Date(),
+            deleted: false,
+          })));
+        }
+      }
+    }
+
+    return { newSession, configCount: originalConfigs.length };
+  }
+
   // POST duplicate a session
   app.post("/api/sessions/:id/duplicate", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -3304,64 +3367,91 @@ Score: [1-10 based on overall coverage and quality of explanation]
       });
       if (!original) return res.status(404).json({ error: "Session not found" });
 
-      // Create duplicate session
-      const [newSession] = await db.insert(sessions).values({
-        userId: userId as number,
-        shareToken: crypto.randomUUID(),
-        title: `${original.title} copy`,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }).returning();
+      const { newSession, configCount } = await cloneSessionForUser(
+        sessionId,
+        userId as number,
+        `${original.title} copy`,
+      );
+      res.json({ ...newSession, configCount });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 
-      // Copy configs
-      const originalConfigs = await db.query.chatConfigs.findMany({
-        where: and(eq(chatConfigs.sessionId, sessionId), eq(chatConfigs.deleted, false)),
+  // POST generate (or return existing) a trainer-share template link for a
+  // session. This is a separate token from shareToken (the learner join link)
+  // so the two can be revoked/regenerated independently.
+  app.post("/api/sessions/:id/share-template", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const sessionId = parseInt(req.params.id);
+      if (!userId || isNaN(sessionId)) return res.status(400).json({ error: "Bad request" });
+
+      const original = await db.query.sessions.findFirst({
+        where: and(eq(sessions.id, sessionId), eq(sessions.userId, userId as number)),
+      });
+      if (!original) return res.status(404).json({ error: "Session not found" });
+
+      let token = original.templateShareToken;
+      if (!token) {
+        token = crypto.randomUUID();
+        await db.update(sessions)
+          .set({ templateShareToken: token })
+          .where(eq(sessions.id, sessionId));
+      }
+      res.json({ templateShareToken: token });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET preview of a shared template (public) — enough to show the recipient
+  // what they're about to add, without exposing any learner data.
+  app.get("/api/import/:token", async (req: Request, res: Response) => {
+    try {
+      const session = await db.query.sessions.findFirst({
+        where: eq(sessions.templateShareToken, req.params.token),
+      });
+      if (!session) return res.status(404).json({ error: "Shared session not found" });
+
+      const owner = await db.query.users.findFirst({
+        where: eq(users.id, session.userId),
+      });
+      const configs = await db.query.chatConfigs.findMany({
+        where: and(eq(chatConfigs.sessionId, session.id), eq(chatConfigs.deleted, false)),
+        columns: { id: true, title: true, type: true },
         orderBy: [chatConfigs.sessionOrder],
       });
 
-      for (const cfg of originalConfigs) {
-        const [newCfg] = await db.insert(chatConfigs).values({
-          userId: userId as number,
-          type: cfg.type,
-          title: cfg.title,
-          systemPrompt: cfg.systemPrompt,
-          userInstructions: cfg.userInstructions,
-          feedbackCriteria: cfg.feedbackCriteria,
-          participant1Role: cfg.participant1Role,
-          participant2Role: cfg.participant2Role,
-          knowledgeLevel: cfg.knowledgeLevel,
-          attitude: cfg.attitude,
-          coachingStyle: cfg.coachingStyle,
-          referenceContent: cfg.referenceContent,
-          referenceImages: cfg.referenceImages,
-          interactionMode: cfg.interactionMode,
-          sessionId: newSession.id,
-          sessionOrder: cfg.sessionOrder,
-          isLive: cfg.isLive,
-          deleted: false,
-          createdAt: new Date(),
-        }).returning();
+      const sharedByName = [owner?.firstName, owner?.lastName].filter(Boolean).join(" ").trim();
+      res.json({
+        title: session.title,
+        sharedBy: sharedByName || null,
+        activities: configs.map(c => ({ title: c.title, type: c.type })),
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 
-        // Copy quiz questions if applicable
-        if (cfg.type === 'quiz') {
-          const questions = await db.query.quizQuestions.findMany({
-            where: and(eq(quizQuestions.configId, cfg.id), eq(quizQuestions.deleted, false)),
-            orderBy: [quizQuestions.orderIndex],
-          });
-          if (questions.length > 0) {
-            await db.insert(quizQuestions).values(questions.map(q => ({
-              configId: newCfg.id,
-              question: q.question,
-              expectedAnswer: q.expectedAnswer,
-              orderIndex: q.orderIndex,
-              createdAt: new Date(),
-              deleted: false,
-            })));
-          }
-        }
-      }
+  // POST accept a shared template — clone the session into the current
+  // trainer's account (structure only, no learner data).
+  app.post("/api/import/:token", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
 
-      res.json({ ...newSession, configCount: originalConfigs.length });
+      const source = await db.query.sessions.findFirst({
+        where: eq(sessions.templateShareToken, req.params.token),
+      });
+      if (!source) return res.status(404).json({ error: "Shared session not found" });
+
+      const { newSession, configCount } = await cloneSessionForUser(
+        source.id,
+        userId as number,
+        source.title,
+      );
+      res.json({ ...newSession, configCount });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

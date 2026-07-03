@@ -59,7 +59,12 @@ export default function AuthPage() {
   // All hooks must run before any conditional return, or React throws
   // "Rendered fewer hooks than expected" when `user` flips between renders.
   if (user) {
-    return <Redirect to="/dashboard" />;
+    const redirect = new URLSearchParams(window.location.search).get('redirect');
+    // Only honour same-origin internal paths to avoid open-redirect.
+    const target = redirect && redirect.startsWith('/') && !redirect.startsWith('//')
+      ? redirect
+      : '/dashboard';
+    return <Redirect to={target} />;
   }
 
   const onSubmit = (data: AuthForm) => {
@@ -68,7 +73,11 @@ export default function AuthPage() {
       loginMutation.mutate(data);
     } else {
       track(EventName.USER_REGISTER, { method: 'email' });
-      registerMutation.mutate(data);
+      // If this signup is completing a shared-session import, tell the server not
+      // to create the empty starter session — the imported one will be their first.
+      const redirect = new URLSearchParams(window.location.search).get('redirect');
+      const skipDefaultSession = !!redirect && redirect.startsWith('/import/');
+      registerMutation.mutate({ ...data, skipDefaultSession });
     }
   };
 
@@ -261,6 +270,11 @@ export default function AuthPage() {
                   </Link>
                 </div>
                 <div className="space-y-2">
+                  {loginMutation.isError && (
+                    <p className="text-sm text-destructive text-center">
+                      Incorrect email or password. If you signed up with Google or Microsoft, use that button below.
+                    </p>
+                  )}
                   <Button
                     type="submit"
                     className="w-full flex items-center justify-between"

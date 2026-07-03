@@ -21,6 +21,7 @@ export const sessions = pgTable("sessions", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
   shareToken: text("share_token").unique().notNull(),
+  templateShareToken: text("template_share_token").unique(),
   title: text("title").notNull().default("New Session"),
   isLibrary: boolean("is_library").default(false).notNull(),
   suggestions: jsonb("suggestions").$type<any[]>().default([]),

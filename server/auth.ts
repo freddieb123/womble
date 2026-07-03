@@ -230,7 +230,11 @@ export function setupAuth(app: Express) {
         .returning();
 
       await ensureLibrarySession(user.id);
-      await createDefaultSession(user.id);
+      // Skip the empty starter session when this signup is completing a
+      // shared-session import — the imported session will be their first one.
+      if (!req.body?.skipDefaultSession) {
+        await createDefaultSession(user.id);
+      }
       sendWelcomeEmail(user);
 
       req.login(user, (err) => {

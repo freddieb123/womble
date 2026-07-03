@@ -19,14 +19,30 @@ type AuthContextType = {
   error: Error | null;
   loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
-  registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
+  registerMutation: UseMutationResult<SelectUser, Error, RegisterData>;
   signInWithGoogle: () => Promise<void>;
   signInWithMicrosoft: () => Promise<void>;
 };
 
 type LoginData = Pick<InsertUser, "email" | "password">;
+// `skipDefaultSession` tells the server not to create the empty starter session
+// when the signup is completing a shared-session import.
+type RegisterData = InsertUser & { skipDefaultSession?: boolean };
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
+// A ?redirect=<internal path> carried through the auth flow (e.g. from a
+// shared-session import link). Only same-origin paths are allowed, to avoid
+// open-redirects.
+export function safeRedirectParam(): string | null {
+  const r = new URLSearchParams(window.location.search).get("redirect");
+  return r && r.startsWith("/") && !r.startsWith("//") ? r : null;
+}
+
+// After auth, honour the redirect if present, otherwise use the given fallback.
+function postAuthRedirect(fallback: string): string {
+  return safeRedirectParam() ?? fallback;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
@@ -74,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.clear();
       identify(String(user.id), { email: user.email });
       queryClient.setQueryData(["/api/user"], user);
-      setLocation("/dashboard");
+      setLocation(postAuthRedirect("/dashboard"));
     },
     onError: (error: Error) => {
       // Toast removed for login/logout errors
@@ -108,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (newUser: InsertUser) => {
+    mutationFn: async (newUser: RegisterData) => {
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -125,7 +141,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       identify(String(user.id), { email: user.email });
       queryClient.setQueryData(["/api/user"], user);
       toast({ description: "Registered successfully" });
-      setLocation("/onboarding");
+      // New accounts still go through onboarding first; carry any post-auth
+      // redirect (e.g. a shared-session import link) through so onboarding can
+      // return the user to it once finished.
+      const redirect = safeRedirectParam();
+      setLocation(redirect ? `/onboarding?redirect=${encodeURIComponent(redirect)}` : "/onboarding");
     },
     onError: (error: Error) => {
       toast({
@@ -156,7 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.clear();
       identify(String(user.id), { email: user.email });
       queryClient.setQueryData(["/api/user"], user);
-      setLocation("/dashboard");
+      setLocation(postAuthRedirect("/dashboard"));
     } catch (error) {
       if ((error as any)?.code === 'auth/unauthorized-domain') {
         toast({
@@ -194,7 +214,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.clear();
       identify(String(user.id), { email: user.email });
       queryClient.setQueryData(["/api/user"], user);
-      setLocation("/dashboard");
+      setLocation(postAuthRedirect("/dashboard"));
     } catch (error) {
       if ((error as any)?.code === 'auth/unauthorized-domain') {
         toast({

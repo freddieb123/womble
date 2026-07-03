@@ -26,7 +26,7 @@ import {
   Share2, Keyboard, Mic, LogOut, Settings, GripVertical, Radio,
   Layers, FolderOpen, Library, Play, Users, MonitorPlay,
   MessageSquare, GraduationCap, Brain, Zap, LayoutGrid, Monitor,
-  FileText, ClipboardList, HelpCircle, Upload, Sparkles, Link2, X,
+  FileText, ClipboardList, HelpCircle, Upload, Sparkles, Link2, X, Check,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { track, EventName } from "@/lib/mixpanel";
@@ -208,6 +208,7 @@ function SessionSidebarItem({
   onDuplicate,
   onDelete,
   onRename,
+  onShare,
 }: {
   session: SessionSummary;
   isSelected: boolean;
@@ -215,6 +216,7 @@ function SessionSidebarItem({
   onDuplicate: () => void;
   onDelete: () => void;
   onRename: (title: string) => void;
+  onShare: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(session.title);
@@ -290,6 +292,9 @@ function SessionSidebarItem({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuItem onClick={onShare}>
+              <Share2 className="h-4 w-4 mr-2" />Share
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={onDuplicate}>
               <Copy className="h-4 w-4 mr-2" />Duplicate
             </DropdownMenuItem>
@@ -494,6 +499,113 @@ function startProgressSimulation(setProgress: (v: number) => void): ReturnType<t
   }, 400);
 }
 
+// ─── Share dialog ──────────────────────────────────────────────────────────────
+
+function ShareRow({ label, url }: { label: string; url: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* clipboard unavailable */ }
+  };
+  return (
+    <div className="flex gap-2">
+      <input
+        readOnly
+        value={url}
+        onFocus={(e) => e.currentTarget.select()}
+        aria-label={label}
+        className="flex-1 min-w-0 text-sm px-3 py-2 rounded-md border bg-muted/50 text-muted-foreground truncate outline-none"
+      />
+      <Button size="sm" variant="outline" onClick={copy} className="flex-shrink-0">
+        {copied ? <Check className="h-4 w-4 mr-1.5" /> : <Copy className="h-4 w-4 mr-1.5" />}
+        {copied ? 'Copied' : 'Copy'}
+      </Button>
+    </div>
+  );
+}
+
+function ShareDialog({
+  open,
+  onOpenChange,
+  session,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  session: SessionSummary | SessionDetail | null;
+}) {
+  const [templateToken, setTemplateToken] = useState<string | null>(null);
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
+  const { toast } = useToast();
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+
+  // Lazily mint the trainer-share token when the dialog opens.
+  useEffect(() => {
+    if (!open || !session) return;
+    setTemplateToken(null);
+    setLoadingTemplate(true);
+    fetch(`/api/sessions/${session.id}/share-template`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    })
+      .then((res) => { if (!res.ok) throw new Error(); return res.json(); })
+      .then((data) => setTemplateToken(data.templateShareToken))
+      .catch(() => toast({ variant: 'destructive', title: 'Error', description: 'Could not create the trainer link.' }))
+      .finally(() => setLoadingTemplate(false));
+  }, [open, session, toast]);
+
+  if (!session) return null;
+
+  const learnerUrl = `${origin}/session?token=${session.shareToken}`;
+  const trainerUrl = templateToken ? `${origin}/import/${templateToken}` : null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Share “{session.title}”</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6 pt-2">
+          {/* Share with learners */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-green-600" />
+              <span className="font-semibold text-sm">Share with learners</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Send this link to the people taking part. They join and complete the live activities.
+            </p>
+            <ShareRow label="Learner link" url={learnerUrl} />
+          </div>
+
+          <div className="border-t" />
+
+          {/* Share with another trainer */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <GraduationCap className="h-4 w-4 text-blue-600" />
+              <span className="font-semibold text-sm">Share with another trainer</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Send this to another trainer. They’ll get their own copy of these activities to run with their own
+              learners — none of your learner data is shared.
+            </p>
+            {loadingTemplate || !trainerUrl ? (
+              <div className="h-[38px] rounded-md border bg-muted/50 animate-pulse" />
+            ) : (
+              <ShareRow label="Trainer link" url={trainerUrl} />
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -503,6 +615,10 @@ export default function Home() {
   const [, navigate] = useLocation();
 
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(() => {
+    // A ?session=<id> param (e.g. after importing a shared session) wins over
+    // the last-viewed session persisted in localStorage.
+    const fromQuery = new URLSearchParams(window.location.search).get('session');
+    if (fromQuery && !isNaN(parseInt(fromQuery))) return parseInt(fromQuery);
     const stored = localStorage.getItem(LS_SESSION_KEY);
     return stored ? parseInt(stored) : null;
   });
@@ -515,6 +631,7 @@ export default function Home() {
   const [editingConfig, setEditingConfig] = useState<ChatConfig | null>(null);
   const [deletingConfig, setDeletingConfig] = useState<ChatConfig | null>(null);
   const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null);
+  const [shareSession, setShareSession] = useState<SessionSummary | null>(null);
   const [controllingQuizId, setControllingQuizId] = useState<number | null>(null);
   const [agentOrderOverride, setAgentOrderOverride] = useState<ChatConfig[]>([]);
   const [libraryTypeFilter, setLibraryTypeFilter] = useState<AgentTypeFilter>('all');
@@ -1102,16 +1219,6 @@ export default function Home() {
     }
   };
 
-  const handleCopySessionLink = async () => {
-    if (!selectedSession) return;
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}/session?token=${selectedSession.shareToken}`);
-      toast({ description: 'Session link copied to clipboard!' });
-    } catch {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to copy session link' });
-    }
-  };
-
   const handleViewFeedback = (configToView: ChatConfig) => {
     if (configToView.type === 'two-way-conversation') {
       window.open(`${window.location.origin}/dual-analysis?configId=${configToView.id}`, '_blank');
@@ -1286,6 +1393,7 @@ export default function Home() {
                     onDuplicate={() => duplicateSession.mutate(session.id)}
                     onDelete={() => setDeletingSessionId(session.id)}
                     onRename={(title) => updateSessionTitle.mutate({ id: session.id, title })}
+                    onShare={() => setShareSession(session)}
                   />
                 ))}
               </div>
@@ -1306,6 +1414,7 @@ export default function Home() {
                     onDuplicate={() => {}}
                     onDelete={() => {}}
                     onRename={(title) => updateSessionTitle.mutate({ id: session.id, title })}
+                    onShare={() => {}}
                   />
                 ))}
               </div>
@@ -1404,8 +1513,8 @@ export default function Home() {
                     >
                       <Plus className="h-3.5 w-3.5 mr-1.5" />Add activity
                     </Button>
-                    <Button size="sm" onClick={handleCopySessionLink}>
-                      <Share2 className="h-3.5 w-3.5 mr-1.5" />Share with participants
+                    <Button size="sm" onClick={() => setShareSession(selectedSession)}>
+                      <Share2 className="h-3.5 w-3.5 mr-1.5" />Share
                     </Button>
                   </div>
                 </>
@@ -1642,6 +1751,12 @@ export default function Home() {
       </main>
 
       {/* ── Dialogs ───────────────────────────────────────────── */}
+
+      <ShareDialog
+        open={!!shareSession}
+        onOpenChange={(open) => { if (!open) setShareSession(null); }}
+        session={shareSession}
+      />
 
       <Dialog open={isAddAgentOpen} onOpenChange={(open) => {
         setIsAddAgentOpen(open);

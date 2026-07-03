@@ -18,6 +18,7 @@ import ResetPasswordPage from "./pages/reset-password-page";
 import LandingPage from "./pages/LandingPage";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
+import ImportSessionPage from "./pages/ImportSessionPage";
 import { AuthProvider } from "./hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
@@ -31,6 +32,7 @@ function App() {
       <Switch>
         <Route path="/" component={LandingPage} />
         <Route path="/auth" component={AuthPage} />
+        <Route path="/import/:token" component={ImportSessionPage} />
         <Route path="/privacypolicy" component={PrivacyPolicy} />
         <Route path="/terms" component={TermsOfService} />
         <Route path="/reset-password" component={ResetPasswordPage} />
