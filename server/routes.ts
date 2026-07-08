@@ -12,6 +12,8 @@ import crypto from 'crypto';
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam } from 'openai/dist/resources/chat/completions';
 import AdmZip from 'adm-zip';
+import multer from 'multer';
+import { toFile } from 'openai';
 
 function withWalkthroughGuide(systemPrompt: string): string {
   return `${systemPrompt}
@@ -1333,14 +1335,12 @@ For "quick-fire-quiz" items only, set "systemPrompt", "feedbackCriteria", and "u
   });
 
   // Transcribe a short audio blob (user utterance from voice session)
+  const transcribeUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
   app.post("/api/voice/transcribe-chunk", (req: Request, res: Response) => {
-    const multer = require('multer');
-    const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
-    upload.single('audio')(req, res, async (err: any) => {
+    transcribeUpload.single('audio')(req, res, async (err: any) => {
       if (err) return res.status(400).json({ error: err.message });
       if (!req.file) return res.status(400).json({ error: "No audio file" });
       try {
-        const { toFile } = await import('openai');
         const audioFile = await toFile(req.file.buffer, 'utterance.webm', { type: req.file.mimetype || 'audio/webm' });
         const result = await openai.audio.transcriptions.create({ model: 'whisper-1', file: audioFile });
         res.json({ text: result.text });
@@ -3401,7 +3401,8 @@ Score: [1-10 based on overall coverage and quality of explanation]
       orderBy: [chatConfigs.sessionOrder],
     });
 
-    for (const cfg of originalConfigs) {
+    for (let i = 0; i < originalConfigs.length; i++) {
+      const cfg = originalConfigs[i];
       const [newCfg] = await db.insert(chatConfigs).values({
         userId: targetUserId,
         type: cfg.type,
@@ -3420,7 +3421,9 @@ Score: [1-10 based on overall coverage and quality of explanation]
         groupBoardSettings: cfg.groupBoardSettings,
         sessionId: newSession.id,
         sessionOrder: cfg.sessionOrder,
-        isLive: false,
+        // Make the first activity live by default so an imported session
+        // always has one live activity for participants to join.
+        isLive: i === 0,
         deleted: false,
         createdAt: new Date(),
       }).returning();
