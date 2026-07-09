@@ -1626,12 +1626,13 @@ ${conversation || '(no conversation yet)'}`;
           .values({
             configId,
             sessionId,
+            attemptNumber: 1,
             userName,
             chatMode,
             messages: messageSessions[sessionId],
           })
           .onConflictDoUpdate({
-            target: [conversations.configId, conversations.sessionId],
+            target: [conversations.configId, conversations.sessionId, conversations.attemptNumber],
             set: {
               messages: messageSessions[sessionId]
             }
@@ -3060,8 +3061,8 @@ Score: [1-10 based on overall coverage and quality of explanation]
   // Save transcript without grading (used by VoiceChatInterface to persist in real-time)
   app.post("/api/conversations/save-transcript", async (req: Request, res: Response) => {
     try {
-      const { configId, sessionId, userName, chatMode, messages } = req.body;
-      const attemptNumber = 1;
+      const { configId, sessionId, userName, chatMode, messages, attemptNumber: clientAttemptNumber } = req.body;
+      const attemptNumber = typeof clientAttemptNumber === 'number' ? clientAttemptNumber : 1;
       if (!configId || !sessionId || !Array.isArray(messages)) {
         return res.status(400).json({ error: "Missing required params" });
       }
