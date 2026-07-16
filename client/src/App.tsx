@@ -18,6 +18,7 @@ import ResetPasswordPage from "./pages/reset-password-page";
 import LandingPage from "./pages/LandingPage";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
+import OurThinking from "./pages/OurThinking";
 import ImportSessionPage from "./pages/ImportSessionPage";
 import { AuthProvider } from "./hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
@@ -35,6 +36,7 @@ function App() {
         <Route path="/import/:token" component={ImportSessionPage} />
         <Route path="/privacypolicy" component={PrivacyPolicy} />
         <Route path="/terms" component={TermsOfService} />
+        <Route path="/our-thinking" component={OurThinking} />
         <Route path="/reset-password" component={ResetPasswordPage} />
         <ProtectedRoute path="/onboarding" component={OnboardingPage} />
         <ProtectedRoute path="/settings" component={SettingsPage} />

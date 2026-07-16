@@ -1,5 +1,5 @@
 import { useState, useEffect, type ReactNode } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Helmet } from "react-helmet";
 import { useAuth } from "@/hooks/use-auth";
 import { track, EventName } from "@/lib/mixpanel";
@@ -339,6 +339,7 @@ export default function LandingPage() {
             <a href="#activities">Features</a>
             <a href="#how">How it works</a>
             <a href="#pricing">Pricing</a>
+            <Link href="/our-thinking">Our thinking</Link>
           </div>
           <div className="lp-nav-spacer" />
           <div className="lp-cta-group">
@@ -598,6 +599,7 @@ export default function LandingPage() {
                 <li><a href="#activities">Features</a></li>
                 <li><a href="#how">How it works</a></li>
                 <li><a href="#pricing">Pricing</a></li>
+                <li><Link href="/our-thinking">Our thinking</Link></li>
               </ul>
             </div>
             <div className="foot-activities">
