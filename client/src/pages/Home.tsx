@@ -84,9 +84,16 @@ type Suggestion = {
   title: string;
   description: string;
   slideReference?: string | null;
-  systemPrompt: string;
-  feedbackCriteria: string;
-  userInstructions: string;
+  // First/last slide this activity relates to. Kept on the suggestion so that
+  // /api/build-suggestion can pull the exact referenced slides back out of the
+  // tagged slideContext when the trainer clicks Build.
+  slideStartIndex?: number | null;
+  slideEndIndex?: number | null;
+  // Populated later by /api/build-suggestion when the trainer picks a suggestion —
+  // the /api/suggest-activities response is intentionally lightweight and omits these.
+  systemPrompt?: string;
+  feedbackCriteria?: string;
+  userInstructions?: string;
 };
 
 const AGENT_TYPE_FILTERS = [

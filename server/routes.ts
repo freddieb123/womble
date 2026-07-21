@@ -947,10 +947,12 @@ Keep the tone conversational and direct. Write in the same voice as the original
     try {
       const { content, fileName, url } = req.body;
       // Cap on how much extracted slide text we keep and send to the model. gpt-4o
-      // has a 128k-token window, so 50k chars (~12k tokens) is well within budget
-      // and covers ~100+ slides. Used for both extraction and the prompt so we
-      // never extract text we then silently drop.
-      const MAX_SLIDE_TEXT = 50000;
+      // has a 128k-token window, so 120k chars (~30k tokens) is well within budget
+      // and comfortably covers 150+ slides. Used for both extraction and the prompt
+      // so we never extract text we then silently drop. The extracted text is tagged
+      // with [Slide N] markers so a later /api/build-suggestion can pull out exactly
+      // the slides a suggestion references instead of rebuilding from its summary.
+      const MAX_SLIDE_TEXT = 120000;
       let slideText = '';
       let slideCount: number | undefined;
 
@@ -959,41 +961,99 @@ Keep the tone conversational and direct. Write in the same voice as the original
         const { fileName: fn } = req.body;
         const ext = (fn || '').toLowerCase().split('.').pop();
         if (ext === 'pptx' || ext === 'ppt') {
-          // PPTX is a ZIP of XML — extract text from slide XML files
+          // PPTX is a ZIP of XML — extract text per slide and tag each with a
+          // [Slide N] marker so build-suggestion can look up the exact slides a
+          // suggestion references. N is the slide's position in presentation order.
           try {
             const zip = new AdmZip(buffer);
-            const textParts: string[] = [];
-            let pageCount = 0;
-            for (const entry of zip.getEntries()) {
-              if (/^ppt\/slides\/slide\d+\.xml$/.test(entry.entryName)) {
-                pageCount++;
-                const xml = entry.getData().toString('utf-8');
-                const matches = xml.match(/<a:t[^>]*>([^<]*)<\/a:t>/g) || [];
-                for (const m of matches) {
-                  const t = m.replace(/<[^>]+>/g, '').trim();
-                  if (t) textParts.push(t);
+            const readEntry = (name: string) => {
+              const e = zip.getEntry(name);
+              return e ? e.getData().toString('utf-8') : '';
+            };
+            const textOfSlideXml = (xml: string) =>
+              (xml.match(/<a:t[^>]*>([^<]*)<\/a:t>/g) || [])
+                .map(m => m.replace(/<[^>]+>/g, '').trim())
+                .filter(Boolean)
+                .join(' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            // Resolve true presentation order via presentation.xml + its rels;
+            // fall back to sorting slide XML files by their numeric suffix.
+            let orderedSlideFiles: string[] = [];
+            const pres = readEntry('ppt/presentation.xml');
+            const rels = readEntry('ppt/_rels/presentation.xml.rels');
+            if (pres && rels) {
+              const relMap: Record<string, string> = {};
+              for (const rel of rels.match(/<Relationship\b[^>]*>/g) || []) {
+                const id = (rel.match(/Id="([^"]+)"/) || [])[1];
+                const target = (rel.match(/Target="([^"]+)"/) || [])[1];
+                if (id && target && /slides\/slide\d+\.xml/.test(target)) {
+                  let full = target.replace(/^\//, '');
+                  if (!full.startsWith('ppt/')) full = 'ppt/' + full;
+                  full = full.replace('ppt/../', '');
+                  relMap[id] = full;
                 }
               }
+              for (const sld of pres.match(/<p:sldId\b[^>]*>/g) || []) {
+                const rid = (sld.match(/r:id="([^"]+)"/) || [])[1];
+                if (rid && relMap[rid]) orderedSlideFiles.push(relMap[rid]);
+              }
             }
-            slideText = textParts.join(' ').replace(/\s+/g, ' ').trim().slice(0, MAX_SLIDE_TEXT);
-            slideCount = pageCount || undefined;
+            if (orderedSlideFiles.length === 0) {
+              orderedSlideFiles = zip.getEntries()
+                .map(e => e.entryName)
+                .filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+                .sort((a, b) => parseInt(a.match(/slide(\d+)/)![1], 10) - parseInt(b.match(/slide(\d+)/)![1], 10));
+            }
+
+            // Hidden slides (marked show="0" on the <p:sld> root) are excluded from
+            // the deck entirely and never suggested or built from. Visible slides are
+            // renumbered sequentially so the [Slide N] markers stay gap-free.
+            const isHiddenSlide = (xml: string) => {
+              const open = xml.match(/<p:sld\b[^>]*>/);
+              return !!open && /\bshow="0"/.test(open[0]);
+            };
+            const parts: string[] = [];
+            let visibleCount = 0;
+            for (const name of orderedSlideFiles) {
+              const xml = readEntry(name);
+              if (isHiddenSlide(xml)) continue;
+              visibleCount++;
+              const t = textOfSlideXml(xml);
+              parts.push(`[Slide ${visibleCount}]${t ? '\n' + t : ''}`);
+            }
+            slideText = parts.join('\n\n').slice(0, MAX_SLIDE_TEXT);
+            slideCount = visibleCount || undefined;
           } catch (e) {
             return res.status(400).json({ error: 'Could not parse PPTX file. Try exporting as PDF.' });
           }
         } else {
-        // Pure-JS PDF text extraction (works for text-based PDFs e.g. slide exports)
+        // Pure-JS PDF text extraction (works for text-based PDFs e.g. slide exports).
+        // We track the file position of each page object and each text block so we
+        // can tag text with [Slide N] markers — each block is attributed to the last
+        // page object preceding it. This is a heuristic (PDF does not guarantee page
+        // and content-stream ordering) but it is internally consistent: build reads
+        // back the same markers, so the referenced slides always resolve to the same
+        // text even if a displayed number is off by one from the true PDF page.
         const data = buffer.toString('binary');
-        const pageCount = (data.match(/\/Type\s*\/Page[^s]/g) || []).length;
-        const textParts: string[] = [];
+        const pageStarts: number[] = [];
+        const pageRe = /\/Type\s*\/Page[^s]/g;
+        let pm: RegExpExecArray | null;
+        while ((pm = pageRe.exec(data)) !== null) pageStarts.push(pm.index);
+        const pageCount = pageStarts.length;
+
+        const blocks: { pos: number; text: string }[] = [];
         const btEt = /BT([\s\S]*?)ET/g;
         let bm: RegExpExecArray | null;
         while ((bm = btEt.exec(data)) !== null) {
           const block = bm[1];
+          const chunk: string[] = [];
           const tj = /\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*(?:Tj|'|")/g;
           let tm: RegExpExecArray | null;
           while ((tm = tj.exec(block)) !== null) {
             const t = tm[1].replace(/\\n/g,'\n').replace(/\\\(/g,'(').replace(/\\\)/g,')').replace(/\\\\/g,'\\');
-            if (t.trim()) textParts.push(t);
+            if (t.trim()) chunk.push(t);
           }
           const tja = /\[([^\]]*)\]\s*TJ/g;
           let ta: RegExpExecArray | null;
@@ -1001,11 +1061,29 @@ Keep the tone conversational and direct. Write in the same voice as the original
             const parts = ta[1].match(/\(([^)\\]*(?:\\.[^)\\]*)*)\)/g) || [];
             for (const p of parts) {
               const t = p.slice(1,-1).replace(/\\n/g,'\n').replace(/\\\(/g,'(').replace(/\\\)/g,')');
-              if (t.trim()) textParts.push(t);
+              if (t.trim()) chunk.push(t);
             }
           }
+          const text = chunk.join(' ').replace(/\s+/g,' ').trim();
+          if (text) blocks.push({ pos: bm.index, text });
         }
-        slideText = textParts.join(' ').replace(/\s+/g,' ').trim().slice(0, MAX_SLIDE_TEXT);
+
+        if (pageCount > 0) {
+          const perPage: string[][] = Array.from({ length: pageCount }, () => []);
+          for (const b of blocks) {
+            let idx = 0;
+            for (let i = 0; i < pageCount; i++) {
+              if (pageStarts[i] <= b.pos) idx = i; else break;
+            }
+            perPage[idx].push(b.text);
+          }
+          slideText = perPage
+            .map((arr, i) => `[Slide ${i + 1}]${arr.length ? '\n' + arr.join(' ') : ''}`)
+            .join('\n\n')
+            .slice(0, MAX_SLIDE_TEXT);
+        } else {
+          slideText = blocks.map(b => b.text).join(' ').replace(/\s+/g,' ').trim().slice(0, MAX_SLIDE_TEXT);
+        }
         slideCount = pageCount || undefined;
         } // end else (PDF)
       } else if (url) {
@@ -1058,39 +1136,39 @@ Keep the tone conversational and direct. Write in the same voice as the original
             role: 'system',
             content: `You are an expert learning designer for apprenticeship training programmes in the UK. You will be given the content of a training slide deck and must suggest learning activities.
 
+The deck content is tagged with "[Slide N]" markers that indicate where each slide begins. Use these exact numbers when reporting which slides an activity relates to — your "slideReference", "slideStartIndex" and "slideEndIndex" must correspond to the real [Slide N] markers so the activity can later be rebuilt from those exact slides.
+
 QUANTITY RULE: Suggest roughly 3–5 activities per 10 slides. So a 10-slide deck → 3–5 suggestions; a 20-slide deck → 6–10; a 5-slide deck → 2–3. It is fine — and encouraged — to suggest more than one activity for the same group of slides when there are genuinely different good options (e.g. a role-play AND a quiz for the same content). The user will pick the best one.
 
 PRIORITY RULE: Before anything else, scan the deck for slides that describe, set up, or reference an activity the trainer already intends participants to do — signalled by things like "Activity:", "Exercise:", "Task:", "Discussion", "Group work", "In pairs", "Role play", "Workshop", "Breakout", "Practise", "Scenario", "Case study", "Reflect on". For EVERY such described activity, create a suggestion that MIRRORS it as closely as possible — the same scenario, task and intent — mapped to the closest-fitting activity type. These are the highest priority: never miss one, and they come first. Mark each with "mirrorsExisting": true. ONLY AFTER mirroring every activity the deck already describes, suggest additional fresh activities for other substantive content, marked "mirrorsExisting": false.
 
-ORDER RULE: List all mirrored activities ("mirrorsExisting": true) first, then the additional ideas. Within each of those two groups, keep slide order — suggestions covering earlier slides come first.
+ORDER RULE: List every suggestion in slide order — the activity relating to the earliest slides comes first, the one relating to the latest slides comes last. Do NOT group by type or by whether a suggestion mirrors an existing activity; order purely by "slideStartIndex".
 
 IGNORE RULE: Only suggest activities grounded in actual learning content — concepts, frameworks, skills, processes, or knowledge. NEVER suggest an activity based on administrative or housekeeping material such as the agenda, schedule, timetable, breaks, lunch, ground rules, introductions, icebreakers, logistics, title/cover slides, contents pages, "about us", thank-you/closing slides, or anything that isn't substantive teaching content. If a slide or section is purely logistical, skip it entirely rather than forcing an activity onto it.
 
-Available activity types:
-- "chat": Learner has a role-play conversation with an AI playing a character — great for practising interactions, applying principles in a scenario, handling objections, or difficult conversations
-- "teach-ai": Learner explains a concept, framework, or set of principles to an AI playing a naive learner — excellent for consolidating knowledge of content already covered in the slides
-- "thought-partner": Open coaching conversation to help the learner apply an idea to their own work context
-- "two-way-conversation": Two real people record a conversation (mock interview, role play with a partner) — AI transcribes and gives feedback
+Available activity types (each is a great fit for different content — reach for the one that best matches, not the most convenient):
+- "chat": Learner has a role-play conversation with an AI playing a character — great for practising interactions, applying principles in a scenario, handling objections, or difficult conversations. A strong default whenever the content involves dealing with people, situations, or judgement.
+- "teach-ai": Learner explains a concept, framework, or set of principles to an AI playing a naive learner — excellent for consolidating knowledge of content the slides have already taught. Reach for this whenever a slide explains a model, theory, or set of principles.
+- "thought-partner": Open coaching conversation to help the learner apply an idea to their own work context — great for reflective content or anything the learner needs to adapt to their own role.
+- "two-way-conversation": Two real people record a conversation (mock interview, role play with a partner) — AI transcribes and gives feedback. Good where the skill is genuinely interpersonal and best practised with another human.
 - "doc-critique": Learner reads a SEPARATE external document (e.g. a case study, contract, report, or business plan that is not part of the slide deck) and shares observations — AI coaches on what they should have noticed. ONLY use this type when the slides explicitly reference an external document for participants to analyse. NEVER suggest it for principles, frameworks, theory, or content that is itself explained in the slides — use "chat" or "teach-ai" for those instead.
-- "task-walkthrough": Learner describes their progress on a task via voice — AI coaches them through completion
+- "task-walkthrough": Learner describes their progress on a specific, concrete deliverable via voice — AI coaches them through completing it. ONLY use this where the content centres on producing a tangible piece of work (a document, plan, build, calculation, or artefact) that a learner would genuinely be part-way through. Do NOT use it as a catch-all for general "apply this skill" content — that is usually better as "chat", "teach-ai", or "thought-partner". Never let this type dominate a set of suggestions.
 - "quick-fire-quiz": A fast, competitive multiple-choice quiz that tests recall. ONLY suggest this when a set of slides contains significant factual knowledge worth memorising — definitions, processes, regulations, named steps, key figures, terminology. Do NOT suggest it for soft skills, open-ended discussion, or content better practised through conversation. You do NOT write the questions — just propose the quiz with a clear title and description; the user builds the questions themselves.
+
+DIVERSITY RULE: Deliberately vary the activity type across your suggestions. Use at least 4 different types across the full set. No single type should account for more than ~30% of your suggestions unless the content genuinely supports only one. Before defaulting to "task-walkthrough", explicitly ask whether the content would be better served by a role-play ("chat"), a teach-back ("teach-ai"), a quiz ("quick-fire-quiz"), or a reflective coaching session ("thought-partner") — pick the type that best fits each piece of content, not the easiest one.
 
 Return ONLY a valid JSON array, no other text. Each item:
 {
   "type": one of the types above,
   "title": compelling activity title, max 8 words,
   "description": 1-2 sentences — what participants do and what they get out of it. NEVER reference "the slides", "the slide deck", "the deck" or "the presentation" here — participants never see your slides. Refer to the content directly instead (e.g. "the steps outlined", "the framework covered", "the key principles") or say "in the session",
-  "slideReference": which slides this relates to (e.g. "Slides 4–6") — always include this,
-  "slideStartIndex": the first slide number this activity relates to (integer, for ordering),
-  "mirrorsExisting": true if this mirrors an activity already described/set up in the slides, false if it is a fresh idea you are adding,
-  "systemPrompt": detailed, specific system prompt for the AI in this activity — reference the actual content from the slides,
-  "feedbackCriteria": specific criteria for evaluating the participant's response,
-  "userInstructions": brief friendly instructions shown to the participant (1-2 sentences) — like "description", never reference "the slides"/"the deck"/"the presentation"; participants don't see them
+  "slideReference": which slides this relates to, using the [Slide N] markers (e.g. "Slides 4–6") — always include this,
+  "slideStartIndex": the first slide number this activity relates to (integer, matching a [Slide N] marker),
+  "slideEndIndex": the last slide number this activity relates to (integer, matching a [Slide N] marker; equal to slideStartIndex for a single slide),
+  "mirrorsExisting": true if this mirrors an activity already described/set up in the slides, false if it is a fresh idea you are adding
 }
 
-For "quick-fire-quiz" items only, set "systemPrompt", "feedbackCriteria", and "userInstructions" to empty strings ("") — they are not used; the user builds the questions manually.
-
-Ground every activity specifically in the slide content — never generic.`,
+Keep each suggestion lightweight — do NOT write a system prompt, feedback criteria, or participant instructions here; those are generated later, once the trainer picks a suggestion. Ground every activity specifically in the slide content — never generic.`,
           },
           {
             role: 'user',
@@ -1105,15 +1183,13 @@ Ground every activity specifically in the slide content — never generic.`,
       let suggestions: any[] = [];
       try { suggestions = JSON.parse(raw); } catch { suggestions = []; }
       suggestions = suggestions
-        .sort((a: any, b: any) => {
-          // Activities the deck already describes come first, then fresh ideas;
-          // within each group, keep slide order.
-          const am = a.mirrorsExisting ? 0 : 1;
-          const bm = b.mirrorsExisting ? 0 : 1;
-          if (am !== bm) return am - bm;
-          return (a.slideStartIndex ?? 999) - (b.slideStartIndex ?? 999);
-        })
-        .map((s: any) => { const { slideStartIndex, mirrorsExisting, ...rest } = s; return { ...rest, id: crypto.randomUUID() }; });
+        // Order strictly by where the content appears in the deck — earliest
+        // slides first, last slides at the bottom — regardless of whether a
+        // suggestion mirrors an existing activity or is a fresh idea.
+        .sort((a: any, b: any) => (a.slideStartIndex ?? 999) - (b.slideStartIndex ?? 999))
+        // Keep slideStartIndex/slideEndIndex on the suggestion so /api/build-suggestion
+        // can pull the exact referenced slides back out of the tagged slideContext.
+        .map((s: any) => { const { mirrorsExisting, ...rest } = s; return { ...rest, id: crypto.randomUUID() }; });
 
       res.json({ suggestions, slideCount, slideContext: slideText });
     } catch (error: any) {
@@ -1136,6 +1212,41 @@ Ground every activity specifically in the slide content — never generic.`,
         'task-walkthrough': 'the learner talks through their progress on a task and the AI coaches them through completion via voice',
       };
 
+      // Pull out the exact slides this suggestion references from the tagged
+      // slideContext, so the activity is built from the real slide content — not
+      // just its one-line summary. Prefer numeric indices; fall back to parsing the
+      // slideReference string; pad by one slide either side for surrounding context.
+      const ctx = typeof slideContext === 'string' ? slideContext : '';
+      const hasMarkers = /\[Slide \d+\]/.test(ctx);
+      const extractSlideWindow = (): string => {
+        if (!hasMarkers) return '';
+        let start = Number.isFinite(suggestion.slideStartIndex) ? Number(suggestion.slideStartIndex) : undefined;
+        let end = Number.isFinite(suggestion.slideEndIndex) ? Number(suggestion.slideEndIndex) : undefined;
+        if (start == null) {
+          const nums = String(suggestion.slideReference || '').match(/\d+/g);
+          if (nums?.length) { start = parseInt(nums[0], 10); end = parseInt(nums[nums.length - 1], 10); }
+        }
+        if (start == null) return '';
+        const lo = Math.max(1, start - 1);
+        const hi = (end ?? start) + 1;
+        const markerRe = /\[Slide (\d+)\]/g;
+        const marks: { n: number; idx: number }[] = [];
+        let mm: RegExpExecArray | null;
+        while ((mm = markerRe.exec(ctx)) !== null) marks.push({ n: parseInt(mm[1], 10), idx: mm.index });
+        let out = '';
+        for (let i = 0; i < marks.length; i++) {
+          if (marks[i].n >= lo && marks[i].n <= hi) {
+            const to = i + 1 < marks.length ? marks[i + 1].idx : ctx.length;
+            out += ctx.slice(marks[i].idx, to);
+          }
+        }
+        return out.trim();
+      };
+      const focused = extractSlideWindow();
+      // Focused excerpt when we can resolve it; otherwise fall back to the whole
+      // deck (larger window than before) so build is never left with just a summary.
+      const buildContext = focused || ctx.slice(0, 60000);
+
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
@@ -1145,11 +1256,11 @@ Ground every activity specifically in the slide content — never generic.`,
 
 The activity type is: ${typeDescriptions[suggestion.type] || suggestion.type}
 
-You will be given a suggested activity and the actual slide content it relates to. Your job is to write rich, highly specific configuration fields that a trainer could use immediately without editing.
+You will be given a suggested activity and the ACTUAL slide content it is based on. Build the activity from that slide content — never from the one-line summary alone. If the slides describe, set up, or reference an activity, exercise, scenario, role-play, case study or task, MIRROR it faithfully: reuse the same scenario, roles, context, names, figures, constraints and instructions exactly as the slides present them. Do NOT invent a different scenario when the slides already provide one — only fill genuine gaps the slides leave open.
 
 Return ONLY valid JSON with these fields:
 {
-  "systemPrompt": "Detailed AI instructions (250-400 words). Be specific: reference exact concepts, frameworks, terminology and scenarios from the slide content. Include how the AI should behave, what it should probe for, what good looks like, and what common mistakes to address.",
+  "systemPrompt": "Detailed AI instructions (250-400 words). Be specific: reference the exact concepts, frameworks, terminology and scenarios from the slide content. Include how the AI should behave, what it should probe for, what good looks like, and what common mistakes to address.",
   "feedbackCriteria": "Specific evaluation rubric (150-250 words). List 4-6 concrete things to look for with clear indicators of what good/adequate/missing looks like. Reference the specific content from the slides.",
   "userInstructions": "Clear, friendly participant-facing instructions (2-4 sentences). Tell them exactly what to do and what to aim for. Make it feel achievable. NEVER reference 'the slides', 'the slide deck', 'the deck' or 'the presentation' — participants never see them; refer to the content directly (e.g. 'the steps outlined') or say 'in the session'."
 }`,
@@ -1159,11 +1270,13 @@ Return ONLY valid JSON with these fields:
             content: `Activity to build:
 Title: ${suggestion.title}
 Type: ${suggestion.type}
-Description: ${suggestion.description}
+Description (summary only — a starting point, not the source of truth): ${suggestion.description}
 Slide reference: ${suggestion.slideReference || 'not specified'}
 
-Relevant slide content:
-${(slideContext || '').slice(0, 30000)}
+${focused
+  ? 'The EXACT slide content this activity is based on (verbatim, tagged with [Slide N] markers). Ground the activity in this — mirror any scenario or task it describes:'
+  : 'Relevant slide content:'}
+${buildContext || '(no slide content was available — build a strong activity from the title and description)'}
 
 Write detailed, specific configuration for this activity.`,
           },
