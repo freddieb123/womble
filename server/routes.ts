@@ -2655,7 +2655,7 @@ Score: [1-10 based on overall coverage and quality of explanation]
             criteria: config.feedbackCriteria || '',
             itemNoun: 'criterion',
             statuses: `🔴 = you didn't demonstrate this\n🟡 = partially demonstrated, or the basics without real depth\n🟢 = clearly and strongly demonstrated`,
-            address: `Address the learner directly as 'you'. Never say 'the user', 'the learner', or 'they'. Refer to the AI as 'me' or 'I'.`,
+            address: `Address the learner directly as 'you'. Never say 'the user', 'the learner', or 'they'. Refer to the role-play AI character in the third person as 'the AI' — never write as though you are the AI (no 'me', 'I', or 'my'). For example, write "you didn't explore the AI's interests", not "you didn't explore my interests".`,
             extraRules: `CRITICAL RULES:\n- Lines labelled "LEARNER:" are the person you are grading.\n- Lines labelled "AI:" are the role-play character — do NOT comment on, score, or treat them as evidence of the learner's performance. Only the LEARNER's messages matter.`,
           })
         : isDocCritiqueFeedback
@@ -2674,7 +2674,7 @@ Score: [1-10 based on overall coverage and quality of explanation]
             statuses: `🔴 = this part of the task isn't done\n🟡 = partially done, or done only to a basic level\n🟢 = fully completed to a genuinely high standard`,
             address: `Address the apprentice directly as 'you'. Never say 'the user', 'the apprentice', or 'they'.`,
           })
-        : `You are grading a LEARNER's performance in a role-play conversation. Your sole job is to evaluate the LEARNER — not the AI.\n\nRole-play scenario (background context only — do NOT evaluate the AI's behaviour):\n${config.systemPrompt}\n\nWhat to assess the LEARNER against:\n${config.feedbackCriteria}\n\nCRITICAL RULES:\n- Lines labelled "LEARNER:" are the person you are grading.\n- Lines labelled "AI:" are the role-play character. Do NOT comment on them, do NOT score them, do NOT use them as evidence of the learner's performance.\n- If the AI gave a good or bad answer, that is irrelevant — only the LEARNER's messages matter.\n- Address the learner directly as 'you'. Never say 'the user', 'the learner', or 'they'. Refer to the AI as 'me' or 'I'.\n\nScoring standard: ${harshnessGuidance(config.feedbackHarshness)}\n\nProvide your analysis in exactly this format:\n\n• [bullet 1: one sentence using 'you', evaluating a specific thing the LEARNER said or did]\n• [bullet 2: one sentence using 'you']\n• [bullet 3: one sentence using 'you']\n\nScore: [1-10]\n[Brief one-line overall summary using 'you']`;
+        : `You are grading a LEARNER's performance in a role-play conversation. Your sole job is to evaluate the LEARNER — not the AI.\n\nRole-play scenario (background context only — do NOT evaluate the AI's behaviour):\n${config.systemPrompt}\n\nWhat to assess the LEARNER against:\n${config.feedbackCriteria}\n\nCRITICAL RULES:\n- Lines labelled "LEARNER:" are the person you are grading.\n- Lines labelled "AI:" are the role-play character. Do NOT comment on them, do NOT score them, do NOT use them as evidence of the learner's performance.\n- If the AI gave a good or bad answer, that is irrelevant — only the LEARNER's messages matter.\n- Address the learner directly as 'you'. Never say 'the user', 'the learner', or 'they'. Refer to the role-play AI character in the third person as 'the AI' — never write as though you are the AI (no 'me', 'I', or 'my'). For example, write "you didn't explore the AI's interests", not "you didn't explore my interests".\n\nScoring standard: ${harshnessGuidance(config.feedbackHarshness)}\n\nProvide your analysis in exactly this format:\n\n• [bullet 1: one sentence using 'you', evaluating a specific thing the LEARNER said or did]\n• [bullet 2: one sentence using 'you']\n• [bullet 3: one sentence using 'you']\n\nScore: [1-10]\n[Brief one-line overall summary using 'you']`;
 
 
       const conversation = messages.map((m: Message) =>
@@ -3335,19 +3335,19 @@ Score: [1-10 based on overall coverage and quality of explanation]
         c => c.messages && c.messages.length >= 2 && (!c.feedback || c.feedback.score === null)
       );
 
-      const prompt = `Context:\n${config.systemPrompt}\n\nAnalyze the conversation based on these criteria:\n${config.feedbackCriteria}\n\nIMPORTANT: Focus only on the user's contributions. Address them directly as 'you'. Never say 'the user' or 'they'.\n\nScoring standard: ${harshnessGuidance(config.feedbackHarshness)}\n\nFormat:\n• [3 bullet points]\n\nScore: [1-10]\n[One-line summary]`;
+      const prompt = `You are grading a LEARNER's performance in a role-play conversation. Your sole job is to evaluate the LEARNER — not the AI.\n\nRole-play scenario (background context only — do NOT evaluate the AI's behaviour):\n${config.systemPrompt}\n\nWhat to assess the LEARNER against:\n${config.feedbackCriteria}\n\nCRITICAL RULES:\n- Lines labelled "LEARNER:" are the person you are grading.\n- Lines labelled "AI:" are the role-play character. Do NOT comment on them, do NOT score them, do NOT use them as evidence of the learner's performance.\n- If the AI gave a good or bad answer, that is irrelevant — only the LEARNER's messages matter.\n- Address the learner directly as 'you'. Never say 'the user', 'the learner', or 'they'. Refer to the role-play AI character in the third person as 'the AI' — never write as though you are the AI (no 'me', 'I', or 'my'). For example, write "you didn't explore the AI's interests", not "you didn't explore my interests".\n\nScoring standard: ${harshnessGuidance(config.feedbackHarshness)}\n\nFormat:\n• [3 bullet points, each one sentence using 'you' about something the LEARNER said or did]\n\nScore: [1-10]\n[One-line summary using 'you']`;
 
       await Promise.all(ungraded.map(async (conv) => {
         try {
           const conversation = conv.messages.map((m: Message) =>
-            `${m.role}: ${typeof m.content === 'string' ? m.content : (m.content as any).text}`
+            `${m.role === 'user' ? 'LEARNER' : 'AI'}: ${typeof m.content === 'string' ? m.content : (m.content as any).text}`
           ).join('\n');
 
           const completion = await openai.chat.completions.create({
             model: "gpt-5.4-mini",
             messages: [
-              { role: "system", content: "You are an expert at analyzing conversations and providing constructive feedback." },
-              { role: "user", content: `${prompt}\n\nConversation:\n${conversation}` }
+              { role: "system", content: "You are an assessor grading a learner's performance in a training activity. You assess only the learner's contributions — never the AI's. The AI is a role-play character, not the person being graded." },
+              { role: "user", content: `${prompt}\n\nConversation to analyze:\n${conversation}` }
             ],
             temperature: 0.7,
             max_completion_tokens: 2000,
