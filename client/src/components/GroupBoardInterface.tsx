@@ -33,12 +33,12 @@ interface Props {
 }
 
 const COLORS = [
-  { label: 'Yellow', value: '#fef08a' },
-  { label: 'Pink', value: '#fda4af' },
-  { label: 'Blue', value: '#93c5fd' },
-  { label: 'Green', value: '#86efac' },
-  { label: 'Purple', value: '#c4b5fd' },
-  { label: 'White', value: '#f9fafb' },
+  { label: 'Yellow', value: '#FBEBC4' },
+  { label: 'Pink', value: '#FFE3FB' },
+  { label: 'Blue', value: '#D6F0FF' },
+  { label: 'Green', value: '#D8F6DE' },
+  { label: 'Purple', value: '#F1E7FF' },
+  { label: 'White', value: '#FBFAF7' },
 ];
 
 export default function GroupBoardInterface({ config, userName, onUserNameSubmit, isAdmin = false }: Props) {
@@ -59,7 +59,7 @@ export default function GroupBoardInterface({ config, userName, onUserNameSubmit
   const [addingToGroup, setAddingToGroup] = useState<number | null>(null);
   const [pendingPos, setPendingPos] = useState({ posX: 10, posY: 10 });
   const [newText, setNewText] = useState('');
-  const [newColor, setNewColor] = useState('#fef08a');
+  const [newColor, setNewColor] = useState('#FBEBC4');
 
   // Edit post-it
   const [editingPostIt, setEditingPostIt] = useState<PostIt | null>(null);
@@ -113,7 +113,7 @@ export default function GroupBoardInterface({ config, userName, onUserNameSubmit
     const posY = Math.max(0, Math.min(85, ((e.clientY - rect.top) / rect.height) * 100));
     setPendingPos({ posX: Math.round(posX), posY: Math.round(posY) });
     setNewText('');
-    setNewColor('#fef08a');
+    setNewColor('#FBEBC4');
     setAddingToGroup(groupNum);
   };
 
@@ -300,7 +300,7 @@ export default function GroupBoardInterface({ config, userName, onUserNameSubmit
                         onClick={() => {
                           setPendingPos({ posX: 10, posY: 10 });
                           setNewText('');
-                          setNewColor('#fef08a');
+                          setNewColor('#FBEBC4');
                           setAddingToGroup(gIdx);
                         }}
                         className="flex items-center gap-1 text-xs text-green-700 hover:text-green-900 px-1.5 py-0.5 rounded hover:bg-green-100"

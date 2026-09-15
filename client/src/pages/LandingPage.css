@@ -2,9 +2,9 @@
 
 /* ── Keyframes ─────────────────────────────────────────────── */
 @keyframes lp-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(22,163,74,0.6); }
-  70%  { box-shadow: 0 0 0 8px rgba(22,163,74,0); }
-  100% { box-shadow: 0 0 0 0 rgba(22,163,74,0); }
+  0%   { box-shadow: 0 0 0 0 hsl(var(--forest-700) / 0.55); }
+  70%  { box-shadow: 0 0 0 8px hsl(var(--forest-700) / 0); }
+  100% { box-shadow: 0 0 0 0 hsl(var(--forest-700) / 0); }
 }
 @keyframes lp-bounce {
   0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
@@ -14,54 +14,58 @@
 
 /* ── Root ──────────────────────────────────────────────────── */
 .lp {
-  --womble-green: #84B440;
-  --lp-primary: #16A34A;
-  --lp-primary-hover: #15803D;
-  --lp-primary-soft: #DCFCE7;
-  --lp-primary-ink: #166534;
-  --lp-primary-fg: #FFFFFF;
+  /* These --lp-* names are kept so the rules below need no edits, but every
+     one now derives from the shared Marginalia tokens in index.css. There is
+     one source of truth; this block is an alias layer, not a second palette. */
+  --lp-primary: hsl(var(--primary));
+  --lp-primary-hover: hsl(var(--forest-600));
+  --lp-primary-soft: hsl(var(--forest-50));
+  --lp-primary-ink: hsl(var(--forest-800));
+  --lp-primary-fg: hsl(var(--primary-foreground));
 
-  --lp-type-chat-bg:         #DCFCE7;
-  --lp-type-chat-ink:        #166534;
-  --lp-type-conv-bg:         #FFEDD5;
-  --lp-type-conv-ink:        #9A3412;
-  --lp-type-teach-bg:        #F3E8FF;
-  --lp-type-teach-ink:       #6B21A8;
-  --lp-type-thought-bg:      #DBEAFE;
-  --lp-type-thought-ink:     #1E40AF;
+  --lp-type-chat-bg:    hsl(var(--tone-chat-fill));
+  --lp-type-chat-ink:   hsl(var(--tone-chat-ink));
+  --lp-type-conv-bg:    hsl(var(--tone-conversation-fill));
+  --lp-type-conv-ink:   hsl(var(--tone-conversation-ink));
+  --lp-type-teach-bg:   hsl(var(--tone-teach-fill));
+  --lp-type-teach-ink:  hsl(var(--tone-teach-ink));
+  --lp-type-thought-bg: hsl(var(--tone-thought-fill));
+  --lp-type-thought-ink:hsl(var(--tone-thought-ink));
 
-  --lp-bg: #FFFFFF;
-  --lp-bg-tint: #EFF6FF;
-  --lp-bg-tint-border: #DBEAFE;
-  --lp-bg-muted: #F9FAFB;
-  --lp-border: #E5E7EB;
-  --lp-border-soft: #F3F4F6;
+  --lp-bg: hsl(var(--card));
+  --lp-bg-tint: hsl(var(--forest-50));
+  --lp-bg-tint-border: hsl(var(--forest-100));
+  --lp-bg-muted: hsl(var(--warm-50));
+  --lp-border: hsl(var(--warm-300));
+  --lp-border-soft: hsl(var(--warm-200));
 
-  --lp-fg: #111827;
-  --lp-fg2: #374151;
-  --lp-fg-muted: #4B5563;
-  --lp-fg-soft: #6B7280;
-  --lp-fg-faint: #9CA3AF;
+  --lp-fg: hsl(var(--warm-900));
+  --lp-fg2: hsl(var(--warm-800));
+  --lp-fg-muted: hsl(var(--warm-700));
+  --lp-fg-soft: hsl(var(--warm-600));
+  --lp-fg-faint: hsl(var(--warm-500));
 
-  --lp-footer-bg: #111827;
-  --lp-footer-fg-soft: #9CA3AF;
-  --lp-footer-border: #1F2937;
+  --lp-footer-bg: hsl(var(--forest-900));
+  --lp-footer-fg-soft: hsl(var(--warm-400));
+  --lp-footer-border: hsl(var(--forest-800));
 
-  --lp-action-blue: #2563EB;
-  --lp-create-purple: #9333EA;
+  --lp-action-blue: hsl(var(--tone-conversation-ink));
+  --lp-create-purple: hsl(var(--tone-teach-ink));
 
-  --lp-r: 0.5rem;
-  --lp-r-md: 0.375rem;
+  /* Four radii only: inputs, cards, panels, pills. */
   --lp-r-sm: 0.25rem;
+  --lp-r-md: 0.375rem;
+  --lp-r: 0.625rem;
+  --lp-r-xl: 1rem;
   --lp-r-full: 9999px;
-  --lp-r-xl: 0.75rem;
 
-  --lp-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / .05);
-  --lp-shadow-md: 0 4px 6px -1px rgb(0 0 0 / .1), 0 2px 4px -2px rgb(0 0 0 / .1);
-  --lp-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / .1), 0 4px 6px -4px rgb(0 0 0 / .1);
-  --lp-shadow-xl: 0 20px 25px -5px rgb(0 0 0 / .1), 0 8px 10px -6px rgb(0 0 0 / .1);
+  /* Depth is a hairline by default; real shadow is for things that float. */
+  --lp-shadow-sm: 0 1px 2px hsl(var(--warm-900) / .04);
+  --lp-shadow-md: 0 1px 2px hsl(var(--warm-900) / .04), 0 6px 16px -10px hsl(var(--warm-900) / .12);
+  --lp-shadow-lg: 0 1px 2px hsl(var(--warm-900) / .04), 0 12px 32px -14px hsl(var(--warm-900) / .16);
+  --lp-shadow-xl: 0 2px 4px hsl(var(--warm-900) / .04), 0 24px 60px -20px hsl(var(--warm-900) / .20);
 
-  font-family: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   color: var(--lp-fg);
   background: var(--lp-bg);
   font-size: 16px;
@@ -70,9 +74,15 @@
 }
 
 .lp *, .lp *::before, .lp *::after { box-sizing: border-box; }
-.lp h1,.lp h2,.lp h3,.lp h4,.lp h5 {
+.lp h1,.lp h2,.lp h3 {
+  font-family: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  font-variation-settings: 'SOFT' 40;
   color: var(--lp-fg); margin: 0;
-  letter-spacing: -0.015em; line-height: 1.1; font-weight: 700;
+  letter-spacing: -0.022em; line-height: 1.08; font-weight: 600;
+}
+.lp h4,.lp h5 {
+  color: var(--lp-fg); margin: 0;
+  letter-spacing: -0.01em; line-height: 1.2; font-weight: 600;
 }
 .lp p { margin: 0; color: var(--lp-fg-muted); }
 .lp a { color: inherit; text-decoration: none; }
@@ -263,11 +273,11 @@
 .lp .tone-conversation{ --tone-bg: var(--lp-type-conv-bg);    --tone-ink: var(--lp-type-conv-ink); }
 .lp .tone-teach       { --tone-bg: var(--lp-type-teach-bg);   --tone-ink: var(--lp-type-teach-ink); }
 .lp .tone-thought     { --tone-bg: var(--lp-type-thought-bg); --tone-ink: var(--lp-type-thought-ink); }
-.lp .tone-quiz        { --tone-bg: #FEF3C7; --tone-ink: #B45309; }
-.lp .tone-board       { --tone-bg: #D1FAE5; --tone-ink: #047857; }
-.lp .tone-tester      { --tone-bg: #EDE9FE; --tone-ink: #6D28D9; }
-.lp .tone-doc         { --tone-bg: #FAE8FF; --tone-ink: #A21CAF; }
-.lp .tone-task        { --tone-bg: #CFFAFE; --tone-ink: #0E7490; }
+.lp .tone-quiz        { --tone-bg: hsl(var(--tone-quiz-fill));      --tone-ink: hsl(var(--tone-quiz-ink)); }
+.lp .tone-board       { --tone-bg: hsl(var(--tone-board-fill));     --tone-ink: hsl(var(--tone-board-ink)); }
+.lp .tone-tester      { --tone-bg: hsl(var(--tone-tester-fill));    --tone-ink: hsl(var(--tone-tester-ink)); }
+.lp .tone-doc         { --tone-bg: hsl(var(--tone-doc-fill));       --tone-ink: hsl(var(--tone-doc-ink)); }
+.lp .tone-task        { --tone-bg: hsl(var(--tone-task-fill));      --tone-ink: hsl(var(--tone-task-ink)); }
 
 /* two-way conversation dual-bubble layout */
 .lp .tone-conversation .preview { gap: 6px; }
@@ -281,7 +291,7 @@
   font-size: 11px; color: var(--tone-ink); margin-top: 4px; font-weight: 500;
 }
 .lp .tone-conversation .preview .rec-dot {
-  width: 8px; height: 8px; background: #DC2626; border-radius: 50%;
+  width: 8px; height: 8px; background: hsl(var(--destructive)); border-radius: 50%;
   animation: lp-pulse 1.4s infinite;
 }
 
@@ -413,11 +423,11 @@
 .lp .price-card .per { font-size: 14px; color: var(--lp-fg-soft); }
 .lp .price-card .strike { font-size: 18px; color: var(--lp-fg-soft); text-decoration: line-through; font-weight: 500; }
 .lp .price-card .offer-line {
-  font-size: 13px; color: #DC2626; font-weight: 500;
+  font-size: 13px; color: hsl(var(--destructive)); font-weight: 500;
   margin-bottom: 22px; display: inline-flex; align-items: center; gap: 6px;
 }
 .lp .price-card .offer-line .badge {
-  background: #FEE2E2; color: #B91C1C;
+  background: hsl(6 60% 95%); color: hsl(var(--destructive));
   font-size: 11px; font-weight: 600;
   padding: 2px 8px; border-radius: var(--lp-r-full);
   text-transform: uppercase; letter-spacing: 0.04em;

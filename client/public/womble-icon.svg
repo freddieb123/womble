@@ -6,34 +6,34 @@
   </defs>
 
   <!-- Globe circle -->
-  <circle cx="50" cy="71" r="29" fill="none" stroke="#16a34a" stroke-width="2.4"/>
+  <circle cx="50" cy="71" r="29" fill="none" stroke="#1E5138" stroke-width="2.4"/>
 
   <!-- Latitude lines (clipped to globe) -->
-  <ellipse cx="50" cy="71" rx="29" ry="7.5" fill="none" stroke="#16a34a" stroke-width="1.5" clip-path="url(#gc)"/>
-  <ellipse cx="50" cy="58" rx="20" ry="5.2" fill="none" stroke="#16a34a" stroke-width="1.4" clip-path="url(#gc)"/>
-  <ellipse cx="50" cy="84" rx="20" ry="5.2" fill="none" stroke="#16a34a" stroke-width="1.4" clip-path="url(#gc)"/>
+  <ellipse cx="50" cy="71" rx="29" ry="7.5" fill="none" stroke="#1E5138" stroke-width="1.5" clip-path="url(#gc)"/>
+  <ellipse cx="50" cy="58" rx="20" ry="5.2" fill="none" stroke="#1E5138" stroke-width="1.4" clip-path="url(#gc)"/>
+  <ellipse cx="50" cy="84" rx="20" ry="5.2" fill="none" stroke="#1E5138" stroke-width="1.4" clip-path="url(#gc)"/>
 
   <!-- Meridian lines -->
-  <path d="M50 42 C65 57 64 86 50 100" fill="none" stroke="#16a34a" stroke-width="1.4" clip-path="url(#gc)"/>
-  <path d="M50 42 C35 57 36 86 50 100" fill="none" stroke="#16a34a" stroke-width="1.4" clip-path="url(#gc)"/>
+  <path d="M50 42 C65 57 64 86 50 100" fill="none" stroke="#1E5138" stroke-width="1.4" clip-path="url(#gc)"/>
+  <path d="M50 42 C35 57 36 86 50 100" fill="none" stroke="#1E5138" stroke-width="1.4" clip-path="url(#gc)"/>
 
   <!-- Graduation cap — drawn on top of globe -->
   <!-- Board (mortarboard, wide rhombus) -->
-  <polygon points="50,11 88,26 50,41 12,26" fill="#16a34a"/>
+  <polygon points="50,11 88,26 50,41 12,26" fill="#1E5138"/>
   <!-- Brim underside -->
-  <ellipse cx="50" cy="41" rx="20" ry="5.5" fill="#0d6b24"/>
+  <ellipse cx="50" cy="41" rx="20" ry="5.5" fill="#163526"/>
   <!-- Tassel string -->
-  <line x1="88" y1="26" x2="88" y2="47" stroke="#16a34a" stroke-width="2" stroke-linecap="round"/>
+  <line x1="88" y1="26" x2="88" y2="47" stroke="#1E5138" stroke-width="2" stroke-linecap="round"/>
   <!-- Tassel ball -->
-  <circle cx="88" cy="50" r="3" fill="#16a34a"/>
+  <circle cx="88" cy="50" r="3" fill="#1E5138"/>
 
   <!-- Sparkles (4-pointed stars) -->
   <!-- Large, upper-left -->
-  <path d="M12,52 L14,46 L16,52 L22,54 L16,56 L14,62 L12,56 L6,54 Z" fill="#16a34a"/>
+  <path d="M12,52 L14,46 L16,52 L22,54 L16,56 L14,62 L12,56 L6,54 Z" fill="#1E5138"/>
   <!-- Medium, right -->
-  <path d="M83,64 L84.8,59.5 L86.5,64 L91,65.8 L86.5,67.5 L84.8,72 L83,67.5 L78.5,65.8 Z" fill="#16a34a"/>
+  <path d="M83,64 L84.8,59.5 L86.5,64 L91,65.8 L86.5,67.5 L84.8,72 L83,67.5 L78.5,65.8 Z" fill="#1E5138"/>
   <!-- Small, lower-left -->
-  <path d="M14,79 L15.5,75 L17,79 L21,80.5 L17,82 L15.5,86 L14,82 L10,80.5 Z" fill="#16a34a"/>
+  <path d="M14,79 L15.5,75 L17,79 L21,80.5 L17,82 L15.5,86 L14,82 L10,80.5 Z" fill="#1E5138"/>
   <!-- Small, upper-right area -->
-  <path d="M80,48 L81.4,44.5 L82.8,48 L86.5,49.5 L82.8,51 L81.4,54.5 L80,51 L76.3,49.5 Z" fill="#16a34a"/>
+  <path d="M80,48 L81.4,44.5 L82.8,48 L86.5,49.5 L82.8,51 L81.4,54.5 L80,51 L76.3,49.5 Z" fill="#1E5138"/>
 </svg>

@@ -434,10 +434,10 @@ export default function LandingPage() {
               <div className="visual visual-leaderboard">
                 <div className="lb-h"><Trophy style={{ width: 11, height: 11 }} /> Live leaderboard</div>
                 {[
-                  { pos: "1", initial: "M", name: "Maya", color: "#16A34A", dots: [1,1,1,1,1] },
-                  { pos: "2", initial: "S", name: "Sam",  color: "#2563EB", dots: [1,1,1,1,0] },
-                  { pos: "3", initial: "A", name: "Alex", color: "#9333EA", dots: [1,1,1,0,0] },
-                  { pos: "4", initial: "J", name: "Jo",   color: "#F97316", dots: [1,1,0,0,0], faint: true },
+                  { pos: "1", initial: "M", name: "Maya", color: "hsl(var(--forest-700))", dots: [1,1,1,1,1] },
+                  { pos: "2", initial: "S", name: "Sam",  color: "hsl(var(--tone-conversation-ink))", dots: [1,1,1,1,0] },
+                  { pos: "3", initial: "A", name: "Alex", color: "hsl(var(--tone-teach-ink))", dots: [1,1,1,0,0] },
+                  { pos: "4", initial: "J", name: "Jo",   color: "hsl(var(--tone-quickfire-ink))", dots: [1,1,0,0,0], faint: true },
                 ].map(({ pos, initial, name, color, dots, faint }) => (
                   <div className="lb-row" key={name} style={faint ? { opacity: 0.55 } : undefined}>
                     <span className="pos">{pos}</span>
@@ -464,7 +464,7 @@ export default function LandingPage() {
                 ].map(({ label, pct, count, orange }) => (
                   <div className="dash-row" key={label}>
                     <span style={{ width: 60, fontSize: 11 }}>{label}</span>
-                    <span className="bar"><i style={{ width: `${pct}%`, background: orange ? "#F97316" : undefined }} /></span>
+                    <span className="bar"><i style={{ width: `${pct}%`, background: orange ? "hsl(var(--tone-quickfire-ink))" : undefined }} /></span>
                     <span className="dash-count">{count}</span>
                   </div>
                 ))}

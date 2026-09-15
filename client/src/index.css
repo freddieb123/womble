@@ -4,59 +4,171 @@
 @tailwind utilities;
 
 @layer base {
+  /* =========================================================================
+     MARGINALIA — Womble design system v1
+     Ramps are generated in OKLCH so steps are perceptually even.
+     Style components from the SEMANTIC tokens below, never from a ramp step.
+     ========================================================================= */
   :root {
-    --background: 210 20% 98%;
-    --foreground: 222 47% 11%;
+    /* — Forest: primary — */
+    --forest-50: 143 40% 96%;
+    --forest-100: 143 41% 91%;
+    --forest-200: 146 35% 83%;
+    --forest-300: 146 28% 71%;
+    --forest-400: 147 21% 55%;
+    --forest-500: 148 25% 39%;
+    --forest-600: 149 32% 29%;
+    --forest-700: 151 46% 22%;
+    --forest-800: 151 41% 15%;
+    --forest-900: 150 46% 9%;
+
+    /* — Honey: accent and marker — */
+    --honey-50: 38 100% 96%;
+    --honey-100: 43 87% 88%;
+    --honey-200: 35 100% 83%;
+    --honey-300: 35 90% 72%;
+    --honey-400: 36 77% 61%;
+    --honey-500: 38 68% 48%;
+    --honey-600: 38 77% 37%;
+    --honey-700: 38 80% 29%;
+    --honey-800: 38 78% 22%;
+    --honey-900: 37 71% 16%;
+
+    /* — Warm neutral: everything else — */
+    --warm-50: 45 33% 98%;
+    --warm-100: 34 24% 94%;
+    --warm-200: 38 14% 89%;
+    --warm-300: 42 10% 81%;
+    --warm-400: 40 5% 64%;
+    --warm-500: 42 4% 49%;
+    --warm-600: 42 5% 38%;
+    --warm-700: 37 6% 27%;
+    --warm-800: 43 8% 17%;
+    --warm-900: 60 6% 10%;
+
+    /* — Semantic — */
+    --background: var(--warm-50);
+    --foreground: var(--warm-900);
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: var(--warm-900);
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: var(--warm-900);
 
-    --primary: 142 63% 32%;
+    --primary: var(--forest-700);
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 20% 96%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: var(--warm-100);
+    --secondary-foreground: var(--warm-900);
 
-    --muted: 210 20% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: var(--warm-100);
+    --muted-foreground: var(--warm-600);
 
-    --accent: 142 44% 94%;
-    --accent-foreground: 142 72% 24%;
+    --accent: var(--forest-50);
+    --accent-foreground: var(--forest-800);
 
-    --destructive: 0 72% 51%;
+    --destructive: 6 55% 38%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 20% 90%;
-    --input: 214 20% 88%;
-    --ring: 142 63% 32%;
+    --border: var(--warm-300);
+    --input: var(--warm-300);
+    --ring: var(--forest-700);
 
-    --radius: 0.5rem;
+    --radius: 0.625rem;
 
-    --chart-1: 142 63% 32%;
-    --chart-2: 199 89% 48%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 262 83% 58%;
-    --chart-5: 0 72% 51%;
+    /* — The marker: the one signature move — */
+    --mark: var(--honey-100);
+    --mark-ink: var(--honey-800);
+
+    /* — Activity tones: constant OKLCH L/C, hue varied, so nine
+         different colours read as one family (6.5:1–7.6:1 throughout) — */
+    --tone-chat-fill: 132 63% 91%;          --tone-chat-ink: 147 100% 18%;
+    --tone-conversation-fill: 202 100% 92%; --tone-conversation-ink: 205 100% 27%;
+    --tone-teach-fill: 265 100% 95%;        --tone-teach-ink: 264 38% 37%;
+    --tone-thought-fill: 189 96% 90%;       --tone-thought-ink: 190 100% 22%;
+    --tone-quiz-fill: 40 86% 89%;           --tone-quiz-ink: 40 100% 21%;
+    --tone-quickfire-fill: 27 100% 91%;     --tone-quickfire-ink: 27 100% 24%;
+    --tone-board-fill: 167 72% 89%;         --tone-board-ink: 169 100% 19%;
+    --tone-tester-fill: 309 100% 95%;       --tone-tester-ink: 304 38% 31%;
+    --tone-doc-fill: 7 100% 94%;            --tone-doc-ink: 2 50% 34%;
+    --tone-upload-fill: 120 55% 91%;        --tone-upload-ink: 122 90% 18%;
+    --tone-task-fill: 275 90% 94%;          --tone-task-ink: 274 40% 35%;
+
+    --chart-1: var(--forest-600);
+    --chart-2: var(--honey-600);
+    --chart-3: 205 100% 27%;
+    --chart-4: 304 38% 31%;
+    --chart-5: 27 100% 24%;
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 215 25% 27%;
-    --sidebar-primary: 142 63% 32%;
+    --sidebar-foreground: var(--warm-700);
+    --sidebar-primary: var(--forest-700);
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 142 44% 94%;
-    --sidebar-accent-foreground: 142 72% 24%;
-    --sidebar-border: 214 20% 90%;
-    --sidebar-ring: 142 63% 32%;
+    --sidebar-accent: var(--forest-50);
+    --sidebar-accent-foreground: var(--forest-800);
+    --sidebar-border: var(--warm-300);
+    --sidebar-ring: var(--forest-700);
+  }
+
+  /* Dark mode. Tailwind is configured darkMode:["class"], so this applies
+     when .dark is set on <html>. Forest and honey lighten to stay legible
+     on a dark ground; the neutral keeps its warm bias. */
+  .dark {
+    --background: 120 5% 8%;
+    --foreground: var(--warm-100);
+
+    --card: 130 6% 11%;
+    --card-foreground: var(--warm-100);
+
+    --popover: 130 6% 11%;
+    --popover-foreground: var(--warm-100);
+
+    --primary: var(--forest-300);
+    --primary-foreground: var(--forest-900);
+
+    --secondary: 135 5% 14%;
+    --secondary-foreground: var(--warm-100);
+
+    --muted: 135 5% 14%;
+    --muted-foreground: var(--warm-400);
+
+    --accent: 150 12% 13%;
+    --accent-foreground: var(--forest-200);
+
+    --destructive: 6 60% 58%;
+    --destructive-foreground: 120 5% 8%;
+
+    --border: 135 6% 20%;
+    --input: 135 6% 20%;
+    --ring: var(--forest-300);
+
+    --mark: 40 47% 15%;
+    --mark-ink: var(--honey-200);
+
+    --sidebar-background: 130 6% 11%;
+    --sidebar-foreground: var(--warm-200);
+    --sidebar-primary: var(--forest-300);
+    --sidebar-primary-foreground: var(--forest-900);
+    --sidebar-accent: 150 12% 13%;
+    --sidebar-accent-foreground: var(--forest-200);
+    --sidebar-border: 135 6% 20%;
+    --sidebar-ring: var(--forest-300);
   }
 
   html {
-    font-family: 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: 'IBM Plex Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
-  
+
+  /* Display face. Never below 19px — at small sizes Fraunces becomes noise. */
+  .font-display {
+    font-family: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+    font-variation-settings: 'SOFT' 40, 'WONK' 1;
+    letter-spacing: -0.022em;
+  }
+
   .landing-page-font {
-    font-family: 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: 'IBM Plex Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
 }
 
@@ -72,9 +184,23 @@
 
   h1,
   h2,
-  h3,
+  h3 {
+    font-family: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+    font-variation-settings: 'SOFT' 40;
+    letter-spacing: -0.02em;
+  }
+
   h4 {
     @apply tracking-normal;
+  }
+
+  /* The marker — one signature move. Box-shadow spread rather than padding so
+     the highlight bleeds past the glyphs without disturbing the line box. */
+  .mark {
+    background: hsl(var(--mark));
+    color: hsl(var(--mark-ink));
+    box-shadow: 0 0 0 4px hsl(var(--mark));
+    border-radius: 2px;
   }
 }
 

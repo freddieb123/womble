@@ -1612,7 +1612,7 @@ export default function Home() {
                         <div className="text-center py-4">
                           <div className="relative w-16 h-16 mx-auto mb-3">
                             <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
-                              <circle cx="32" cy="32" r="26" fill="none" stroke="#e5e7eb" strokeWidth="5" />
+                              <circle cx="32" cy="32" r="26" fill="none" stroke="hsl(var(--border))" strokeWidth="5" />
                               <circle cx="32" cy="32" r="26" fill="none" stroke="hsl(var(--primary))" strokeWidth="5"
                                 strokeDasharray={`${2 * Math.PI * 26}`}
                                 strokeDashoffset={`${2 * Math.PI * 26 * (1 - suggestionsProgress / 100)}`}

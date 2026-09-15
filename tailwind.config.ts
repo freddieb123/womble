@@ -10,7 +10,37 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      fontFamily: {
+        display: ["Fraunces", "Iowan Old Style", "Georgia", "serif"],
+        sans: ["IBM Plex Sans", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
+        mono: ["IBM Plex Mono", "ui-monospace", "SF Mono", "Menlo", "monospace"],
+      },
       colors: {
+        forest: {
+          50: "hsl(var(--forest-50))", 100: "hsl(var(--forest-100))",
+          200: "hsl(var(--forest-200))", 300: "hsl(var(--forest-300))",
+          400: "hsl(var(--forest-400))", 500: "hsl(var(--forest-500))",
+          600: "hsl(var(--forest-600))", 700: "hsl(var(--forest-700))",
+          800: "hsl(var(--forest-800))", 900: "hsl(var(--forest-900))",
+        },
+        honey: {
+          50: "hsl(var(--honey-50))", 100: "hsl(var(--honey-100))",
+          200: "hsl(var(--honey-200))", 300: "hsl(var(--honey-300))",
+          400: "hsl(var(--honey-400))", 500: "hsl(var(--honey-500))",
+          600: "hsl(var(--honey-600))", 700: "hsl(var(--honey-700))",
+          800: "hsl(var(--honey-800))", 900: "hsl(var(--honey-900))",
+        },
+        warm: {
+          50: "hsl(var(--warm-50))", 100: "hsl(var(--warm-100))",
+          200: "hsl(var(--warm-200))", 300: "hsl(var(--warm-300))",
+          400: "hsl(var(--warm-400))", 500: "hsl(var(--warm-500))",
+          600: "hsl(var(--warm-600))", 700: "hsl(var(--warm-700))",
+          800: "hsl(var(--warm-800))", 900: "hsl(var(--warm-900))",
+        },
+        mark: {
+          DEFAULT: "hsl(var(--mark))",
+          foreground: "hsl(var(--mark-ink))",
+        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {
