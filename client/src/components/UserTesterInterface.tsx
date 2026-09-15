@@ -19,6 +19,28 @@ interface Props {
 type ConnectionState = 'idle' | 'connecting' | 'active' | 'ended';
 type ActivityState = 'idle' | 'listening' | 'speaking';
 
+// ---------------------------------------------------------------------------
+// Screen capture tuning.
+// Frames travel over the SAME WebSocket as the mic audio, so oversized or
+// over-frequent frames queue ahead of speech and delay Gemini's spoken replies.
+// Every frame is also tokenised into the session context, so a high rate makes
+// responses slower the longer the session runs. Keep this conservative.
+// ---------------------------------------------------------------------------
+const FRAME_INTERVAL_MS = 1500;
+const FRAME_MAX_WIDTH = 960;
+const FRAME_MAX_HEIGHT = 540;
+const FRAME_QUALITY = 0.4;
+const PREVIEW_WIDTH = 320;
+const PREVIEW_QUALITY = 0.5;
+// Re-send an unchanged frame occasionally so the model keeps recent visual
+// context even while the learner's screen is static.
+const MAX_SKIPPED_FRAMES = 10;
+
+// Verbose Gemini logging is opt-in — it stringifies every inbound message,
+// including base64 audio chunks, on the main thread during playback.
+const DEBUG_GEMINI = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).has('debugGemini');
+
 // Resample PCM buffer from one sample rate to another (mono, float32)
 function resampleBuffer(buffer: Float32Array, inputRate: number, outputRate: number): Float32Array {
   if (inputRate === outputRate) return buffer;
@@ -94,6 +116,9 @@ export default function UserTesterInterface({ config, sessionId, userName, onUse
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const screenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const lastFrameRef = useRef<string | null>(null);
+  const skippedFramesRef = useRef(0);
   const transcriptRef = useRef<Message[]>([]);
   // Queue for sequential audio playback
   const audioQueueRef = useRef<Float32Array[]>([]);
@@ -174,7 +199,7 @@ export default function UserTesterInterface({ config, sessionId, userName, onUse
   }, []);
 
   const handleGeminiMessage = useCallback((msg: any) => {
-    console.log('[Gemini] message:', JSON.stringify(msg, null, 2));
+    if (DEBUG_GEMINI) console.log('[Gemini] message:', JSON.stringify(msg, null, 2));
     try {
       // Interruption — stop buffered audio immediately
       if (msg.serverContent?.interrupted) {
@@ -318,31 +343,59 @@ export default function UserTesterInterface({ config, sessionId, userName, onUse
       screenVideoRef.current = video;
 
       const canvas = document.createElement('canvas');
-      canvas.width = 1280;
-      canvas.height = 720;
+      canvas.width = FRAME_MAX_WIDTH;
+      canvas.height = FRAME_MAX_HEIGHT;
       screenCanvasRef.current = canvas;
 
-      // Send first frame once video is ready
+      // Separate, much smaller canvas for the on-screen thumbnail so the frame
+      // sent to Gemini is never re-encoded at preview size (or vice versa).
+      const previewCanvas = document.createElement('canvas');
+      previewCanvas.width = PREVIEW_WIDTH;
+      previewCanvas.height = Math.round(PREVIEW_WIDTH * FRAME_MAX_HEIGHT / FRAME_MAX_WIDTH);
+      previewCanvasRef.current = previewCanvas;
+
+      // Fit the capture inside FRAME_MAX_WIDTH x FRAME_MAX_HEIGHT without
+      // distorting it — shared windows are not always 16:9.
       video.onloadedmetadata = () => {
-        canvas.width = video.videoWidth || 1280;
-        canvas.height = video.videoHeight || 720;
+        const srcW = video.videoWidth || FRAME_MAX_WIDTH;
+        const srcH = video.videoHeight || FRAME_MAX_HEIGHT;
+        const scale = Math.min(FRAME_MAX_WIDTH / srcW, FRAME_MAX_HEIGHT / srcH, 1);
+        canvas.width = Math.round(srcW * scale);
+        canvas.height = Math.round(srcH * scale);
+        previewCanvas.width = PREVIEW_WIDTH;
+        previewCanvas.height = Math.round((canvas.height / canvas.width) * PREVIEW_WIDTH);
         video.play();
       };
 
-      // Capture and send a frame every 3 seconds (cost-effective)
+      // Downscale, encode and send a frame on a fixed interval. Identical
+      // frames are skipped: a static screen would otherwise re-send the same
+      // JPEG every tick, for no extra information.
       frameIntervalRef.current = setInterval(() => {
-        if (!sessionRef.current || !screenVideoRef.current || !screenCanvasRef.current) return;
-        const ctx = screenCanvasRef.current.getContext('2d');
+        const canvasEl = screenCanvasRef.current;
+        const videoEl = screenVideoRef.current;
+        if (!sessionRef.current || !videoEl || !canvasEl) return;
+        const ctx = canvasEl.getContext('2d');
         if (!ctx) return;
-        ctx.drawImage(screenVideoRef.current, 0, 0, screenCanvasRef.current.width, screenCanvasRef.current.height);
-        const dataUrl = screenCanvasRef.current.toDataURL('image/jpeg', 0.6);
-        const base64 = dataUrl.split(',')[1];
-        if (base64) {
-          sessionRef.current.sendRealtimeInput({ video: { data: base64, mimeType: 'image/jpeg' } });
+        ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+        const base64 = canvasEl.toDataURL('image/jpeg', FRAME_QUALITY).split(',')[1];
+        if (!base64) return;
+
+        if (base64 === lastFrameRef.current && skippedFramesRef.current < MAX_SKIPPED_FRAMES) {
+          skippedFramesRef.current++;
+          return;
         }
-        // Update preview thumbnail
-        setScreenPreviewUrl(dataUrl);
-      }, 750);
+        lastFrameRef.current = base64;
+        skippedFramesRef.current = 0;
+        sessionRef.current.sendRealtimeInput({ video: { data: base64, mimeType: 'image/jpeg' } });
+
+        // Thumbnail encoded separately, and only when the screen actually changed.
+        const previewEl = previewCanvasRef.current;
+        const previewCtx = previewEl?.getContext('2d');
+        if (previewEl && previewCtx) {
+          previewCtx.drawImage(canvasEl, 0, 0, previewEl.width, previewEl.height);
+          setScreenPreviewUrl(previewEl.toDataURL('image/jpeg', PREVIEW_QUALITY));
+        }
+      }, FRAME_INTERVAL_MS);
 
       setConnectionState('active');
 
@@ -373,6 +426,9 @@ export default function UserTesterInterface({ config, sessionId, userName, onUse
     screenStreamRef.current = null;
     screenVideoRef.current = null;
     screenCanvasRef.current = null;
+    previewCanvasRef.current = null;
+    lastFrameRef.current = null;
+    skippedFramesRef.current = 0;
     setScreenPreviewUrl(null);
   };
 
